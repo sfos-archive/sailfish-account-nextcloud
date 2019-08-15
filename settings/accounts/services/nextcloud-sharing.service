@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<service id="nextcloud-sharing">
+    <type>sharing</type>
+    <name>Nextcloud Sharing</name>
+    <icon>image://theme/icon-m-share</icon>
+    <provider>nextcloud</provider>
+
+    <template>
+        <group name="auth">
+            <setting name="method">password</setting>
+            <setting name="mechanism">password</setting>
+        </group>
+    </template>
+</service>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<service id="nextcloud-backup">
+    <type>storage</type>
+    <name>Nextcloud Backup Storage</name>
+    <icon>image://theme/icon-m-storage</icon>
+    <provider>nextcloud</provider>
+
+    <template>
+        <setting name="sync_profile_templates" type="as">["nextcloud.Backup"]</setting>
+        <group name="auth">
+            <setting name="method">password</setting>
+            <setting name="mechanism">password</setting>
+        </group>
+    </template>
+</service>
