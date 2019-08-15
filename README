@@ -1,0 +1,8 @@
+TODO:
+
+Add the skeleton for the new Nextcloud account:
+- the accounts&sso plugin files (.provider/.service)
+- the settings-accounts ui plugin files (.qml)
+- the buteo sync plugins specific to Nextcloud
+- the transfer engine sharing plugin for Nextcloud
+
