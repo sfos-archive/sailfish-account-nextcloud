@@ -86,6 +86,41 @@ Provides synchronisation of gallery images with Nextcloud.
 %config %{_sysconfdir}/buteo/profiles/sync/nextcloud.Images.xml
 
 
+%package -n jolla-gallery-extension-nextcloud
+Summary:   Provides integration of Nextcloud images into Gallery application
+Group:     System/Libraries
+
+%description -n jolla-gallery-extension-nextcloud
+Provides integration of Nextcloud images into Gallery application.
+
+%files -n jolla-gallery-extension-nextcloud
+%defattr(-,root,root,-)
+%{_datadir}/translations/gallery-extension-nextcloud_eng_en.qm
+%{_datadir}/jolla-gallery/mediasources/NextcloudCacheMediaSource.qml
+%{_libdir}/qt5/qml/com/jolla/gallery/nextcloud/NextcloudGalleryIcon.qml
+%{_libdir}/qt5/qml/com/jolla/gallery/nextcloud/NextcloudUsersPage.qml
+%{_libdir}/qt5/qml/com/jolla/gallery/nextcloud/NextcloudAlbumsPage.qml
+%{_libdir}/qt5/qml/com/jolla/gallery/nextcloud/NextcloudAlbumDelegate.qml
+%{_libdir}/qt5/qml/com/jolla/gallery/nextcloud/NextcloudPhotoGridPage.qml
+%{_libdir}/qt5/qml/com/jolla/gallery/nextcloud/NextcloudFullscreenPhotoPage.qml
+%{_libdir}/qt5/qml/com/jolla/gallery/nextcloud/qmldir
+%{_libdir}/qt5/qml/com/jolla/gallery/nextcloud/libjollagallerynextcloudplugin.so
+%dir %{_libdir}/qt5/qml/com/jolla/gallery/nextcloud
+
+
+%package -n jolla-gallery-extension-nextcloud-ts-devel
+Summary:  Translation source for Gallery Nextcloud plugin
+Group:    System/Libraries
+Requires: jolla-gallery-extension-nextcloud
+
+%description -n jolla-gallery-extension-nextcloud-ts-devel
+Translation source for Gallery Nextcloud plugin.
+
+%files -n jolla-gallery-extension-nextcloud-ts-devel
+%defattr(-,root,root,-)
+%{_datadir}/translations/source/gallery-extension-nextcloud.ts
+
+
 %package -n transferengine-plugin-nextcloud
 Summary: Nextcloud file sharing plugin for Transfer Engine
 Group: System/Libraries
