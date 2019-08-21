@@ -13,6 +13,11 @@ import Sailfish.Accounts 1.0
 import com.jolla.settings.accounts 1.0
 
 OnlineSyncAccountSettingsAgent {
-    carddavService: accountManager.service("nextcloud-carddav")
-    caldavService: accountManager.service("nextcloud-caldav")
+    services: [
+        accountManager.service("nextcloud-carddav"),
+        accountManager.service("nextcloud-caldav"),
+        accountManager.service("nextcloud-images"),
+        accountManager.service("nextcloud-backup"),
+        accountManager.service("nextcloud-sharing")
+    ]
 }
