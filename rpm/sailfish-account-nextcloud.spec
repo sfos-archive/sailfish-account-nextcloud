@@ -167,7 +167,7 @@ Translation source for Nextcloud Transfer Engine share plugin.
 %setup -q -n %{name}-%{version}
 
 %build
-%qmake5 "VERSION=%{version}"
+%qmake5 "VERSION=%{version}" "DEFINES+=BUTEO_OUT_OF_PROCESS_SUPPORT"
 make
 
 %install
