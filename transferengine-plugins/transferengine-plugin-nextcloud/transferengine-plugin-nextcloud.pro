@@ -16,21 +16,16 @@ HEADERS += nextcloudshareplugin.h \
            nextclouduploader.h \
            nextcloudshareservicestatus.h \
            nextcloudapi.h \
-           nextcloudplugininfo.h
+           nextcloudplugininfo.h \
+           auth_p.h
 
 SOURCES += nextcloudshareplugin.cpp \
            nextclouduploader.cpp \
            nextcloudplugininfo.cpp \
            nextcloudshareservicestatus.cpp \
-           nextcloudapi.cpp
-
-OTHER_FILES += *.qml
-
-shareui.files = NextcloudShareImage.qml
-shareui.path = /usr/share/nemo-transferengine/plugins
+           nextcloudapi.cpp \
+           auth.cpp
 
 target.path = /usr/lib/nemo-transferengine/plugins
 
-INSTALLS += target shareui
-
-include(translations/translations.pri)
+INSTALLS += target

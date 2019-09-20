@@ -16,6 +16,7 @@ class NextcloudShareServiceStatus;
 class NextcloudPluginInfo : public TransferPluginInfo
 {
     Q_OBJECT
+
 public:
     NextcloudPluginInfo();
     ~NextcloudPluginInfo();

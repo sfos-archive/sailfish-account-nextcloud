@@ -146,8 +146,12 @@ Nextcloud file sharing plugin for Transfer Engine.
 %files -n transferengine-plugin-nextcloud
 %defattr(-,root,root,-)
 %{_libdir}/nemo-transferengine/plugins/libnextcloudshareplugin.so
-%{_datadir}/nemo-transferengine/plugins/NextcloudShareImage.qml
+%{_datadir}/nemo-transferengine/plugins/NextcloudShareDialog.qml
 %{_datadir}/translations/sailfish_transferengine_plugin_nextcloud_eng_en.qm
+%{_libdir}/qt5/qml/Sailfish/TransferEngine/Nextcloud/qmldir
+%{_libdir}/qt5/qml/Sailfish/TransferEngine/Nextcloud/NextcloudShareFile.qml
+%{_libdir}/qt5/qml/Sailfish/TransferEngine/Nextcloud/libsailfishtransferenginenextcloudplugin.so
+%dir %{_libdir}/qt5/qml/Sailfish/TransferEngine/Nextcloud
 
 
 %package -n transferengine-plugin-nextcloud-ts-devel

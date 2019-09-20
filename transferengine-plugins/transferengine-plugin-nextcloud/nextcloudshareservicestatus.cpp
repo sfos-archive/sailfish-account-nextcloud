@@ -9,63 +9,158 @@
 
 #include "nextcloudshareservicestatus.h"
 
-#include <Accounts/Account>
-#include <SignOn/SessionData>
 #include <QtDebug>
 
-#define NEXTCLOUD_PROVIDER_NAME    "nextcloud"
-#define NEXTCLOUD_SERVICE_NAME     "nextcloud-sharing"
-
 NextcloudShareServiceStatus::NextcloudShareServiceStatus(QObject *parent)
-    : QObject(parent)
+    : Auth(parent)
 {
+    connect(this, &Auth::signInCompleted, this, &NextcloudShareServiceStatus::signInResponseHandler);
+    connect(this, &Auth::signInError, this, &NextcloudShareServiceStatus::signInErrorHandler);
 }
 
-bool NextcloudShareServiceStatus::signInParameters(QVariantMap *params) const
+void NextcloudShareServiceStatus::signInResponseHandler(int accountId, const QString &serverAddress, const QString &webdavPath, const QString &username, const QString &password, const QString &accessToken, bool ignoreSslErrors)
 {
-    if (!params) {
-        qWarning() << Q_FUNC_INFO << "NULL SignInParams object!";
-        return false;
+    if (!m_accountIdToDetailsIdx.contains(accountId)) {
+        return;
     }
 
-    QString clientId = storedKeyValue(NEXTCLOUD_PROVIDER_NAME, NEXTCLOUD_SERVICE_NAME, "client_id");
-    QString clientSecret = storedKeyValue(NEXTCLOUD_PROVIDER_NAME, NEXTCLOUD_SERVICE_NAME, "client_secret");
-    if (clientId.isEmpty() || clientSecret.isEmpty()) {
-        qWarning() << Q_FUNC_INFO << "No valid OAuth2 keys found";
-        return false;
-    }
+    AccountDetails &accountDetails(m_accountDetails[m_accountIdToDetailsIdx[accountId]]);
+    accountDetails.accessToken = accessToken;
+    accountDetails.username = username;
+    accountDetails.password = password;
+    accountDetails.serverAddress = serverAddress;
+    accountDetails.webdavPath = webdavPath.isEmpty() ? QStringLiteral("/remote.php/webdav/") : webdavPath;
+    accountDetails.photosPath = accountDetails.webdavPath.endsWith("/")
+                              ? QStringLiteral("%1Photos/").arg(accountDetails.webdavPath)
+                              : QStringLiteral("%1/Photos/").arg(accountDetails.webdavPath);
+    accountDetails.documentsPath = accountDetails.webdavPath.endsWith("/")
+                              ? QStringLiteral("%1Documents/").arg(accountDetails.webdavPath)
+                              : QStringLiteral("%1/Documents/").arg(accountDetails.webdavPath);
+    accountDetails.ignoreSslErrors = ignoreSslErrors;
 
-    // Set required parameters for the Nextcloud
-    params->insert("ClientId", clientId);
-    params->insert("ClientSecret", clientSecret);
-    params->insert("UiPolicy", SignOn::NoUserInteractionPolicy);
-    return true;
+    setAccountDetailsState(accountId, Populated);
 }
 
-bool NextcloudShareServiceStatus::signInResponseHandler(const QVariantMap &receivedData, QVariantMap &outputData)
+void NextcloudShareServiceStatus::signInErrorHandler(int accountId)
 {
-    QLatin1String accessToken("AccessToken");
-    if (!receivedData.contains(accessToken)) {
-        return false;
+    setAccountDetailsState(accountId, Error);
+}
+
+void NextcloudShareServiceStatus::setAccountDetailsState(int accountId, AccountDetailsState state)
+{
+    if (!m_accountIdToDetailsIdx.contains(accountId)) {
+        return;
     }
 
-    Accounts::Account *account = receivedData.value("account").value<Accounts::Account*>();
-    if (!account) {
-        qWarning() << Q_FUNC_INFO << "Empty account";
-        return false;
+    m_accountDetailsState[accountId] = state;
+
+    bool anyWaiting = false;
+    bool anyPopulated = false;
+    Q_FOREACH (const int accountId, m_accountDetailsState.keys()) {
+        AccountDetailsState accState = m_accountDetailsState.value(accountId, NextcloudShareServiceStatus::Waiting);
+        if (accState == NextcloudShareServiceStatus::Waiting) {
+            anyWaiting = true;
+        } else if (accState == NextcloudShareServiceStatus::Populated) {
+            anyPopulated = true;
+        }
     }
 
-    QString host = account->value(QStringLiteral("api/Host")).toString();
-    if (host.isEmpty()) {
-        qWarning() << Q_FUNC_INFO << "Missing response parameters";
-        return false;
+    if (!anyWaiting) {
+        if (anyPopulated) {
+            emit serviceReady();
+        } else {
+            emit serviceError(QStringLiteral("Unable to retrieve Nextcloud account credentials"));
+        }
+    }
+}
+
+int NextcloudShareServiceStatus::count() const
+{
+    return m_accountDetails.count();
+}
+
+void NextcloudShareServiceStatus::queryStatus(QueryStatusMode mode)
+{
+    m_accountDetails.clear();
+    m_accountIdToDetailsIdx.clear();
+    m_accountDetailsState.clear();
+
+    bool signInActive = false;
+    foreach(uint id, manager()->accountList()) {
+        Accounts::Account *acc = manager()->account(id);
+
+        if (!acc) {
+            qWarning() << Q_FUNC_INFO << "Failed to get account for id: " << id;
+            continue;
+        }
+
+        acc->selectService(Accounts::Service());
+        const Accounts::Service service(manager()->service(m_serviceName));
+        const Accounts::ServiceList services = acc->services();
+        bool found = false;
+        Q_FOREACH (const Accounts::Service &s, services) {
+            if (s.name() == m_serviceName) {
+                found = true;
+                break;
+            }
+        }
+
+        if (acc->enabled() && service.isValid() && found) {
+            if (acc->value(QStringLiteral("CredentialsNeedUpdate")).toBool() == true) {
+                // credentials need update for global service, skip the account
+                qWarning() << Q_FUNC_INFO << "Credentials need update for account id: " << id;
+                continue;
+            }
+            acc->selectService(service);
+            if (acc->value(QStringLiteral("CredentialsNeedUpdate")).toBool() == true) {
+                // credentials need update for sharing service, skip the account
+                qWarning() << Q_FUNC_INFO << "Credentials need update for account id: " << id;
+                acc->selectService(Accounts::Service());
+                continue;
+            }
+
+            if (acc->enabled()) {
+                if (!m_accountIdToDetailsIdx.contains(id)) {
+                    AccountDetails details;
+                    details.accountId = id;
+                    details.providerName = manager()->provider(acc->providerName()).displayName();
+                    details.serviceName = manager()->service(m_serviceName).displayName();
+                    details.displayName = acc->displayName();
+                    m_accountIdToDetailsIdx.insert(id, m_accountDetails.size());
+                    m_accountDetails.append(details);
+                }
+
+                if (mode == NextcloudShareServiceStatus::SignInMode) {
+                    signInActive = true;
+                    signIn(id);
+                }
+            }
+            acc->selectService(Accounts::Service());
+        }
     }
 
-    QString contentApiUrl = account->value(QStringLiteral("api/Host")).toString();
+    // either no enabled accounts, or mode was passive (no sign in required).
+    if (!signInActive) {
+        emit serviceReady();
+    }
+}
 
-    outputData.insert(QStringLiteral("host"), host);
-    outputData.insert(accessToken, receivedData[accessToken]);
-    outputData.insert(QStringLiteral("contentApiUrl"), contentApiUrl);
+NextcloudShareServiceStatus::AccountDetails NextcloudShareServiceStatus::details(int index) const
+{
+    if (index < 0 || m_accountDetails.size() <= index) {
+        qWarning() << Q_FUNC_INFO << "Index out of range";
+        return AccountDetails();
+    }
 
-    return true;
+    return m_accountDetails.at(index);
+}
+
+NextcloudShareServiceStatus::AccountDetails NextcloudShareServiceStatus::detailsByIdentifier(int accountIdentifier) const
+{
+    if (!m_accountIdToDetailsIdx.contains(accountIdentifier)) {
+        qWarning() << Q_FUNC_INFO << "No details known for account with identifier" << accountIdentifier;
+        return AccountDetails();
+    }
+
+    return m_accountDetails[m_accountIdToDetailsIdx[accountIdentifier]];
 }

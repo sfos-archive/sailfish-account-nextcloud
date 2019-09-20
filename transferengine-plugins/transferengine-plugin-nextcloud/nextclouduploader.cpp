@@ -17,12 +17,15 @@
 
 #include <QFile>
 #include <QMimeDatabase>
+#include <QMimeData>
+#include <QMimeType>
 #include <QtDebug>
 
-NextcloudUploader::NextcloudUploader(QObject *parent)
+NextcloudUploader::NextcloudUploader(QNetworkAccessManager *qnam, QObject *parent)
     : MediaTransferInterface(parent)
-    , m_nextcloudShareServiceStatus(0)
     , m_api(0)
+    , m_nextcloudShareServiceStatus(0)
+    , m_qnam(qnam)
 {
 }
 
@@ -37,7 +40,7 @@ QString NextcloudUploader::displayName() const
 
 QUrl NextcloudUploader::serviceIcon() const
 {
-    return QUrl("image://theme/icon-s-service-nextcloud");
+    return QUrl("image://theme/graphic-s-service-nextcloud");
 }
 
 bool NextcloudUploader::cancelEnabled() const
@@ -62,8 +65,7 @@ void NextcloudUploader::start()
     // Query status and get access token within the response
     if (!m_nextcloudShareServiceStatus) {
         m_nextcloudShareServiceStatus = new NextcloudShareServiceStatus(this);
-        connect(m_nextcloudShareServiceStatus, SIGNAL(serviceReady()), this, SLOT(startUploading()));
-        connect(m_nextcloudShareServiceStatus, SIGNAL(credentialsCleared()), this, SLOT(transferError()));
+        connect(m_nextcloudShareServiceStatus, &NextcloudShareServiceStatus::serviceReady, this, &NextcloudUploader::startUploading);
     }
     m_nextcloudShareServiceStatus->queryStatus();
 }
@@ -85,21 +87,9 @@ void NextcloudUploader::startUploading()
     }
 
     // In a case of having multiple accounts get the token based on account id
-    quint32 accountId = mediaItem()->value(MediaItem::AccountId).toInt();
-    QVariantMap details = m_nextcloudShareServiceStatus->detailsByIdentifier(accountId);
-    if (details.isEmpty()) {
-        qWarning() << Q_FUNC_INFO << "Nextcloud account details are empty. Can't start uploading!";
-        return;
-    }
-
-    m_detailsMap = details;
-
-    const QString mimeType = mediaItem()->value(MediaItem::MimeType).toString();
-    if (mimeType.contains("image") || mimeType.contains("video")) {
-        postFile();
-    } else {
-        qWarning() << Q_FUNC_INFO << "Undefined mimeType: " << (mimeType.isEmpty() ? "empty" : mimeType);
-    }
+    const quint32 accountId = mediaItem()->value(MediaItem::AccountId).toInt();
+    m_accountDetails = m_nextcloudShareServiceStatus->detailsByIdentifier(accountId);
+    postFile();
 }
 
 void NextcloudUploader::transferFinished()
@@ -127,26 +117,40 @@ void NextcloudUploader::transferCanceled()
 void NextcloudUploader::credentialsExpired()
 {
     quint32 accountId = mediaItem()->value(MediaItem::AccountId).toInt();
-    m_nextcloudShareServiceStatus->setCredentialsExpired(accountId);
+    m_nextcloudShareServiceStatus->setCredentialsNeedUpdate(accountId);
 }
 
 void NextcloudUploader::postFile()
 {
     m_filePath = mediaItem()->value(MediaItem::Url).toUrl().toLocalFile();
-    createApi();
-
-    setStatus(MediaTransferInterface::TransferStarted);
-    m_api->uploadFile(m_filePath, m_detailsMap);
-}
-
-void NextcloudUploader::createApi()
-{
     if (!m_api) {
-        m_api = new NextcloudApi(this);
-        connect(m_api, SIGNAL(transferProgressUpdated(qreal)), this, SLOT(transferProgress(qreal)));
-        connect(m_api, SIGNAL(transferFinished()), this, SLOT(transferFinished()));
-        connect(m_api, SIGNAL(transferError()), this, SLOT(transferError()));
-        connect(m_api, SIGNAL(transferCanceled()), this, SLOT(transferCanceled()));
-        connect(m_api, SIGNAL(credentialsExpired()), this, SLOT(credentialsExpired()));
+        m_api = new NextcloudApi(m_qnam, this);
+        connect(m_api, &NextcloudApi::transferProgressUpdated, this, &NextcloudUploader::transferProgress);
+        connect(m_api, &NextcloudApi::transferFinished, this, &NextcloudUploader::transferFinished);
+        connect(m_api, &NextcloudApi::transferError, this, &NextcloudUploader::transferError);
+        connect(m_api, &NextcloudApi::transferCanceled, this, &NextcloudUploader::transferCanceled);
+        connect(m_api, &NextcloudApi::credentialsExpired, this, &NextcloudUploader::credentialsExpired);
     }
+    setStatus(MediaTransferInterface::TransferStarted);
+
+    QMimeDatabase mimeDb;
+    QMimeType mimeType = mimeDb.mimeTypeForFile(m_filePath);
+    const bool mimeTypeIsImage = mimeType.name().startsWith(QStringLiteral("image"), Qt::CaseInsensitive);
+
+    QObject *contextObj = new QObject(this);
+    connect(m_api, &NextcloudApi::propfindFinished, contextObj, [this, contextObj, mimeTypeIsImage] {
+        contextObj->deleteLater();
+        m_api->uploadFile(m_filePath,
+                          m_accountDetails.accessToken,
+                          m_accountDetails.username,
+                          m_accountDetails.password,
+                          m_accountDetails.serverAddress,
+                          mimeTypeIsImage ? m_accountDetails.photosPath : m_accountDetails.documentsPath,
+                          m_accountDetails.ignoreSslErrors);
+    });
+    m_api->propfindPath(m_accountDetails.accessToken,
+                        m_accountDetails.username,
+                        m_accountDetails.password,
+                        m_accountDetails.serverAddress,
+                        mimeTypeIsImage ? m_accountDetails.photosPath : m_accountDetails.documentsPath);
 }

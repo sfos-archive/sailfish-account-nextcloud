@@ -10,21 +10,23 @@
 #ifndef NEXTCLOUDUPLOADER_H
 #define NEXTCLOUDUPLOADER_H
 
+#include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkReply>
 
 // transferengine-qt5
 #include <mediatransferinterface.h>
 
+#include "nextcloudshareservicestatus.h"
+
 class NextcloudApi;
 class AccountSettings;
-class NextcloudShareServiceStatus;
 
 class NextcloudUploader : public MediaTransferInterface
 {
     Q_OBJECT
 
 public:
-    NextcloudUploader(QObject *parent = 0);
+    NextcloudUploader(QNetworkAccessManager *qnam, QObject *parent = 0);
     ~NextcloudUploader();
 
     QString displayName() const;
@@ -44,15 +46,13 @@ private Q_SLOTS:
     void transferCanceled();
     void credentialsExpired();
 
-protected:
-    void postFile();
-    void createApi();
-
 private:
-    NextcloudShareServiceStatus *m_nextcloudShareServiceStatus;
+    void postFile();
     NextcloudApi *m_api;
+    NextcloudShareServiceStatus *m_nextcloudShareServiceStatus;
+    QNetworkAccessManager *m_qnam;
+    NextcloudShareServiceStatus::AccountDetails m_accountDetails;
     QString m_filePath;
-    QVariantMap m_detailsMap;
     QString m_token;
 
     friend class ut_nextclouduploader;

@@ -12,8 +12,11 @@
 #include "nextcloudplugininfo.h"
 
 #include <QtPlugin>
+#include <QNetworkAccessManager>
 
 NextcloudSharePlugin::NextcloudSharePlugin()
+    : QObject(), TransferPluginInterface()
+    , m_qnam(new QNetworkAccessManager(this))
 {
 }
 
@@ -23,7 +26,7 @@ NextcloudSharePlugin::~NextcloudSharePlugin()
 
 MediaTransferInterface * NextcloudSharePlugin::transferObject()
 {
-    return new NextcloudUploader;
+    return new NextcloudUploader(m_qnam, this);
 }
 
 TransferPluginInfo *NextcloudSharePlugin::infoObject()

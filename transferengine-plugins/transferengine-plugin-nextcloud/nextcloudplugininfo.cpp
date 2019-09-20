@@ -11,11 +11,12 @@
 #include "nextcloudshareservicestatus.h"
 
 NextcloudPluginInfo::NextcloudPluginInfo()
-    : m_nextcloudShareServiceStatus(new NextcloudShareServiceStatus(this))
+    : TransferPluginInfo()
+    , m_nextcloudShareServiceStatus(new NextcloudShareServiceStatus(this))
+    , m_ready(false)
 {
-    m_ready = false;
-    connect(m_nextcloudShareServiceStatus, SIGNAL(serviceReady()), this, SLOT(serviceReady()));
-    connect(m_nextcloudShareServiceStatus, SIGNAL(error(QString)), this, SIGNAL(infoError(QString)));
+    connect(m_nextcloudShareServiceStatus, &NextcloudShareServiceStatus::serviceReady, this, &NextcloudPluginInfo::serviceReady);
+    connect(m_nextcloudShareServiceStatus, &NextcloudShareServiceStatus::serviceError, this, &NextcloudPluginInfo::infoError);
 }
 
 NextcloudPluginInfo::~NextcloudPluginInfo()
@@ -29,7 +30,7 @@ QList<TransferMethodInfo> NextcloudPluginInfo::info() const
 
 void NextcloudPluginInfo::query()
 {
-    m_nextcloudShareServiceStatus->queryStatus(ServiceStatus::PassiveMode); // don't perform sign-in.
+    m_nextcloudShareServiceStatus->queryStatus(NextcloudShareServiceStatus::PassiveMode); // don't perform sign-in.
 }
 
 bool NextcloudPluginInfo::ready() const
@@ -39,21 +40,23 @@ bool NextcloudPluginInfo::ready() const
 
 void NextcloudPluginInfo::serviceReady()
 {
-    for (int i=0; i < m_nextcloudShareServiceStatus->count(); i++) {
+    m_info.clear();
+    for (int i = 0; i < m_nextcloudShareServiceStatus->count(); ++i) {
         TransferMethodInfo info;
 
         QStringList capabilities;
         capabilities << QLatin1String("image/*")
-                     << QLatin1String("video/*");
+                     << QLatin1String("*");
 
-        info.displayName     = m_nextcloudShareServiceStatus->details(i).value(QLatin1String("providerName")).toString();
-        info.userName        = m_nextcloudShareServiceStatus->details(i).value(QLatin1String("accountName")).toString();
-        info.accountId       = m_nextcloudShareServiceStatus->details(i).value(QLatin1String("identifier")).toInt();
+        info.displayName     = m_nextcloudShareServiceStatus->details(i).providerName;
+        info.userName        = m_nextcloudShareServiceStatus->details(i).displayName;
+        info.accountId       = m_nextcloudShareServiceStatus->details(i).accountId;
 
         info.methodId        = QLatin1String("Nextcloud");
-        info.accountIcon     = QLatin1String("image://theme/icon-m-service-nextcloud");
-        info.shareUIPath     = QLatin1String("/usr/share/nemo-transferengine/plugins/NextcloudShareImage.qml");
+        info.accountIcon     = QLatin1String("image://theme/graphic-m-service-nextcloud");
+        info.shareUIPath     = QLatin1String("/usr/share/nemo-transferengine/plugins/NextcloudShareDialog.qml");
         info.capabilitities  = capabilities;
+
         m_info << info;
     }
 

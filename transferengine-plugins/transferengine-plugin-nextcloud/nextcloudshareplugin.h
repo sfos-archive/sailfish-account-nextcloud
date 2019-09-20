@@ -14,6 +14,7 @@
 
 #include <transferplugininterface.h>
 
+class QNetworkAccessManager;
 class Q_DECL_EXPORT NextcloudSharePlugin : public QObject, public TransferPluginInterface
 {
     Q_OBJECT
@@ -29,6 +30,9 @@ public:
     QString pluginId() const;
 
     bool enabled() const;
+
+private:
+    QNetworkAccessManager *m_qnam;
 };
 
 #endif // NEXTCLOUDSHAREPLUGIN_H

@@ -12,7 +12,7 @@ import Sailfish.Silica 1.0
 import Sailfish.Gallery 1.0
 import org.nemomobile.thumbnailer 1.0
 import Sailfish.TransferEngine 1.0
-import Sailfish.TransferEngine.Nextcloud 1.0 // TODO: translations
+import Sailfish.TransferEngine.Nextcloud 1.0 // for translations
 
 ShareDialog {
     id: root
@@ -46,13 +46,24 @@ ShareDialog {
             acceptText: qsTrId("webshare-he-upload_heading")
         }
 
-        PreviewImage {
+        Thumbnail {
             id: thumbnail
-            width: root.isPortrait ? Screen.width : Screen.width / 2
-            height: root.isPortrait ? Screen.height / 2: Screen.width / 2
-            source: root.source
+
             mimeType: fileInfo.mimeType
-            fileSize: fileInfo.size
+            source: root.source
+            sourceSize.width: Screen.width
+            sourceSize.height: Screen.height / 3
+            fillMode: Thumbnail.PreserveAspectCrop
+            width: root.isPortrait ? Screen.width : Screen.width / 2
+            height: root.isPortrait ? Screen.height / 2 : Screen.width / 2
+            clip: true
+
+            Label {
+                 anchors.centerIn: parent
+                 font.pixelSize: root.isPortrait ? Theme.fontSizeLarge : Theme.fontSizeMedium
+                 color: Theme.secondaryColor
+                 text: Format.formatFileSize(fileInfo.size)
+            }
         }
 
         Column {
@@ -116,10 +127,17 @@ ShareDialog {
                     color: Theme.secondaryHighlightColor
                     truncationMode: TruncationMode.Fade
                     font.pixelSize: Theme.fontSizeSmall
-                    //: Target folder in Nextcloud. Nextcloud has a special folder called Camera Roll
-                    //: where images are upload. Localization should match that.
-                    //% "Camera Roll"
-                    text: qsTrId("webshare-la-nextcloud-uploads-videos")
+                    //: Target folder in Nextcloud. Nextcloud has a special folder called Photos
+                    //: where images are uploaded. Localization should match that.
+                    //% "Photos"
+                    property string photosPath: qsTrId("webshare-la-nextcloud-uploads-images")
+
+                    //: Target folder in Nextcloud. Nextcloud has a special folder called Documents
+                    //: where files other than images are uploaded. Localization should match that.
+                    //% "Documents"
+                    property string docsPath: qsTrId("webshare-la-nextcloud-uploads-documents")
+
+                    text: fileInfo.mimeFileType == "image" ? photosPath : docsPath
                 }
             }
         }
