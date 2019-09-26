@@ -19,9 +19,8 @@
 #include <QPair>
 #include <QNetworkAccessManager>
 
-class tst_replyparser;
-class Auth;
-class RequestGenerator;
+class AccountAuthenticator;
+class WebDavRequestGenerator;
 class ReplyParser;
 namespace Buteo { class SyncProfile; }
 
@@ -50,24 +49,23 @@ private Q_SLOTS:
 private:
     bool performAlbumContentMetadataRequest(const QString &serverUrl, const QString &albumPath, const QString &parentAlbumPath);
     void calculateAndApplyDelta();
-    friend class RequestGenerator;
-    friend class tst_replyparser;
-    Buteo::SyncProfile *m_syncProfile;
-    Auth *m_auth;
-    RequestGenerator *m_requestGenerator;
-    ReplyParser *m_replyParser;
+
+    Buteo::SyncProfile *m_syncProfile = nullptr;
+    AccountAuthenticator *m_auth = nullptr;
+    WebDavRequestGenerator *m_requestGenerator = nullptr;
+    ReplyParser *m_replyParser = nullptr;
     QNetworkAccessManager m_qnam;
-    bool m_syncAborted;
-    bool m_syncError;
+    bool m_syncAborted = false;
+    bool m_syncError = false;
 
     // auth related
-    int m_accountId;
+    int m_accountId = 0;
     QString m_serverUrl;
     QString m_webdavPath;
     QString m_username;
     QString m_password;
     QString m_accessToken;
-    bool m_ignoreSslErrors;
+    bool m_ignoreSslErrors = false;
 
     // request queue
     QList<QNetworkReply*> m_requestQueue;

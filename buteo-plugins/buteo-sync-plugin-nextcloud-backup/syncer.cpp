@@ -8,9 +8,9 @@
 ****************************************************************************************/
 
 #include "syncer_p.h"
-#include "auth_p.h"
-#include "requestgenerator_p.h"
-#include "replyparser_p.h"
+#include "accountauthenticator_p.h"
+#include "webdavrequestgenerator_p.h"
+#include "xmlreplyparser_p.h"
 
 #include <QtCore/QDateTime>
 #include <QtCore/QUrl>
@@ -72,6 +72,7 @@ Syncer::Syncer(QObject *parent, Buteo::SyncProfile *syncProfile)
 Syncer::~Syncer()
 {
     delete m_auth;
+    delete m_requestGenerator;
 }
 
 void Syncer::abortSync()
@@ -83,10 +84,11 @@ void Syncer::startSync(int accountId)
 {
     Q_ASSERT(accountId != 0);
     m_accountId = accountId;
-    m_auth = new Auth(this);
-    connect(m_auth, &Auth::signInCompleted,
+    delete m_auth;
+    m_auth = new AccountAuthenticator("storage", "nextcloud-backup", this);
+    connect(m_auth, &AccountAuthenticator::signInCompleted,
             this, &Syncer::sync);
-    connect(m_auth, &Auth::signInError,
+    connect(m_auth, &AccountAuthenticator::signInError,
             this, &Syncer::signInError);
     LOG_DEBUG(Q_FUNC_INFO << "starting Nextcloud backup sync with account" << m_accountId);
     m_auth->signIn(accountId);
@@ -175,10 +177,11 @@ void Syncer::sync(const QString &serverUrl, const QString &webdavPath, const QSt
     m_password = password;
     m_accessToken = accessToken;
     m_ignoreSslErrors = ignoreSslErrors;
+
+    delete m_requestGenerator;
     m_requestGenerator = accessToken.isEmpty()
-                       ? new RequestGenerator(this, username, password)
-                       : new RequestGenerator(this, accessToken);
-    m_replyParser = new ReplyParser(this, m_accountId, NEXTCLOUD_USERID, serverUrl);
+                       ? new WebDavRequestGenerator(&m_qnam, username, password)
+                       : new WebDavRequestGenerator(&m_qnam, accessToken);
 
     if (!loadConfig()) {
         finishWithError("Config load failed");
@@ -267,17 +270,17 @@ void Syncer::handleDirListingReply()
     }
 
     if (m_operation == List) {
-        const QList<ReplyParser::FileInfo> fileInfoList = m_replyParser->parsePropFindResponse(
+        const QList<XmlReplyParser::Resource> resourceList = XmlReplyParser::parsePropFindResponse(
                 replyData, remoteDirPath);
         QFile file(m_dirListingFileName);
         if (!file.open(QFile::WriteOnly | QFile::Text)) {
             finishWithError("Cannot open " + file.fileName() + " for writing!");
             return;
         }
-        for (const ReplyParser::FileInfo &fileInfo : fileInfoList) {
-            LOG_DEBUG("Found remote file or dir:" << fileInfo.href);
-            if (!fileInfo.isDir
-                    && file.write(fileInfo.href.toUtf8() + '\n') < 0) {
+        for (const XmlReplyParser::Resource &resource : resourceList) {
+            LOG_DEBUG("Found remote file or dir:" << resource.href);
+            if (!resource.isCollection
+                    && file.write(resource.href.toUtf8() + '\n') < 0) {
                 finishWithError("Failed to write to " + file.fileName());
                 return;
             }
@@ -292,12 +295,12 @@ void Syncer::handleDirListingReply()
         }
 
     } else if (m_operation == Download) {
-        const QList<ReplyParser::FileInfo> fileInfoList = m_replyParser->parsePropFindResponse(
+        const QList<XmlReplyParser::Resource> resourceList = XmlReplyParser::parsePropFindResponse(
                 replyData, remoteDirPath);
-        for (const ReplyParser::FileInfo &fileInfo : fileInfoList) {
-            if (!fileInfo.isDir) {
-                int lastDirSep = fileInfo.href.lastIndexOf('/');
-                QString fileName = fileInfo.href.mid(lastDirSep + 1);
+        for (const XmlReplyParser::Resource &resource : resourceList) {
+            if (!resource.isCollection) {
+                int lastDirSep = resource.href.lastIndexOf('/');
+                QString fileName = resource.href.mid(lastDirSep + 1);
                 if (fileName.length() > 0) {
                     m_backupFileNames << fileName;
                 }

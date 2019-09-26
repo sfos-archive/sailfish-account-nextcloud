@@ -7,8 +7,8 @@
 **
 ****************************************************************************************/
 
-#ifndef NEXTCLOUD_BACKUP_AUTH_P_H
-#define NEXTCLOUD_BACKUP_AUTH_P_H
+#ifndef NEXTCLOUD_ACCOUNTAUTHENTICATOR_P_H
+#define NEXTCLOUD_ACCOUNTAUTHENTICATOR_P_H
 
 #include <QObject>
 
@@ -21,13 +21,13 @@
 #include <SignOn/SessionData>
 #include <SignOn/AuthSession>
 
-class Auth : public QObject
+class AccountAuthenticator : public QObject
 {
     Q_OBJECT
 
 public:
-    Auth(QObject *parent);
-    ~Auth();
+    AccountAuthenticator(const QString &serviceType, const QString &serviceName, QObject *parent);
+    ~AccountAuthenticator();
 
     void signIn(int accountId);
     void setCredentialsNeedUpdate(int accountId);
@@ -42,12 +42,15 @@ private Q_SLOTS:
 
 private:
     Accounts::Manager m_manager;
-    Accounts::Account *m_account;
-    SignOn::Identity *m_ident;
-    SignOn::AuthSession *m_session;
+    Accounts::Account *m_account = nullptr;
+    SignOn::Identity *m_ident = nullptr;
+    SignOn::AuthSession *m_session = nullptr;
+
+    QString m_serviceType;
+    QString m_serviceName;
     QString m_serverUrl;
     QString m_webdavPath;
-    bool m_ignoreSslErrors;
+    bool m_ignoreSslErrors = false;
 };
 
-#endif // NEXTCLOUD_BACKUP_AUTH_P_H
+#endif // NEXTCLOUD_ACCOUNTAUTHENTICATOR_P_H

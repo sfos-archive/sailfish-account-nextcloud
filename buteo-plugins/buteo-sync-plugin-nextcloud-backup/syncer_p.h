@@ -18,10 +18,8 @@
 #include <QPair>
 #include <QNetworkAccessManager>
 
-class tst_replyparser;
-class Auth;
-class RequestGenerator;
-class ReplyParser;
+class AccountAuthenticator;
+class WebDavRequestGenerator;
 class QFile;
 namespace Buteo { class SyncProfile; }
 
@@ -72,12 +70,9 @@ private:
 
     bool loadConfig();
 
-    friend class RequestGenerator;
-    friend class tst_replyparser;
     Buteo::SyncProfile *m_syncProfile = nullptr;
-    Auth *m_auth = nullptr;
-    RequestGenerator *m_requestGenerator = nullptr;
-    ReplyParser *m_replyParser = nullptr;
+    AccountAuthenticator *m_auth = nullptr;
+    WebDavRequestGenerator *m_requestGenerator = nullptr;
     QFile *m_downloadedFile = nullptr;
     QNetworkAccessManager m_qnam;
     bool m_syncAborted = false;

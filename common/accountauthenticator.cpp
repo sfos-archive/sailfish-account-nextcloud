@@ -7,12 +7,12 @@
 **
 ****************************************************************************************/
 
-#include "auth_p.h"
+#include "accountauthenticator_p.h"
+
 #include <LogMacros.h>
 
 #ifdef USE_SAILFISHKEYPROVIDER
 #include <sailfishkeyprovider.h>
-
 namespace {
     QString skp_storedKey(const QString &provider, const QString &service, const QString &key)
     {
@@ -30,16 +30,14 @@ namespace {
 }
 #endif // USE_SAILFISHKEYPROVIDER
 
-Auth::Auth(QObject *parent)
+AccountAuthenticator::AccountAuthenticator(const QString &serviceType, const QString &serviceName, QObject *parent)
     : QObject(parent)
-    , m_account(0)
-    , m_ident(0)
-    , m_session(0)
-    , m_ignoreSslErrors(false)
+    , m_serviceType(serviceType.toLower())
+    , m_serviceName(serviceName)
 {
 }
 
-Auth::~Auth()
+AccountAuthenticator::~AccountAuthenticator()
 {
     delete m_account;
     if (m_ident && m_session) {
@@ -48,7 +46,7 @@ Auth::~Auth()
     delete m_ident;
 }
 
-void Auth::signIn(int accountId)
+void AccountAuthenticator::signIn(int accountId)
 {
     m_account = Accounts::Account::fromId(&m_manager, accountId, this);
     if (!m_account) {
@@ -61,15 +59,15 @@ void Auth::signIn(int accountId)
     Accounts::Service srv;
     Accounts::ServiceList services = m_account->services();
     Q_FOREACH (const Accounts::Service &s, services) {
-        if (s.serviceType().toLower() == QStringLiteral("sync")
-                && s.name() == QStringLiteral("nextcloud-images")) {
+        if (s.serviceType().toLower() == m_serviceType
+                && s.name() == m_serviceName) {
             srv = s;
             break;
         }
     }
 
     if (!srv.isValid()) {
-        LOG_WARNING(Q_FUNC_INFO << "unable to find carddav service for account" << accountId);
+        LOG_WARNING(Q_FUNC_INFO << "unable to find service for account" << accountId);
         emit signInError();
         return;
     }
@@ -139,7 +137,7 @@ void Auth::signIn(int accountId)
     session->process(SignOn::SessionData(signonSessionData), mechanism);
 }
 
-void Auth::signOnResponse(const SignOn::SessionData &response)
+void AccountAuthenticator::signOnResponse(const SignOn::SessionData &response)
 {
     QString username, password, accessToken;
     Q_FOREACH (const QString &key, response.propertyNames()) {
@@ -165,22 +163,22 @@ void Auth::signOnResponse(const SignOn::SessionData &response)
     }
 }
 
-void Auth::signOnError(const SignOn::Error &error)
+void AccountAuthenticator::signOnError(const SignOn::Error &error)
 {
     LOG_WARNING(Q_FUNC_INFO << "authentication error:" << error.type() << ":" << error.message());
     emit signInError();
     return;
 }
 
-void Auth::setCredentialsNeedUpdate(int accountId)
+void AccountAuthenticator::setCredentialsNeedUpdate(int accountId)
 {
     Accounts::Account *account = m_manager.account(accountId);
     if (account) {
         Accounts::ServiceList services = account->services();
         Q_FOREACH (const Accounts::Service &s, services) {
-            if (s.serviceType().toLower() == QStringLiteral("carddav")) {
+            if (s.serviceType().toLower() == m_serviceType) {
                 account->setValue(QStringLiteral("CredentialsNeedUpdate"), QVariant::fromValue<bool>(true));
-                account->setValue(QStringLiteral("CredentialsNeedUpdateFrom"), QVariant::fromValue<QString>(QString::fromLatin1("carddav-sync")));
+                account->setValue(QStringLiteral("CredentialsNeedUpdateFrom"), QVariant::fromValue<QString>(QString::fromLatin1("nextcloud-sync")));
                 account->selectService(Accounts::Service());
                 account->syncAndBlock();
                 break;

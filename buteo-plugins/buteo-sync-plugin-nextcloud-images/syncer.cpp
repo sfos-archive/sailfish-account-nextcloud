@@ -8,8 +8,8 @@
 ****************************************************************************************/
 
 #include "syncer_p.h"
-#include "auth_p.h"
-#include "requestgenerator_p.h"
+#include "accountauthenticator_p.h"
+#include "webdavrequestgenerator_p.h"
 #include "replyparser_p.h"
 
 #include <QtCore/QUrl>
@@ -30,19 +30,14 @@ static const QString NEXTCLOUD_USERID = QStringLiteral("nextcloud");
 Syncer::Syncer(QObject *parent, Buteo::SyncProfile *syncProfile)
     : QObject(parent)
     , m_syncProfile(syncProfile)
-    , m_auth(Q_NULLPTR)
-    , m_requestGenerator(Q_NULLPTR)
-    , m_replyParser(Q_NULLPTR)
-    , m_syncAborted(false)
-    , m_syncError(false)
-    , m_accountId(0)
-    , m_ignoreSslErrors(false)
 {
 }
 
 Syncer::~Syncer()
 {
     delete m_auth;
+    delete m_requestGenerator;
+    delete m_replyParser;
 }
 
 void Syncer::abortSync()
@@ -54,10 +49,11 @@ void Syncer::startSync(int accountId)
 {
     Q_ASSERT(accountId != 0);
     m_accountId = accountId;
-    m_auth = new Auth(this);
-    connect(m_auth, &Auth::signInCompleted,
+    delete m_auth;
+    m_auth = new AccountAuthenticator("sync", "nextcloud-images", this);
+    connect(m_auth, &AccountAuthenticator::signInCompleted,
             this, &Syncer::sync);
-    connect(m_auth, &Auth::signInError,
+    connect(m_auth, &AccountAuthenticator::signInError,
             this, &Syncer::signInError);
     LOG_DEBUG(Q_FUNC_INFO << "starting Nextcloud images sync with account" << m_accountId);
     m_auth->signIn(accountId);
@@ -76,9 +72,13 @@ void Syncer::sync(const QString &serverUrl, const QString &webdavPath, const QSt
     m_password = password;
     m_accessToken = accessToken;
     m_ignoreSslErrors = ignoreSslErrors;
+
+    delete m_requestGenerator;
     m_requestGenerator = accessToken.isEmpty()
-                       ? new RequestGenerator(this, username, password)
-                       : new RequestGenerator(this, accessToken);
+                       ? new WebDavRequestGenerator(&m_qnam, username, password)
+                       : new WebDavRequestGenerator(&m_qnam, accessToken);
+
+    delete m_replyParser;
     m_replyParser = new ReplyParser(this, m_accountId, NEXTCLOUD_USERID, serverUrl, m_webdavPath);
 
     // Generate request for top-level Photos directory.
@@ -95,7 +95,7 @@ void Syncer::sync(const QString &serverUrl, const QString &webdavPath, const QSt
 
 bool Syncer::performAlbumContentMetadataRequest(const QString &serverUrl, const QString &albumPath, const QString &parentAlbumPath)
 {
-    QNetworkReply *reply = m_requestGenerator->albumContentMetadata(serverUrl, albumPath);
+    QNetworkReply *reply = m_requestGenerator->dirListing(serverUrl, albumPath);
     if (reply) {
         m_requestQueue.append(reply);
         reply->setProperty("albumPath", albumPath);
