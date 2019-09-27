@@ -1,7 +1,6 @@
 include($$PWD/../../common/common.pri)
 
 QT -= gui
-PKGCONFIG += mlite5
 
 INCLUDEPATH += $$PWD
 

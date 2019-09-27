@@ -1,11 +1,10 @@
-QT += sql network dbus systeminfo
+QT += sql network dbus
 
 INCLUDEPATH += $$PWD
 DEPENDPATH += .
 
 CONFIG += link_pkgconfig console c++11
-PKGCONFIG += buteosyncfw5 libsignon-qt5 accounts-qt5
-LIBS += -lssu
+PKGCONFIG += buteosyncfw5 libsignon-qt5 accounts-qt5 sailfishaccounts
 
 packagesExist(libsailfishkeyprovider) {
     PKGCONFIG += libsailfishkeyprovider

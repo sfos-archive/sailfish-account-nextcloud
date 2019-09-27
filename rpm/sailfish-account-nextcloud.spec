@@ -55,7 +55,6 @@ Group:     System/Applications
 BuildRequires: pkgconfig(Qt5Core)
 BuildRequires: pkgconfig(Qt5DBus)
 BuildRequires: pkgconfig(Qt5Sql)
-BuildRequires: pkgconfig(Qt5SystemInfo)
 BuildRequires: pkgconfig(Qt5Network)
 BuildRequires: pkgconfig(mlite5)
 BuildRequires: pkgconfig(buteosyncfw5)
@@ -63,6 +62,7 @@ BuildRequires: pkgconfig(libsignon-qt5)
 BuildRequires: pkgconfig(accounts-qt5)
 BuildRequires: pkgconfig(socialcache)
 BuildRequires: pkgconfig(libsailfishkeyprovider)
+BuildRequires: pkgconfig(sailfishaccounts)
 Requires: %{name} = %{version}-%{release}
 Requires: buteo-syncfw-qt5-msyncd
 Requires: systemd

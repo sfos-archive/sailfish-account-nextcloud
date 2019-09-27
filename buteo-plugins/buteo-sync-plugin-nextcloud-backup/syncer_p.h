@@ -18,6 +18,9 @@
 #include <QPair>
 #include <QNetworkAccessManager>
 
+// sailfishaccounts
+#include <accountsyncmanager.h>
+
 class AccountAuthenticator;
 class WebDavRequestGenerator;
 class QFile;
@@ -44,12 +47,6 @@ private Q_SLOTS:
     void signInError();
 
 private:
-    enum Operation {
-        List,
-        Upload,
-        Download
-    };
-
     bool performDirCreationRequest(const QStringList &remotePathParts, int remotePathPartsIndex);
     void handleDirCreationReply();
 
@@ -74,6 +71,7 @@ private:
     AccountAuthenticator *m_auth = nullptr;
     WebDavRequestGenerator *m_requestGenerator = nullptr;
     QFile *m_downloadedFile = nullptr;
+    AccountSyncManager m_accountSyncManager;
     QNetworkAccessManager m_qnam;
     bool m_syncAborted = false;
     bool m_syncError = false;
@@ -87,11 +85,8 @@ private:
     QString m_accessToken;
     bool m_ignoreSslErrors = false;
 
-    QString m_localBackupDirPath;
-    QString m_remoteBackupDirPath;
+    AccountSyncManager::BackupRestoreOptions m_backupRestoreOptions;
     QStringList m_backupFileNames;
-    QString m_dirListingFileName;
-    Operation m_operation;
 };
 
 #endif // NEXTCLOUD_BACKUP_SYNCER_P_H
