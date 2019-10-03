@@ -13,5 +13,11 @@ import com.jolla.gallery 1.0
 import com.jolla.gallery.nextcloud 1.0
 
 MediaSourceIcon {
-    model: ["image://theme/graphic-service-nextcloud"]
+    timerEnabled: false
+    Image {
+        anchors.fill: parent
+        source: "image://theme/graphic-service-nextcloud"
+        fillMode: Image.PreserveAspectCrop
+        clip: true
+    }
 }

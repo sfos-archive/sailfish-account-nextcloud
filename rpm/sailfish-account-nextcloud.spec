@@ -6,6 +6,7 @@ Source0: %{name}-%{version}.tar.bz2
 Summary: Account plugin for Nextcloud
 Group:   System/Libraries
 BuildRequires: qt5-qmake
+BuildRequires: sailfish-svg2png
 
 %description
 %{summary}.
@@ -21,6 +22,31 @@ BuildRequires: qt5-qmake
 %{_datadir}/accounts/ui/nextcloud.qml
 %{_datadir}/accounts/ui/nextcloud-settings.qml
 %{_datadir}/accounts/ui/nextcloud-update.qml
+# TODO: only install the appropriate scale factor icons for the build target?  How?
+%{_datadir}/themes/sailfish-default/meegotouch/z1.0/icons/graphic-service-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/z1.0/icons/graphic-m-service-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/z1.0/icons/graphic-s-service-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/z1.0/icons/icon-l-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/z1.25/icons/graphic-service-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/z1.25/icons/graphic-m-service-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/z1.25/icons/graphic-s-service-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/z1.25/icons/icon-l-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/z1.5/icons/graphic-service-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/z1.5/icons/graphic-m-service-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/z1.5/icons/graphic-s-service-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/z1.5/icons/icon-l-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/z1.5-large/icons/graphic-service-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/z1.5-large/icons/graphic-m-service-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/z1.5-large/icons/graphic-s-service-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/z1.5-large/icons/icon-l-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/z1.75/icons/graphic-service-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/z1.75/icons/graphic-m-service-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/z1.75/icons/graphic-s-service-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/z1.75/icons/icon-l-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/z2.0/icons/graphic-service-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/z2.0/icons/graphic-m-service-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/z2.0/icons/graphic-s-service-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/z2.0/icons/icon-l-nextcloud.png
 
 
 %package -n buteo-sync-plugin-nextcloud-backup
@@ -176,6 +202,8 @@ make
 
 %install
 %qmake5_install
+cd icons
+make INSTALL_ROOT=%{buildroot} install
 
 %post -p /sbin/ldconfig
 %postun -p /sbin/ldconfig

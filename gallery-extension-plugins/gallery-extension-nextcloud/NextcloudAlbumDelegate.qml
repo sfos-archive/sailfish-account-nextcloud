@@ -30,7 +30,8 @@ BackgroundItem {
         anchors.left: parent.left
         width: Theme.itemSizeExtraLarge
         height: width
-        source: albumThumbnailPath.length ? albumThumbnailPath : "image://theme/graphic-service-nextcloud"
+        source: albumThumbnailPath.toString().length ? albumThumbnailPath : "image://theme/icon-l-nextcloud"
+        fillMode: albumThumbnailPath.toString().length ? Image.PreserveAspectCrop : Image.PreserveAspectFit
     }
 
     Column {

@@ -25,17 +25,22 @@ Page {
         model: photosModel
         delegate: ThumbnailImage {
             id: delegateItem
-            size: grid.cellSize
-            source: model.imagePath.toString().length > 0
-                  ? model.imagePath
-                  : model.thumbnailPath.toString().length > 0
-                        ? model.thumbnailPath
-                        : "image://theme/graphic-service-nextcloud"
 
             property int accountId: model.accountId
             property string userId: model.userId
             property string albumId: model.albumId
             property string photoId: model.photoId
+
+            source: model.imagePath.toString().length > 0 ? model.imagePath : model.thumbnailPath
+            size: grid.cellSize
+
+            Image {
+                id: placeholderItem
+                anchors.fill: parent
+                fillMode: Image.PreserveAspectFit
+                visible: delegateItem.source.toString().length === 0
+                source: "image://theme/icon-l-nextcloud"
+            }
 
             MouseArea {
                 anchors.fill: parent
