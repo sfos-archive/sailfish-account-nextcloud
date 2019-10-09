@@ -19,9 +19,9 @@
 #include <SignOn/SessionData>
 #include <SignOn/Error>
 
-#include "auth_p.h"
+#include "accountauthenticator_p.h"
 
-class NextcloudShareServiceStatus : public Auth
+class NextcloudShareServiceStatus : public AccountAuthenticator
 {
     Q_OBJECT
 
@@ -57,10 +57,14 @@ Q_SIGNALS:
     void serviceError(const QString &message);
 
 private Q_SLOTS:
-    void signInResponseHandler(int accountId, const QString &serverUrl, const QString &webdavPath, const QString &username, const QString &password, const QString &accessToken, bool ignoreSslErrors);
-    void signInErrorHandler(int accountId);
+    void signInResponseHandler(int accountId, const QString &serviceName,
+                               const QString &serverUrl, const QString &webdavPath,
+                               const QString &username, const QString &password,
+                               const QString &accessToken, bool ignoreSslErrors);
+    void signInErrorHandler(int accountId, const QString &serviceName);
 
 private:
+    QString m_serviceName;
     enum AccountDetailsState {
         Waiting,
         Populated,

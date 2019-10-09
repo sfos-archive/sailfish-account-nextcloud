@@ -1,18 +1,9 @@
 QT -= gui
-QT += network dbus systeminfo
-
-CONFIG += link_pkgconfig console c++11
-PKGCONFIG += buteosyncfw5 libsignon-qt5 accounts-qt5 mlite5
+QT += systeminfo
 LIBS += -lssu
 
-packagesExist(libsailfishkeyprovider) {
-    PKGCONFIG += libsailfishkeyprovider
-    DEFINES += USE_SAILFISHKEYPROVIDER
-}
-
-DEFINES += NEXTCLOUDEVENTCACHE
+DEFINES += NEXTCLOUDEVENTCACHE NEXTCLOUDWEBDAV
 include($$PWD/../../common/common.pri)
-DEFINES -= NEXTCLOUDEVENTCACHE
 
 INCLUDEPATH += $$PWD
 

@@ -28,58 +28,19 @@ static const int HTTP_UNAUTHORIZED_ACCESS = 401;
 static const QString NEXTCLOUD_USERID = QStringLiteral("nextcloud");
 
 Syncer::Syncer(QObject *parent, Buteo::SyncProfile *syncProfile)
-    : QObject(parent)
-    , m_syncProfile(syncProfile)
+    : WebDavSyncer(parent, syncProfile, QStringLiteral("nextcloud-images"))
 {
 }
 
 Syncer::~Syncer()
 {
-    delete m_auth;
-    delete m_requestGenerator;
     delete m_replyParser;
 }
 
-void Syncer::abortSync()
+void Syncer::beginSync()
 {
-    m_syncAborted = true;
-}
-
-void Syncer::startSync(int accountId)
-{
-    Q_ASSERT(accountId != 0);
-    m_accountId = accountId;
-    delete m_auth;
-    m_auth = new AccountAuthenticator("sync", "nextcloud-images", this);
-    connect(m_auth, &AccountAuthenticator::signInCompleted,
-            this, &Syncer::sync);
-    connect(m_auth, &AccountAuthenticator::signInError,
-            this, &Syncer::signInError);
-    LOG_DEBUG(Q_FUNC_INFO << "starting Nextcloud images sync with account" << m_accountId);
-    m_auth->signIn(accountId);
-}
-
-void Syncer::signInError()
-{
-    emit syncFailed();
-}
-
-void Syncer::sync(const QString &serverUrl, const QString &webdavPath, const QString &username, const QString &password, const QString &accessToken, bool ignoreSslErrors)
-{
-    m_serverUrl = serverUrl;
-    m_webdavPath = webdavPath.isEmpty() ? QStringLiteral("/remote.php/webdav/") : webdavPath;
-    m_username = username;
-    m_password = password;
-    m_accessToken = accessToken;
-    m_ignoreSslErrors = ignoreSslErrors;
-
-    delete m_requestGenerator;
-    m_requestGenerator = accessToken.isEmpty()
-                       ? new WebDavRequestGenerator(&m_qnam, username, password)
-                       : new WebDavRequestGenerator(&m_qnam, accessToken);
-
     delete m_replyParser;
-    m_replyParser = new ReplyParser(this, m_accountId, NEXTCLOUD_USERID, serverUrl, m_webdavPath);
+    m_replyParser = new ReplyParser(this, m_accountId, NEXTCLOUD_USERID, m_serverUrl, m_webdavPath);
 
     // Generate request for top-level Photos directory.
     // Then, for every Album entry, generate a request for that directory.
@@ -87,9 +48,9 @@ void Syncer::sync(const QString &serverUrl, const QString &webdavPath, const QSt
     const QString photosPath = QString::fromUtf8(
             QByteArray::fromPercentEncoding(
                     QStringLiteral("%1%2").arg(m_webdavPath, QStringLiteral("Photos/")).toUtf8()));
-    if (!performAlbumContentMetadataRequest(serverUrl, photosPath, QString())) {
+    if (!performAlbumContentMetadataRequest(m_serverUrl, photosPath, QString())) {
         LOG_WARNING("handleAlbumContentMetaDataReply: failed to trigger initial album request!");
-        webDavError();
+        finishWithHttpError(QStringLiteral("failed to trigger initial album request"), 0);
     }
 }
 
@@ -126,7 +87,7 @@ void Syncer::handleAlbumContentMetaDataReply()
         Q_FOREACH (const SyncCache::Album &album, metadata.albums) {
             if (album.albumId != albumPath && !performAlbumContentMetadataRequest(m_serverUrl, album.albumId, metadata.album.albumId)) {
                 LOG_WARNING("handleAlbumContentMetaDataReply: failed to trigger request for album:" << album.albumId);
-                webDavError();
+                finishWithHttpError(QStringLiteral("failed to trigger request for album %1").arg(album.albumId), 0);
                 return;
             }
         }
@@ -135,7 +96,7 @@ void Syncer::handleAlbumContentMetaDataReply()
         }
     } else {
         LOG_WARNING("handleAlbumContentMetaDataReply: error:" << reply->error() << reply->errorString());
-        webDavError(httpCode);
+        finishWithHttpError(QStringLiteral("album content metadata reply error: %1").arg(reply->errorString()), httpCode);
         return;
     }
 
@@ -321,17 +282,6 @@ void Syncer::calculateAndApplyDelta()
     LOG_DEBUG(Q_FUNC_INFO << "Nextcloud images photos A/M/R:" << addedPhotos << "/" << modifiedPhotos << "/" << removedPhotos);
     LOG_DEBUG(Q_FUNC_INFO << "Nextcloud images sync with account" << m_accountId << "finished successfully!");
     emit syncSucceeded();
-}
-
-void Syncer::webDavError(int errorCode)
-{
-    LOG_WARNING("Nextcloud images sync finished with error:" << errorCode <<
-                "for account:" << m_accountId);
-    m_syncError = true;
-    if (errorCode == HTTP_UNAUTHORIZED_ACCESS) {
-        m_auth->setCredentialsNeedUpdate(m_accountId);
-    }
-    emit syncFailed();
 }
 
 void Syncer::purgeAccount(int accountId)

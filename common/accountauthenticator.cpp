@@ -9,7 +9,13 @@
 
 #include "accountauthenticator_p.h"
 
+#ifdef NEXTCLOUDWEBDAV
 #include <LogMacros.h>
+#else
+#include <QtDebug>
+#define LOG_DEBUG(msg) qDebug() << msg
+#define LOG_WARNING(msg) qDebug() << msg
+#endif
 
 #ifdef USE_SAILFISHKEYPROVIDER
 #include <sailfishkeyprovider.h>
@@ -30,87 +36,92 @@ namespace {
 }
 #endif // USE_SAILFISHKEYPROVIDER
 
-AccountAuthenticator::AccountAuthenticator(const QString &serviceType, const QString &serviceName, QObject *parent)
+AccountAuthenticator::AccountAuthenticator(QObject *parent)
     : QObject(parent)
-    , m_serviceType(serviceType.toLower())
-    , m_serviceName(serviceName)
 {
 }
 
 AccountAuthenticator::~AccountAuthenticator()
 {
-    delete m_account;
-    if (m_ident && m_session) {
-        m_ident->destroySession(m_session);
+    while (m_authData.size()) {
+        AuthData authData = m_authData.takeFirst();
+        authData.identity->destroySession(authData.authSession);
+        authData.identity->deleteLater();
+        authData.account->deleteLater();
     }
-    delete m_ident;
 }
 
-void AccountAuthenticator::signIn(int accountId)
+void AccountAuthenticator::signIn(int accountId, const QString &serviceName)
 {
-    m_account = Accounts::Account::fromId(&m_manager, accountId, this);
-    if (!m_account) {
+    Accounts::Account *account = Accounts::Account::fromId(&m_manager, accountId, this);
+    if (!account) {
         LOG_WARNING(Q_FUNC_INFO << "unable to load account" << accountId);
-        emit signInError();
+        emit signInError(accountId, serviceName);
         return;
     }
 
     // determine which service to sign in with.
     Accounts::Service srv;
-    Accounts::ServiceList services = m_account->services();
+    Accounts::ServiceList services = account->services();
     Q_FOREACH (const Accounts::Service &s, services) {
-        if (s.serviceType().toLower() == m_serviceType
-                && s.name() == m_serviceName) {
+        if (s.name() == serviceName) {
             srv = s;
             break;
         }
     }
 
     if (!srv.isValid()) {
-        LOG_WARNING(Q_FUNC_INFO << "unable to find service for account" << accountId);
-        emit signInError();
+        LOG_WARNING(Q_FUNC_INFO << "unable to find sharing service for account" << accountId);
+        account->deleteLater();
+        emit signInError(accountId, serviceName);
         return;
     }
 
     // determine the remote URL from the account settings, and then sign in.
-    m_account->selectService(srv);
-    if (!m_account->enabled()) {
-        LOG_WARNING("Service:" << srv.name() << "is not enabled for account:" << m_account->id());
-        emit signInError();
+    account->selectService(srv);
+    if (!account->enabled()) {
+        LOG_WARNING(Q_FUNC_INFO << "Service:" << srv.name() << "is not enabled for account:" << accountId);
+        account->deleteLater();
+        emit signInError(accountId, serviceName);
         return;
     }
-    m_ignoreSslErrors = m_account->value("ignore_ssl_errors").toBool();
-    m_serverUrl = m_account->value("server_address").toString();
-    m_webdavPath = m_account->value("webdav_path").toString(); // optional, may be empty.
-    if (m_serverUrl.isEmpty()) {
+
+    const bool ignoreSslErrors = account->value(QStringLiteral("ignore_ssl_errors")).toBool();
+    const QString serverAddress = account->value(QStringLiteral("server_address")).toString();
+    const QString webdavPath = account->value(QStringLiteral("webdav_path")).toString(); // optional, may be empty.
+    if (serverAddress.isEmpty()) {
         LOG_WARNING(Q_FUNC_INFO << "no valid server url setting in account" << accountId);
-        emit signInError();
+        account->deleteLater();
+        emit signInError(accountId, serviceName);
         return;
     }
 
-    m_ident = m_account->credentialsId() > 0 ? SignOn::Identity::existingIdentity(m_account->credentialsId()) : 0;
-    if (!m_ident) {
+    SignOn::Identity *ident = account->credentialsId() > 0 ? SignOn::Identity::existingIdentity(account->credentialsId()) : 0;
+    if (!ident) {
         LOG_WARNING(Q_FUNC_INFO << "no valid credentials for account" << accountId);
-        emit signInError();
+        account->deleteLater();
+        emit signInError(accountId, serviceName);
         return;
     }
 
-    Accounts::AccountService accSrv(m_account, srv);
+    Accounts::AccountService accSrv(account, srv);
     QString method = accSrv.authData().method();
     QString mechanism = accSrv.authData().mechanism();
-    SignOn::AuthSession *session = m_ident->createSession(method);
+    SignOn::AuthSession *session = ident->createSession(method);
     if (!session) {
         LOG_WARNING(Q_FUNC_INFO << "unable to create authentication session with account" << accountId);
-        emit signInError();
+        account->deleteLater();
+        ident->deleteLater();
+        emit signInError(accountId, serviceName);
         return;
     }
 
-    QString providerName = m_account->providerName();
     QString clientId;
     QString clientSecret;
     QString consumerKey;
     QString consumerSecret;
 #ifdef USE_SAILFISHKEYPROVIDER
+    QString providerName = account->providerName();
     clientId = skp_storedKey(providerName, QString(), QStringLiteral("client_id"));
     clientSecret = skp_storedKey(providerName, QString(), QStringLiteral("client_secret"));
     consumerKey = skp_storedKey(providerName, QString(), QStringLiteral("consumer_key"));
@@ -131,9 +142,20 @@ void AccountAuthenticator::signIn(int accountId)
             this, SLOT(signOnError(SignOn::Error)),
             Qt::UniqueConnection);
 
+    AuthData authData;
+    authData.accountId = accountId;
+    authData.serviceName = serviceName;
+    authData.mechanism = mechanism;
+    authData.signonSessionData = signonSessionData;
+    authData.account = account;
+    authData.identity = ident;
+    authData.authSession = session;
+    authData.serverAddress = serverAddress;
+    authData.webdavPath = webdavPath;
+    authData.ignoreSslErrors = ignoreSslErrors;
+    m_authData.append(authData);
+
     session->setProperty("accountId", accountId);
-    session->setProperty("mechanism", mechanism);
-    session->setProperty("signonSessionData", signonSessionData);
     session->process(SignOn::SessionData(signonSessionData), mechanism);
 }
 
@@ -152,33 +174,61 @@ void AccountAuthenticator::signOnResponse(const SignOn::SessionData &response)
         }
     }
 
-    // we need both username+password, OR accessToken.
-    if (!accessToken.isEmpty()) {
-        emit signInCompleted(m_serverUrl, m_webdavPath, QString(), QString(), accessToken, m_ignoreSslErrors);
-    } else if (!username.isEmpty() && !password.isEmpty()) {
-        emit signInCompleted(m_serverUrl, m_webdavPath, username, password, QString(), m_ignoreSslErrors);
-    } else {
-        LOG_WARNING(Q_FUNC_INFO << "authentication succeeded, but couldn't find valid credentials");
-        emit signInError();
+    const int accountId = sender()->property("accountId").toInt();
+    const int authDataSize = m_authData.size();
+    for (int i = 0; i < authDataSize; ++i) {
+        if (m_authData[i].accountId == accountId) {
+            AuthData authData = m_authData.takeAt(i);
+            authData.identity->destroySession(authData.authSession);
+            authData.identity->deleteLater();
+            authData.account->deleteLater();
+
+            // we need both username+password, OR accessToken.
+            if (!accessToken.isEmpty()) {
+                emit signInCompleted(accountId, authData.serviceName, authData.serverAddress, authData.webdavPath, QString(), QString(), accessToken, authData.ignoreSslErrors);
+            } else if (!username.isEmpty() && !password.isEmpty()) {
+                emit signInCompleted(accountId, authData.serviceName, authData.serverAddress, authData.webdavPath, username, password, QString(), authData.ignoreSslErrors);
+            } else {
+                LOG_WARNING(Q_FUNC_INFO << "authentication succeeded, but couldn't find valid credentials");
+                emit signInError(accountId, authData.serviceName);
+            }
+            return;
+        }
     }
+
+    LOG_WARNING("Authentication succeeded but unknown auth session");
+    emit signInError(accountId, QString());
 }
 
 void AccountAuthenticator::signOnError(const SignOn::Error &error)
 {
-    LOG_WARNING(Q_FUNC_INFO << "authentication error:" << error.type() << ":" << error.message());
-    emit signInError();
-    return;
+    const int accountId = sender()->property("accountId").toInt();
+    const int authDataSize = m_authData.size();
+    for (int i = 0; i < authDataSize; ++i) {
+        if (m_authData[i].accountId == accountId) {
+            AuthData authData = m_authData.takeAt(i);
+            authData.identity->destroySession(authData.authSession);
+            authData.identity->deleteLater();
+            authData.account->deleteLater();
+            LOG_WARNING(Q_FUNC_INFO << "authentication error:" << error.type() << ":" << error.message());
+            emit signInError(accountId, authData.serviceName);
+            return;
+        }
+    }
+
+    LOG_WARNING(Q_FUNC_INFO << "Unknown authentication session, authentication error:" << error.type() << ":" << error.message());
+    emit signInError(accountId, QString());
 }
 
-void AccountAuthenticator::setCredentialsNeedUpdate(int accountId)
+void AccountAuthenticator::setCredentialsNeedUpdate(int accountId, const QString &serviceName)
 {
     Accounts::Account *account = m_manager.account(accountId);
     if (account) {
         Accounts::ServiceList services = account->services();
         Q_FOREACH (const Accounts::Service &s, services) {
-            if (s.serviceType().toLower() == m_serviceType) {
+            if (s.serviceType().toLower() == serviceName) {
                 account->setValue(QStringLiteral("CredentialsNeedUpdate"), QVariant::fromValue<bool>(true));
-                account->setValue(QStringLiteral("CredentialsNeedUpdateFrom"), QVariant::fromValue<QString>(QString::fromLatin1("nextcloud-sync")));
+                account->setValue(QStringLiteral("CredentialsNeedUpdateFrom"), QVariant::fromValue<QString>(serviceName));
                 account->selectService(Accounts::Service());
                 account->syncAndBlock();
                 break;

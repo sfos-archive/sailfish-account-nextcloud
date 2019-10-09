@@ -117,7 +117,7 @@ void NextcloudUploader::transferCanceled()
 void NextcloudUploader::credentialsExpired()
 {
     quint32 accountId = mediaItem()->value(MediaItem::AccountId).toInt();
-    m_nextcloudShareServiceStatus->setCredentialsNeedUpdate(accountId);
+    m_nextcloudShareServiceStatus->setCredentialsNeedUpdate(accountId, QStringLiteral("nextcloud-sharing"));
 }
 
 void NextcloudUploader::postFile()

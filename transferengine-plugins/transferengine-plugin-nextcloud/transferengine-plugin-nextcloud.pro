@@ -5,26 +5,23 @@ DEPENDPATH += .
 
 QT += network
 
-include(../common/common.pri)
-
 CONFIG += link_pkgconfig
-PKGCONFIG += accounts-qt5 libsignon-qt5
 PKGCONFIG += nemotransferengine-qt5
-PKGCONFIG += libsailfishkeyprovider
+
+DEFINES += NEXTCLOUDACCOUNTAUTH
+include($$PWD/../../common/common.pri)
 
 HEADERS += nextcloudshareplugin.h \
            nextclouduploader.h \
            nextcloudshareservicestatus.h \
            nextcloudapi.h \
-           nextcloudplugininfo.h \
-           auth_p.h
+           nextcloudplugininfo.h
 
 SOURCES += nextcloudshareplugin.cpp \
            nextclouduploader.cpp \
            nextcloudplugininfo.cpp \
            nextcloudshareservicestatus.cpp \
-           nextcloudapi.cpp \
-           auth.cpp
+           nextcloudapi.cpp
 
 target.path = /usr/lib/nemo-transferengine/plugins
 

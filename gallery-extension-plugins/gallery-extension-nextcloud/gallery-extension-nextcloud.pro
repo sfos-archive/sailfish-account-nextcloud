@@ -11,7 +11,6 @@ PKGCONFIG += libsignon-qt5 accounts-qt5 libsailfishkeyprovider
 
 DEFINES += NEXTCLOUDIMAGECACHE
 include($$PWD/../../common/common.pri)
-DEFINES -= NEXTCLOUDIMAGECACHE
 
 include ($$PWD/translations.pri)
 

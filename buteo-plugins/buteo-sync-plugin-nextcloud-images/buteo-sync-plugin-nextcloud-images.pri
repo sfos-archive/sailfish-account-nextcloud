@@ -1,13 +1,7 @@
 QT -= gui
 
-packagesExist(libsailfishkeyprovider) {
-    PKGCONFIG += libsailfishkeyprovider
-    DEFINES += USE_SAILFISHKEYPROVIDER
-}
-
-DEFINES += NEXTCLOUDIMAGECACHE
+DEFINES += NEXTCLOUDIMAGECACHE NEXTCLOUDWEBDAV
 include($$PWD/../../common/common.pri)
-DEFINES -= NEXTCLOUDIMAGECACHE
 
 INCLUDEPATH += $$PWD
 

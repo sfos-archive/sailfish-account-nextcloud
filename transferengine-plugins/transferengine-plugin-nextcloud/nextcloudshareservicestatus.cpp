@@ -12,13 +12,13 @@
 #include <QtDebug>
 
 NextcloudShareServiceStatus::NextcloudShareServiceStatus(QObject *parent)
-    : Auth(parent)
+    : AccountAuthenticator(parent), m_serviceName(QStringLiteral("nextcloud-sharing"))
 {
-    connect(this, &Auth::signInCompleted, this, &NextcloudShareServiceStatus::signInResponseHandler);
-    connect(this, &Auth::signInError, this, &NextcloudShareServiceStatus::signInErrorHandler);
+    connect(this, &AccountAuthenticator::signInCompleted, this, &NextcloudShareServiceStatus::signInResponseHandler);
+    connect(this, &AccountAuthenticator::signInError, this, &NextcloudShareServiceStatus::signInErrorHandler);
 }
 
-void NextcloudShareServiceStatus::signInResponseHandler(int accountId, const QString &serverAddress, const QString &webdavPath, const QString &username, const QString &password, const QString &accessToken, bool ignoreSslErrors)
+void NextcloudShareServiceStatus::signInResponseHandler(int accountId, const QString &, const QString &serverAddress, const QString &webdavPath, const QString &username, const QString &password, const QString &accessToken, bool ignoreSslErrors)
 {
     if (!m_accountIdToDetailsIdx.contains(accountId)) {
         return;
@@ -41,7 +41,7 @@ void NextcloudShareServiceStatus::signInResponseHandler(int accountId, const QSt
     setAccountDetailsState(accountId, Populated);
 }
 
-void NextcloudShareServiceStatus::signInErrorHandler(int accountId)
+void NextcloudShareServiceStatus::signInErrorHandler(int accountId, const QString &)
 {
     setAccountDetailsState(accountId, Error);
 }
@@ -132,7 +132,7 @@ void NextcloudShareServiceStatus::queryStatus(QueryStatusMode mode)
 
                 if (mode == NextcloudShareServiceStatus::SignInMode) {
                     signInActive = true;
-                    signIn(id);
+                    signIn(id, m_serviceName);
                 }
             }
             acc->selectService(Accounts::Service());

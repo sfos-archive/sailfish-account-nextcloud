@@ -10,7 +10,8 @@
 #ifndef NEXTCLOUD_ACCOUNTAUTHENTICATOR_P_H
 #define NEXTCLOUD_ACCOUNTAUTHENTICATOR_P_H
 
-#include <QObject>
+#include <QtCore/QObject>
+#include <QtCore/QVector>
 
 #include <Accounts/Account>
 #include <Accounts/Manager>
@@ -26,31 +27,41 @@ class AccountAuthenticator : public QObject
     Q_OBJECT
 
 public:
-    AccountAuthenticator(const QString &serviceType, const QString &serviceName, QObject *parent);
+    AccountAuthenticator(QObject *parent);
     ~AccountAuthenticator();
 
-    void signIn(int accountId);
-    void setCredentialsNeedUpdate(int accountId);
+    void signIn(int accountId, const QString &serviceName);
+    void setCredentialsNeedUpdate(int accountId, const QString &serviceName);
 
 Q_SIGNALS:
-    void signInCompleted(const QString &serverUrl, const QString &webdavPath, const QString &username, const QString &password, const QString &accessToken, bool ignoreSslErrors);
-    void signInError();
+    void signInCompleted(int accountId, const QString &serviceName,
+                         const QString &serverUrl, const QString &webdavPath,
+                         const QString &username, const QString &password,
+                         const QString &accessToken, bool ignoreSslErrors);
+    void signInError(int accountId, const QString &serviceName);
 
 private Q_SLOTS:
     void signOnResponse(const SignOn::SessionData &response);
     void signOnError(const SignOn::Error &error);
 
+protected:
+    Accounts::Manager *manager() { return &m_manager; }
+
 private:
     Accounts::Manager m_manager;
-    Accounts::Account *m_account = nullptr;
-    SignOn::Identity *m_ident = nullptr;
-    SignOn::AuthSession *m_session = nullptr;
-
-    QString m_serviceType;
-    QString m_serviceName;
-    QString m_serverUrl;
-    QString m_webdavPath;
-    bool m_ignoreSslErrors = false;
+    struct AuthData {
+        int accountId;
+        QString serviceName;
+        QString mechanism;
+        QVariantMap signonSessionData;
+        Accounts::Account *account;
+        SignOn::Identity *identity;
+        SignOn::AuthSession *authSession;
+        QString serverAddress;
+        QString webdavPath;
+        bool ignoreSslErrors;
+    };
+    QVector<AuthData> m_authData;
 };
 
 #endif // NEXTCLOUD_ACCOUNTAUTHENTICATOR_P_H

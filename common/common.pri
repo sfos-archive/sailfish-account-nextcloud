@@ -1,44 +1,58 @@
-QT += sql network dbus
-
 INCLUDEPATH += $$PWD
 DEPENDPATH += .
 
-CONFIG += link_pkgconfig console c++11
-PKGCONFIG += buteosyncfw5 libsignon-qt5 accounts-qt5 sailfishaccounts
+contains (DEFINES, NEXTCLOUDWEBDAV) {
+    QT += sql network dbus
+    CONFIG += link_pkgconfig console c++11
+    PKGCONFIG += buteosyncfw5
+    DEFINES += NEXTCLOUDACCOUNTAUTH
 
-packagesExist(libsailfishkeyprovider) {
-    PKGCONFIG += libsailfishkeyprovider
-    DEFINES += USE_SAILFISHKEYPROVIDER
+    HEADERS += \
+        $$PWD/webdavsyncer_p.h \
+        $$PWD/webdavrequestgenerator_p.h \
+        $$PWD/xmlreplyparser_p.h
+
+    SOURCES += \
+        $$PWD/webdavsyncer.cpp \
+        $$PWD/webdavrequestgenerator.cpp \
+        $$PWD/xmlreplyparser.cpp
 }
 
-HEADERS += \
-    $$PWD/accountauthenticator_p.h \
-    $$PWD/xmlreplyparser_p.h \
-    $$PWD/webdavrequestgenerator_p.h \
-    $$PWD/processmutex_p.h
-
-SOURCES += \
-    $$PWD/accountauthenticator.cpp \
-    $$PWD/xmlreplyparser.cpp \
-    $$PWD/webdavrequestgenerator.cpp \
-    $$PWD/processmutex_p.cpp
+contains (DEFINES, NEXTCLOUDACCOUNTAUTH) {
+    CONFIG += link_pkgconfig
+    PKGCONFIG += libsignon-qt5 accounts-qt5
+    packagesExist(libsailfishkeyprovider) {
+        PKGCONFIG += libsailfishkeyprovider
+        DEFINES += USE_SAILFISHKEYPROVIDER
+    }
+    HEADERS += $$PWD/accountauthenticator_p.h
+    SOURCES += $$PWD/accountauthenticator.cpp
+}
 
 contains (DEFINES, NEXTCLOUDIMAGECACHE) {
+    QT += sql network
+
     HEADERS += \
+        $$PWD/processmutex_p.h \
         $$PWD/imagecache.h \
         $$PWD/imagecache_p.h
 
     SOURCES += \
+        $$PWD/processmutex_p.cpp \
         $$PWD/imagecache.cpp \
         $$PWD/imagedatabase.cpp
 }
 
 contains (DEFINES, NEXTCLOUDEVENTCACHE) {
+    QT += sql network
+
     HEADERS += \
+        $$PWD/processmutex_p.h \
         $$PWD/eventcache.h \
         $$PWD/eventcache_p.h
 
     SOURCES += \
+        $$PWD/processmutex_p.cpp \
         $$PWD/eventcache.cpp \
         $$PWD/eventdatabase.cpp
 }

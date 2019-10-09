@@ -8,9 +8,13 @@
 ****************************************************************************************/
 
 #include "syncer_p.h"
+
 #include "accountauthenticator_p.h"
 #include "webdavrequestgenerator_p.h"
 #include "xmlreplyparser_p.h"
+
+#include "accountauthenticator_p.h"
+#include "webdavrequestgenerator_p.h"
 
 #include "eventcache.h"
 
@@ -36,51 +40,16 @@ namespace {
 }
 
 Syncer::Syncer(QObject *parent, Buteo::SyncProfile *syncProfile)
-    : QObject(parent)
-    , m_syncProfile(syncProfile)
+    : WebDavSyncer(parent, syncProfile, QStringLiteral("nextcloud-posts"))
 {
 }
 
 Syncer::~Syncer()
 {
-    delete m_auth;
 }
 
-void Syncer::abortSync()
+void Syncer::beginSync()
 {
-    m_syncAborted = true;
-}
-
-void Syncer::startSync(int accountId)
-{
-    Q_ASSERT(accountId != 0);
-    m_accountId = accountId;
-    m_auth = new AccountAuthenticator("posts", "nextcloud-posts", this);
-    connect(m_auth, &AccountAuthenticator::signInCompleted,
-            this, &Syncer::sync);
-    connect(m_auth, &AccountAuthenticator::signInError,
-            this, &Syncer::signInError);
-    LOG_DEBUG(Q_FUNC_INFO << "starting Nextcloud Posts sync with account" << m_accountId);
-    m_auth->signIn(accountId);
-}
-
-void Syncer::signInError()
-{
-    emit syncFailed();
-}
-
-void Syncer::sync(const QString &serverUrl, const QString &webdavPath, const QString &username, const QString &password, const QString &accessToken, bool ignoreSslErrors)
-{
-    m_serverUrl = serverUrl;
-    m_webdavPath = webdavPath.isEmpty() ? QStringLiteral("/remote.php/webdav/") : webdavPath;
-    m_username = username;
-    m_password = password;
-    m_accessToken = accessToken;
-    m_ignoreSslErrors = ignoreSslErrors;
-    m_requestGenerator = accessToken.isEmpty()
-                       ? new WebDavRequestGenerator(&m_qnam, username, password)
-                       : new WebDavRequestGenerator(&m_qnam, accessToken);
-
     if (!performCapabilitiesRequest()) {
         finishWithError("Capabilities request failed");
         return;
@@ -196,27 +165,6 @@ void Syncer::handleNotificationListReply()
     } else {
         emit finishWithError(QStringLiteral("Failed to store Posts: %1: %2").arg(error.errorCode).arg(error.errorMessage));
     }
-}
-
-void Syncer::finishWithHttpError(const QString &errorMessage, int httpCode)
-{
-    if (httpCode == HTTP_UNAUTHORIZED_ACCESS) {
-        m_auth->setCredentialsNeedUpdate(m_accountId);
-    }
-    finishWithError(QString("%1 (http status=%2)").arg(errorMessage).arg(httpCode));
-}
-
-void Syncer::finishWithError(const QString &errorMessage)
-{
-    LOG_WARNING("Nextcloud Posts sync for account" << m_accountId << "finished with error:" << errorMessage);
-    m_syncError = true;
-    emit syncFailed();
-}
-
-void Syncer::finishWithSuccess()
-{
-    LOG_DEBUG(Q_FUNC_INFO << "Nextcloud Posts listing with account" << m_accountId << "finished successfully!");
-    emit syncSucceeded();
 }
 
 void Syncer::purgeAccount(int accountId)

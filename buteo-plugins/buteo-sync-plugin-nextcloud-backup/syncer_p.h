@@ -10,23 +10,14 @@
 #ifndef NEXTCLOUD_BACKUP_SYNCER_P_H
 #define NEXTCLOUD_BACKUP_SYNCER_P_H
 
-#include <QObject>
-#include <QDateTime>
-#include <QString>
-#include <QList>
-#include <QHash>
-#include <QPair>
-#include <QNetworkAccessManager>
+#include "webdavsyncer_p.h"
 
 // sailfishaccounts
 #include <accountsyncmanager.h>
 
-class AccountAuthenticator;
-class WebDavRequestGenerator;
 class QFile;
-namespace Buteo { class SyncProfile; }
 
-class Syncer : public QObject
+class Syncer : public WebDavSyncer
 {
     Q_OBJECT
 
@@ -34,19 +25,11 @@ public:
     Syncer(QObject *parent, Buteo::SyncProfile *profile);
    ~Syncer();
 
-    void startSync(int accountId);
-    void purgeAccount(int accountId);
-    void abortSync();
-
-Q_SIGNALS:
-    void syncSucceeded();
-    void syncFailed();
-
-private Q_SLOTS:
-    void sync(const QString &serverUrl, const QString &addressbookPath, const QString &username, const QString &password, const QString &accessToken, bool ignoreSslErrors);
-    void signInError();
+    void purgeAccount(int accountId) Q_DECL_OVERRIDE;
 
 private:
+    void beginSync() Q_DECL_OVERRIDE;
+
     bool performDirCreationRequest(const QStringList &remotePathParts, int remotePathPartsIndex);
     void handleDirCreationReply();
 
@@ -67,24 +50,8 @@ private:
 
     bool loadConfig();
 
-    Buteo::SyncProfile *m_syncProfile = nullptr;
-    AccountAuthenticator *m_auth = nullptr;
-    WebDavRequestGenerator *m_requestGenerator = nullptr;
     QFile *m_downloadedFile = nullptr;
     AccountSyncManager m_accountSyncManager;
-    QNetworkAccessManager m_qnam;
-    bool m_syncAborted = false;
-    bool m_syncError = false;
-
-    // auth related
-    int m_accountId = 0;
-    QString m_serverUrl;
-    QString m_webdavPath;
-    QString m_username;
-    QString m_password;
-    QString m_accessToken;
-    bool m_ignoreSslErrors = false;
-
     AccountSyncManager::BackupRestoreOptions m_backupRestoreOptions;
     QStringList m_backupFileNames;
 };
