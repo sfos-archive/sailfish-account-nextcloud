@@ -11,7 +11,7 @@
 #define NEXTCLOUD_IMAGECACHE_P_H
 
 #include "imagecache.h"
-#include "processmutex_p.h"
+#include "synccachedatabase_p.h"
 
 #include <QtCore/QObject>
 #include <QtCore/QString>
@@ -182,12 +182,24 @@ private:
     ImageCacheThreadWorker *m_worker;
 };
 
-class ImageDatabasePrivate
+class ImageDatabasePrivate : public DatabasePrivate
 {
 public:
-    mutable QScopedPointer<ProcessMutex> m_processMutex;
-    QSqlDatabase m_database;
-    bool m_inTransaction = false;
+    ImageDatabasePrivate(ImageDatabase *parent);
+
+    int currentSchemaVersion() const Q_DECL_OVERRIDE;
+    QVector<const char *> createStatements() const Q_DECL_OVERRIDE;
+    QVector<UpgradeOperation> upgradeVersions() const Q_DECL_OVERRIDE;
+
+    void preTransactionCommit() Q_DECL_OVERRIDE;
+    void transactionCommittedPreUnlock() Q_DECL_OVERRIDE;
+    void transactionCommittedPostUnlock() Q_DECL_OVERRIDE;
+    void transactionRolledBackPreUnlocked() Q_DECL_OVERRIDE;
+
+private:
+    friend class SyncCache::ImageDatabase;
+    ImageDatabase *m_imageDbParent;
+
     QVector<QString> m_filesToDelete;
     QVector<SyncCache::User> m_deletedUsers;
     QVector<SyncCache::Album> m_deletedAlbums;
@@ -195,6 +207,14 @@ public:
     QVector<SyncCache::User> m_storedUsers;
     QVector<SyncCache::Album> m_storedAlbums;
     QVector<SyncCache::Photo> m_storedPhotos;
+
+    QVector<QString> m_tempFilesToDelete;
+    QVector<SyncCache::User> m_tempDeletedUsers;
+    QVector<SyncCache::Album> m_tempDeletedAlbums;
+    QVector<SyncCache::Photo> m_tempDeletedPhotos;
+    QVector<SyncCache::User> m_tempStoredUsers;
+    QVector<SyncCache::Album> m_tempStoredAlbums;
+    QVector<SyncCache::Photo> m_tempStoredPhotos;
 };
 
 } // namespace SyncCache

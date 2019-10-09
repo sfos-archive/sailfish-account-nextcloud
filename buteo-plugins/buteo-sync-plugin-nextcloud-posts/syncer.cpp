@@ -152,7 +152,7 @@ void Syncer::handleNotificationListReply()
         }
     }
 
-    bool commitSucceeded = storeSucceeded && db.commitTransation(&error);
+    bool commitSucceeded = storeSucceeded && db.commitTransaction(&error);
     if (!commitSucceeded) {
         SyncCache::DatabaseError rollbackError;
         db.rollbackTransaction(&rollbackError);
@@ -203,7 +203,7 @@ void Syncer::purgeAccount(int accountId)
         }
     }
 
-    const bool commitSucceeded = deleteSucceeded && db.commitTransation(&error);
+    const bool commitSucceeded = deleteSucceeded && db.commitTransaction(&error);
     if (!commitSucceeded) {
         SyncCache::DatabaseError rollbackError;
         db.rollbackTransaction(&rollbackError); // TODO: log the fact that we need to purge this one later.

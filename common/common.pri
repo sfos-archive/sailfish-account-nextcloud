@@ -1,3 +1,4 @@
+QMAKE_CXXFLAGS = -Wall -Werror
 INCLUDEPATH += $$PWD
 DEPENDPATH += .
 
@@ -34,11 +35,14 @@ contains (DEFINES, NEXTCLOUDIMAGECACHE) {
 
     HEADERS += \
         $$PWD/processmutex_p.h \
+        $$PWD/synccachedatabase.h \
+        $$PWD/synccachedatabase_p.h \
         $$PWD/imagecache.h \
         $$PWD/imagecache_p.h
 
     SOURCES += \
-        $$PWD/processmutex_p.cpp \
+        $$PWD/processmutex.cpp \
+        $$PWD/synccachedatabase.cpp \
         $$PWD/imagecache.cpp \
         $$PWD/imagedatabase.cpp
 }
@@ -48,11 +52,14 @@ contains (DEFINES, NEXTCLOUDEVENTCACHE) {
 
     HEADERS += \
         $$PWD/processmutex_p.h \
+        $$PWD/synccachedatabase.h \
+        $$PWD/synccachedatabase_p.h \
         $$PWD/eventcache.h \
         $$PWD/eventcache_p.h
 
     SOURCES += \
-        $$PWD/processmutex_p.cpp \
+        $$PWD/processmutex.cpp \
+        $$PWD/synccachedatabase.cpp \
         $$PWD/eventcache.cpp \
         $$PWD/eventdatabase.cpp
 }

@@ -10,6 +10,8 @@
 #ifndef NEXTCLOUD_EVENTCACHE_H
 #define NEXTCLOUD_EVENTCACHE_H
 
+#include "synccachedatabase.h"
+
 #include <QtCore/QMetaType>
 #include <QtCore/QObject>
 #include <QtCore/QString>
@@ -33,58 +35,21 @@ struct Event {
     QDateTime timestamp;
 };
 
-struct DatabaseError {
-    enum ErrorCode {
-        NoError = 0,
-        CreateError,
-        OpenError,
-        AlreadyOpenError,
-        NotOpenError,
-        ConfigurationError,
-        IntegrityCheckError,
-        UpgradeError,
-        ProcessMutexError,
-        VersionQueryError,
-        VersionMismatchError,
-        TransactionError,
-        TransactionLockError,
-        PrepareQueryError,
-        QueryError,
-        UnknownError = 1024
-    };
-    ErrorCode errorCode = NoError;
-    QString errorMessage;
-};
-
-class EventDatabasePrivate;
-class EventDatabase : public QObject
+class EventDatabase : public Database
 {
     Q_OBJECT
 
 public:
     EventDatabase(QObject *parent = Q_NULLPTR);
-    virtual ~EventDatabase();
-
-    ProcessMutex *processMutex() const;
-    void openDatabase(const QString &fileName, SyncCache::DatabaseError *error);
 
     QVector<SyncCache::Event> events(int accountId, SyncCache::DatabaseError *error) const;
     SyncCache::Event event(int accountId, const QString &eventId, SyncCache::DatabaseError *error) const;
     void storeEvent(const SyncCache::Event &event, SyncCache::DatabaseError *error);
     void deleteEvent(const SyncCache::Event &event, SyncCache::DatabaseError *error);
 
-    bool inTransaction() const;
-    bool beginTransaction(SyncCache::DatabaseError *error);
-    bool commitTransation(SyncCache::DatabaseError *error);
-    bool rollbackTransaction(SyncCache::DatabaseError *error);
-
 Q_SIGNALS:
     void eventsStored(const QVector<SyncCache::Event> &event);
     void eventsDeleted(const QVector<SyncCache::Event> &event);
-
-private:
-    Q_DECLARE_PRIVATE(EventDatabase)
-    QScopedPointer<EventDatabasePrivate> d_ptr;
 };
 
 class EventCachePrivate;

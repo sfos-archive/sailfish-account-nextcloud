@@ -11,7 +11,7 @@
 #define NEXTCLOUD_EVENTCACHE_P_H
 
 #include "eventcache.h"
-#include "processmutex_p.h"
+#include "synccachedatabase_p.h"
 
 #include <QtCore/QObject>
 #include <QtCore/QString>
@@ -152,15 +152,29 @@ private:
     EventCacheThreadWorker *m_worker;
 };
 
-class EventDatabasePrivate
+class EventDatabasePrivate : public DatabasePrivate
 {
 public:
-    mutable QScopedPointer<ProcessMutex> m_processMutex;
-    QSqlDatabase m_database;
-    bool m_inTransaction = false;
+    EventDatabasePrivate(EventDatabase *parent);
+
+    int currentSchemaVersion() const Q_DECL_OVERRIDE;
+    QVector<const char *> createStatements() const Q_DECL_OVERRIDE;
+    QVector<UpgradeOperation> upgradeVersions() const Q_DECL_OVERRIDE;
+
+    void preTransactionCommit() Q_DECL_OVERRIDE;
+    void transactionCommittedPreUnlock() Q_DECL_OVERRIDE;
+    void transactionCommittedPostUnlock() Q_DECL_OVERRIDE;
+    void transactionRolledBackPreUnlocked() Q_DECL_OVERRIDE;
+
+private:
+    friend class SyncCache::EventDatabase;
+    EventDatabase *m_eventDbParent;
     QVector<QString> m_filesToDelete;
     QVector<SyncCache::Event> m_deletedEvents;
     QVector<SyncCache::Event> m_storedEvents;
+    QVector<QString> m_tempFilesToDelete;
+    QVector<SyncCache::Event> m_tempDeletedEvents;
+    QVector<SyncCache::Event> m_tempStoredEvents;
 };
 
 } // namespace SyncCache

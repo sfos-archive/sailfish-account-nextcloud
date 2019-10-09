@@ -10,6 +10,8 @@
 #ifndef NEXTCLOUD_IMAGECACHE_H
 #define NEXTCLOUD_IMAGECACHE_H
 
+#include "synccachedatabase.h"
+
 #include <QtCore/QMetaType>
 #include <QtCore/QObject>
 #include <QtCore/QString>
@@ -58,40 +60,12 @@ struct Photo {
     int imageHeight = 0;
 };
 
-struct DatabaseError {
-    enum ErrorCode {
-        NoError = 0,
-        CreateError,
-        OpenError,
-        AlreadyOpenError,
-        NotOpenError,
-        ConfigurationError,
-        IntegrityCheckError,
-        UpgradeError,
-        ProcessMutexError,
-        VersionQueryError,
-        VersionMismatchError,
-        TransactionError,
-        TransactionLockError,
-        PrepareQueryError,
-        QueryError,
-        UnknownError = 1024
-    };
-    ErrorCode errorCode = NoError;
-    QString errorMessage;
-};
-
-class ImageDatabasePrivate;
-class ImageDatabase : public QObject
+class ImageDatabase : public Database
 {
     Q_OBJECT
 
 public:
     ImageDatabase(QObject *parent = Q_NULLPTR);
-    virtual ~ImageDatabase();
-
-    ProcessMutex *processMutex() const;
-    void openDatabase(const QString &fileName, SyncCache::DatabaseError *error);
 
     QVector<SyncCache::User> users(SyncCache::DatabaseError *error) const;
     QVector<SyncCache::Album> albums(int accountId, const QString &userId, SyncCache::DatabaseError *error) const;
@@ -109,11 +83,6 @@ public:
     void deleteAlbum(const SyncCache::Album &album, SyncCache::DatabaseError *error);
     void deletePhoto(const SyncCache::Photo &photo, SyncCache::DatabaseError *error);
 
-    bool inTransaction() const;
-    bool beginTransaction(SyncCache::DatabaseError *error);
-    bool commitTransation(SyncCache::DatabaseError *error);
-    bool rollbackTransaction(SyncCache::DatabaseError *error);
-
 Q_SIGNALS:
     void usersStored(const QVector<SyncCache::User> &users);
     void albumsStored(const QVector<SyncCache::Album> &albums);
@@ -122,10 +91,6 @@ Q_SIGNALS:
     void usersDeleted(const QVector<SyncCache::User> &users);
     void albumsDeleted(const QVector<SyncCache::Album> &albums);
     void photosDeleted(const QVector<SyncCache::Photo> &photos);
-
-private:
-    Q_DECLARE_PRIVATE(ImageDatabase)
-    QScopedPointer<ImageDatabasePrivate> d_ptr;
 };
 
 class ImageCachePrivate;

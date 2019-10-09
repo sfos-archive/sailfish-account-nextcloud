@@ -270,7 +270,7 @@ void Syncer::calculateAndApplyDelta()
         db.rollbackTransaction(&error);
         emit syncFailed();
         return;
-    } else if (!db.commitTransation(&error)) {
+    } else if (!db.commitTransaction(&error)) {
         LOG_WARNING("calculateAndApplyDelta: failed to commit transaction:" << error.errorCode << error.errorMessage);
         db.rollbackTransaction(&error);
         emit syncFailed();
