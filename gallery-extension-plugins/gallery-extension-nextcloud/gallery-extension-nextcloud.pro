@@ -9,7 +9,10 @@ QT += qml
 CONFIG += plugin link_pkgconfig c++11
 PKGCONFIG += libsignon-qt5 accounts-qt5 libsailfishkeyprovider
 
+DEFINES += NEXTCLOUDIMAGECACHE
 include($$PWD/../../common/common.pri)
+DEFINES -= NEXTCLOUDIMAGECACHE
+
 include ($$PWD/translations.pri)
 
 import.files = \

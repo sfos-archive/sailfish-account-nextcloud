@@ -22,8 +22,9 @@
 
 namespace {
     const QByteArray XmlContentType("application/xml; charset=utf-8");
+    const QByteArray JsonContentType("application/json");
 
-    QUrl setRequestUrl(const QString &url, const QString &path, const QString &username, const QString &password)
+    QUrl networkRequestUrl(const QString &url, const QString &path)
     {
         QUrl ret(url);
         QString modifiedPath(path);
@@ -47,10 +48,6 @@ namespace {
             } else {
                 ret.setPath('/' + modifiedPath);
             }
-        }
-        if (!username.isEmpty() && !password.isEmpty()) {
-            ret.setUserName(username);
-            ret.setPassword(password);
         }
         return ret;
     }
@@ -77,9 +74,10 @@ QNetworkReply *WebDavRequestGenerator::sendRequest(const QNetworkRequest &reques
         requestDataBuffer->setData(requestData);
     }
 
-    LOG_DEBUG("Sending request:" << request.url().toString() << requestType
-                << "token:" << m_accessToken
-                << "data:" << QString::fromUtf8(requestData));
+    LOG_DEBUG("Sending request:"
+              << request.url().toString() << requestType
+              << "token:" << m_accessToken
+              << "data:" << QString::fromUtf8(requestData));
     QNetworkReply *reply = m_networkAccessManager->sendCustomRequest(request, requestType, requestDataBuffer);
 
     if (requestDataBuffer) {
@@ -89,22 +87,49 @@ QNetworkReply *WebDavRequestGenerator::sendRequest(const QNetworkRequest &reques
     return reply;
 }
 
-QUrl WebDavRequestGenerator::networkRequestUrl(const QString &url, const QString &path) const
-{
-    return setRequestUrl(url, path, m_username, m_password);
-}
-
 QNetworkRequest WebDavRequestGenerator::networkRequest(const QUrl &url, const QString &contentType, const QByteArray &requestData) const
 {
     QNetworkRequest request(url);
+
+    if (url.path().startsWith(QStringLiteral("/ocs/"))) {
+        // Nextcloud APIs require Basic Authentication. Qt 5.6 QNetworkAccessManager does not
+        // generate the expected request headers for this if user/pass are set in the URL, so
+        // set them manually instead.
+        QByteArray credentials((m_username + ':' + m_password).toUtf8());
+        request.setRawHeader("Authorization", QByteArray("Basic ") + credentials.toBase64());
+
+        // Nextcloud APIs require this to avoid "CSRF check failed" error.
+        request.setRawHeader("OCS-APIRequest", "true");
+
+    } else if (!m_username.isEmpty() && !m_password.isEmpty()) {
+        QUrl authenticatedUrl = url;
+        authenticatedUrl.setUserName(m_username);
+        authenticatedUrl.setPassword(m_password);
+        request.setUrl(authenticatedUrl);
+    }
+
     if (!contentType.isEmpty()) {
         request.setHeader(QNetworkRequest::ContentTypeHeader, contentType.toUtf8());
     }
     request.setHeader(QNetworkRequest::ContentLengthHeader, requestData.length());
+
     if (!m_accessToken.isEmpty()) {
         request.setRawHeader("Authorization", QString(QLatin1String("Bearer ") + m_accessToken).toUtf8());
     }
+
     return request;
+}
+
+QNetworkReply *WebDavRequestGenerator::capabilities(const QString &serverUrl)
+{
+    if (Q_UNLIKELY(serverUrl.isEmpty())) {
+        LOG_WARNING(Q_FUNC_INFO << "server url empty, aborting");
+        return 0;
+    }
+
+    QNetworkRequest request = networkRequest(networkRequestUrl(serverUrl, "/ocs/v2.php/cloud/capabilities"));
+    request.setRawHeader("Accept", JsonContentType);
+    return sendRequest(request, "GET");
 }
 
 QNetworkReply *WebDavRequestGenerator::dirListing(const QString &serverUrl, const QString &remoteDirPath)
@@ -180,5 +205,17 @@ QNetworkReply *WebDavRequestGenerator::download(const QString &serverUrl, const 
 
     QNetworkRequest request = networkRequest(networkRequestUrl(serverUrl, remoteFilePath));
     request.setRawHeader("Depth", "1");
+    return sendRequest(request, "GET");
+}
+
+QNetworkReply *WebDavRequestGenerator::notificationList(const QString &serverUrl)
+{
+    if (Q_UNLIKELY(serverUrl.isEmpty())) {
+        LOG_WARNING(Q_FUNC_INFO << "server url empty, aborting");
+        return 0;
+    }
+
+    QNetworkRequest request = networkRequest(networkRequestUrl(serverUrl, "/ocs/v2.php/apps/notifications/api/v2/notifications"));
+    request.setRawHeader("Accept", JsonContentType);
     return sendRequest(request, "GET");
 }

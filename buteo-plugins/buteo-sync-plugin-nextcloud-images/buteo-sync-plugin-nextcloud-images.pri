@@ -1,6 +1,14 @@
-include($$PWD/../../common/common.pri)
-
 QT -= gui
+
+packagesExist(libsailfishkeyprovider) {
+    PKGCONFIG += libsailfishkeyprovider
+    DEFINES += USE_SAILFISHKEYPROVIDER
+}
+
+DEFINES += NEXTCLOUDIMAGECACHE
+include($$PWD/../../common/common.pri)
+DEFINES -= NEXTCLOUDIMAGECACHE
+
 INCLUDEPATH += $$PWD
 
 SOURCES += \

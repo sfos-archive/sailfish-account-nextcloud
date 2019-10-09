@@ -15,10 +15,11 @@ import com.jolla.settings.accounts 1.0
 OnlineSyncAccountCreationAgent {
     provider: accountProvider
     services: [
+        accountManager.service("nextcloud-backup"),
         accountManager.service("nextcloud-carddav"),
         accountManager.service("nextcloud-caldav"),
         accountManager.service("nextcloud-images"),
-        accountManager.service("nextcloud-backup"),
+        accountManager.service("nextcloud-posts"),
         accountManager.service("nextcloud-sharing")
     ]
     webdavPath: "/remote.php/webdav/"

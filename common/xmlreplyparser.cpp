@@ -14,6 +14,11 @@
 #include <QList>
 #include <QXmlStreamReader>
 
+#include <QJsonDocument>
+#include <QJsonParseError>
+
+const QString XmlReplyParser::XmlElementTextKey = QStringLiteral("@text");
+
 namespace {
 
 QVariantMap elementToVariantMap(QXmlStreamReader &reader)
@@ -31,8 +36,8 @@ QVariantMap elementToVariantMap(QXmlStreamReader &reader)
         if (reader.isCharacters()) {
             // store the text of the element, if any
             QString elementText = reader.text().toString();
-            if (!elementText.isEmpty()) {
-                element.insert(QLatin1String("@text"), elementText);
+            if (!elementText.trimmed().isEmpty()) {
+                element.insert(XmlReplyParser::XmlElementTextKey, elementText);
             }
         } else if (reader.isStartElement()) {
             // recurse if necessary.
@@ -59,6 +64,12 @@ QVariantMap elementToVariantMap(QXmlStreamReader &reader)
     }
 
     return element;
+}
+
+int ocsMetaStatusCode(const QVariantMap &ocsVariantMap)
+{
+    return ocsVariantMap.value(QStringLiteral("meta")).toMap()
+            .value(QStringLiteral("statuscode")).toInt();
 }
 
 }
@@ -171,7 +182,7 @@ QList<XmlReplyParser::Resource> XmlReplyParser::parsePropFindResponse(const QByt
         const QString entryHref = QString::fromUtf8(
                 QByteArray::fromPercentEncoding(
                         rmap.value(QStringLiteral("href")).toMap().value(
-                                QStringLiteral("@text")).toString().toUtf8()));
+                                XmlElementTextKey).toString().toUtf8()));
         QVariantList propstats;
         if (rmap.value(QStringLiteral("propstat")).type() == QVariant::List) {
             propstats = rmap.value(QStringLiteral("propstat")).toList();
@@ -190,10 +201,10 @@ QList<XmlReplyParser::Resource> XmlReplyParser::parsePropFindResponse(const QByt
                 resourcetypeCollection = resourceTypeKeys.contains(QStringLiteral("collection"), Qt::CaseInsensitive);
             }
             if (prop.contains(QStringLiteral("getlastmodified"))) {
-                lastModified = QDateTime::fromString(prop.value(QStringLiteral("getlastmodified")).toMap().value(QStringLiteral("@text")).toString(), Qt::RFC2822Date);
+                lastModified = QDateTime::fromString(prop.value(QStringLiteral("getlastmodified")).toMap().value(XmlElementTextKey).toString(), Qt::RFC2822Date);
             }
             if (prop.contains(QStringLiteral("getcontenttype"))) {
-                contentType = prop.value(QStringLiteral("getcontenttype")).toMap().value(QStringLiteral("@text")).toString();
+                contentType = prop.value(QStringLiteral("getcontenttype")).toMap().value(XmlElementTextKey).toString();
             }
         }
 
@@ -208,4 +219,172 @@ QList<XmlReplyParser::Resource> XmlReplyParser::parsePropFindResponse(const QByt
     }
 
     return result;
+}
+
+QVariantMap XmlReplyParser::findCapabilityfromJson(const QString &capabilityName, const QByteArray &capabilityResponse)
+{
+    /* We expect a response of the form:
+
+    {
+      "ocs": {
+        ...
+        "data": {
+          ...
+          "capabilities": {
+            ...
+            "notifications": {
+              "ocs-endpoints": [
+                "list",
+                "get",
+                "delete",
+                "delete-all",
+                "icons",
+                "rich-strings",
+                "action-web"
+              ]
+            }
+          }
+        }
+      }
+    }
+    */
+
+    debugDumpData(QString::fromUtf8(capabilityResponse));
+
+    QJsonParseError err;
+    QJsonDocument doc = QJsonDocument::fromJson(capabilityResponse, &err);
+    if (err.error != QJsonParseError::NoError) {
+        qWarning() << "JSON parsing failed:" << err.errorString();
+        return QVariantMap();
+    }
+
+    const QVariant variant = doc.toVariant();
+    if (variant.type() != QVariant::Map) {
+        qWarning() << "Cannot convert JSON to map!";
+        return QVariantMap();
+    }
+
+    const QVariantMap ocs = variant.toMap().value(QStringLiteral("ocs")).toMap();
+    if (ocsMetaStatusCode(ocs) != 200) {
+        qWarning() << "Capabilities response has non-success status code:" << ocsMetaStatusCode(ocs);
+        return QVariantMap();
+    }
+
+    const QVariantMap capabilityMap = ocs.value(QStringLiteral("data")).toMap().value(QStringLiteral("capabilities")).toMap();
+    if (capabilityMap.isEmpty()) {
+        qWarning() << "No capabilities found in capability response!";
+        return QVariantMap();
+    }
+
+    return capabilityMap.value(capabilityName).toMap();
+}
+
+QList<XmlReplyParser::Notification> XmlReplyParser::parseNotificationsFromJson(const QByteArray &replyData)
+{
+    /* Expected result:
+    {
+      "ocs": {
+        "meta": {
+          "status": "ok",
+          "statuscode": 200,
+          "message": null
+        },
+        "data": [
+          {
+            "notification_id": 61,
+            "app": "files_sharing",
+            "user": "admin",
+            "datetime": "2004-02-12T15:19:21+00:00",
+            "object_type": "remote_share",
+            "object_id": "13",
+            "subject": "You received admin@localhost as a remote share from test",
+            "subjectRich": "You received {share} as a remote share from {user}",
+            "subjectRichParameters": {
+              "share": {
+                "type": "pending-federated-share",
+                "id": "1",
+                "name": "test"
+              },
+              "user": {
+                "type": "user",
+                "id": "test1",
+                "name": "User One",
+                "server": "http:\/\/nextcloud11.local"
+              }
+            },
+            "message": "",
+            "messageRich": "",
+            "messageRichParameters": [],
+            "link": "http://localhost/index.php/apps/files_sharing/pending",
+            "icon": "http://localhost/img/icon.svg",
+            "actions": [
+              {
+                "label": "Accept",
+                "link": "http:\/\/localhost\/ocs\/v1.php\/apps\/files_sharing\/api\/v1\/remote_shares\/13",
+                "type": "POST",
+                "primary": true
+              },
+              {
+                "label": "Decline",
+                "link": "http:\/\/localhost\/ocs\/v1.php\/apps\/files_sharing\/api\/v1\/remote_shares\/13",
+                "type": "DELETE",
+                "primary": false
+              }
+            ]
+          }
+        ]
+      }
+    }
+    */
+
+    debugDumpData(QString::fromUtf8(replyData));
+    QList<Notification> notifs;
+
+    QJsonParseError err;
+    QJsonDocument doc = QJsonDocument::fromJson(replyData, &err);
+    if (err.error != QJsonParseError::NoError) {
+        qWarning() << "JSON parsing failed:" << err.errorString();
+        return notifs;
+    }
+
+    const QVariant variant = doc.toVariant();
+    if (variant.type() != QVariant::Map) {
+        qWarning() << "Cannot convert JSON to map!";
+        return notifs;
+    }
+
+    const QVariantMap ocs = variant.toMap().value(QStringLiteral("ocs")).toMap();
+    if (ocsMetaStatusCode(ocs) != 200) {
+        qWarning() << "Notifications response has non-success status code:" << ocsMetaStatusCode(ocs);
+        return notifs;
+    }
+
+    const QVariantList notificationList = ocs.value(QStringLiteral("data")).toList();
+    for (const QVariant &notifVariant : notificationList) {
+        const QVariantMap notifMap = notifVariant.toMap();
+
+        Notification notif;
+        notif.notificationId = notifMap.value(QStringLiteral("notification_id")).toString();
+        notif.app = notifMap.value(QStringLiteral("app")).toString();
+        notif.userName = notifMap.value(QStringLiteral("user")).toString();
+        notif.dateTime = QDateTime::fromString(notifMap.value(QStringLiteral("datetime")).toString(), Qt::ISODate);
+        notif.icon = notifMap.value(QStringLiteral("icon")).toString();
+        notif.link = notifMap.value(QStringLiteral("link")).toString();
+        notif.actions = notifMap.value(QStringLiteral("actions")).toList();
+
+        notif.objectType = notifMap.value(QStringLiteral("object_type")).toString();
+        notif.objectId = notifMap.value(QStringLiteral("object_id")).toString();
+
+        notif.subject = notifMap.value(QStringLiteral("subject")).toString();
+        notif.subjectRich = notifMap.value(QStringLiteral("subjectRich")).toString();
+        notif.subjectRichParameters = notifMap.value(QStringLiteral("subjectRichParameters"));
+
+        notif.message = notifMap.value(QStringLiteral("message")).toString();
+        notif.messageRich = notifMap.value(QStringLiteral("messageRich")).toString();
+        notif.messageRichParameters = notifMap.value(QStringLiteral("messageRichParameters"));
+
+        notifs.append(notif);
+    }
+
+    return notifs;
 }

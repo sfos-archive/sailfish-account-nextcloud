@@ -6,6 +6,7 @@ OTHER_FILES += \
     $$PWD/services/nextcloud-caldav.service \
     $$PWD/services/nextcloud-carddav.service \
     $$PWD/services/nextcloud-images.service \
+    $$PWD/services/nextcloud-posts.service \
     $$PWD/services/nextcloud-sharing.service \
     $$PWD/ui/nextcloud.qml \
     $$PWD/ui/nextcloud-settings.qml \
@@ -19,6 +20,7 @@ services.files += \
     $$PWD/services/nextcloud-caldav.service \
     $$PWD/services/nextcloud-carddav.service \
     $$PWD/services/nextcloud-images.service \
+    $$PWD/services/nextcloud-posts.service \
     $$PWD/services/nextcloud-sharing.service
 services.path = /usr/share/accounts/services/
 

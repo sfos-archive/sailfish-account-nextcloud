@@ -18,6 +18,7 @@ BuildRequires: sailfish-svg2png
 %{_datadir}/accounts/services/nextcloud-caldav.service
 %{_datadir}/accounts/services/nextcloud-carddav.service
 %{_datadir}/accounts/services/nextcloud-images.service
+%{_datadir}/accounts/services/nextcloud-posts.service
 %{_datadir}/accounts/services/nextcloud-sharing.service
 %{_datadir}/accounts/ui/nextcloud.qml
 %{_datadir}/accounts/ui/nextcloud-settings.qml
@@ -47,6 +48,40 @@ BuildRequires: sailfish-svg2png
 %{_datadir}/themes/sailfish-default/meegotouch/z2.0/icons/graphic-m-service-nextcloud.png
 %{_datadir}/themes/sailfish-default/meegotouch/z2.0/icons/graphic-s-service-nextcloud.png
 %{_datadir}/themes/sailfish-default/meegotouch/z2.0/icons/icon-l-nextcloud.png
+
+
+%package -n buteo-sync-plugin-nextcloud-posts
+Summary:   Provides synchronisation of posts blobs with Nextcloud
+Group:     System/Applications
+BuildRequires: pkgconfig(Qt5Core)
+BuildRequires: pkgconfig(Qt5DBus)
+BuildRequires: pkgconfig(Qt5Sql)
+BuildRequires: pkgconfig(Qt5Network)
+BuildRequires: pkgconfig(mlite5)
+BuildRequires: pkgconfig(buteosyncfw5)
+BuildRequires: pkgconfig(libsignon-qt5)
+BuildRequires: pkgconfig(accounts-qt5)
+BuildRequires: pkgconfig(socialcache)
+BuildRequires: pkgconfig(libsailfishkeyprovider)
+BuildRequires: pkgconfig(sailfishaccounts)
+Requires: %{name} = %{version}-%{release}
+Requires: buteo-syncfw-qt5-msyncd
+Requires: systemd
+Requires(post): systemd
+
+%description -n buteo-sync-plugin-nextcloud-posts
+Provides synchronisation of posts blobs with Nextcloud.
+
+%files -n buteo-sync-plugin-nextcloud-posts
+%defattr(-,root,root,-)
+#out-of-process-plugin form:
+/usr/lib/buteo-plugins-qt5/oopp/nextcloud-posts-client
+#in-process-plugin form:
+#/usr/lib/buteo-plugins-qt5/libnextcloud-posts-client.so
+%config %{_sysconfdir}/buteo/profiles/client/nextcloud-posts.xml
+%config %{_sysconfdir}/buteo/profiles/sync/nextcloud.Posts.xml
+%{_libdir}/qt5/qml/com/jolla/eventsview/nextcloud/*
+%{_datadir}/lipstick/eventfeed/*
 
 
 %package -n buteo-sync-plugin-nextcloud-backup
