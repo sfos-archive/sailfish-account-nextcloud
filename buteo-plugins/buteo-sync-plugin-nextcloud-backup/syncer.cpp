@@ -64,6 +64,7 @@ bool Syncer::loadConfig()
         LOG_WARNING("Warning: failed to reset backup/restore options for profile: " + m_syncProfile->name());
     }
 
+    // Set up remote directory
     const QString &backupDeviceName = AccountSyncManager::backupDeviceName();
     if (backupDeviceName.isEmpty()) {
         LOG_WARNING("Default backup/restore dir name is empty!");
@@ -72,6 +73,17 @@ bool Syncer::loadConfig()
         m_backupRestoreOptions.remoteDirPath = "Sailfish OS/Backups/" + backupDeviceName;
     }
 
+    // Set up local directory
+    if (m_backupRestoreOptions.operation == AccountSyncManager::BackupRestoreOptions::DirectoryListing
+            || m_backupRestoreOptions.operation == AccountSyncManager::BackupRestoreOptions::Download) {
+        QDir dir;
+        if (!dir.mkpath(m_backupRestoreOptions.localDirPath)) {
+            LOG_WARNING("Cannot create local dir" << m_backupRestoreOptions.localDirPath);
+            return false;
+        }
+    }
+
+    // Set up backup file names
     if (m_backupRestoreOptions.operation == AccountSyncManager::BackupRestoreOptions::Upload) {
         m_backupFileNames = m_backupRestoreOptions.localDirFileNames();
         if (m_backupFileNames.isEmpty()) {
@@ -81,11 +93,6 @@ bool Syncer::loadConfig()
         LOG_DEBUG("Will upload files:" << m_backupFileNames);
 
     } else if (m_backupRestoreOptions.operation == AccountSyncManager::BackupRestoreOptions::Download) {
-        QDir dir;
-        if (!dir.mkpath(m_backupRestoreOptions.localDirPath)) {
-            LOG_WARNING("Cannot create local dir" << m_backupRestoreOptions.localDirPath);
-            return false;
-        }
         if (!m_backupRestoreOptions.fileName.isEmpty()) {
             m_backupFileNames = QStringList(m_backupRestoreOptions.fileName);
         }
@@ -175,8 +182,13 @@ void Syncer::handleDirListingReply()
     }
 
     if (reply->error() != QNetworkReply::NoError) {
-        WebDavSyncer::finishWithHttpError("Remote directory listing failed", httpCode);
-        return;
+        if (m_backupRestoreOptions.operation == AccountSyncManager::BackupRestoreOptions::DirectoryListing
+                && dirNotFound) {
+            // No backups created yet, that's OK
+        } else {
+            WebDavSyncer::finishWithHttpError("Remote directory listing failed", httpCode);
+            return;
+        }
     }
 
     if (m_backupRestoreOptions.operation == AccountSyncManager::BackupRestoreOptions::DirectoryListing) {
