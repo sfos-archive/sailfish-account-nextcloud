@@ -1,0 +1,6 @@
+module com.jolla.gallery.nextcloud
+plugin jollagallerynextcloudplugin
+NextcloudGalleryIcon 1.0 NextcloudGalleryIcon.qml
+NextcloudUsersPage 1.0 NextcloudUsersPage.qml
+NextcloudAlbumsPage 1.0 NextcloudAlbumsPage.qml
+NextcloudFullscreenPhotoPage 1.0 NextcloudFullscreenPhotoPage.qml

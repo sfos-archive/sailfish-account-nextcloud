@@ -1,0 +1,15 @@
+*.so*
+*.swp
+*.o
+*.prl
+*.moc
+moc_*
+Makefile
+documentation.list
+debugfiles.list
+debuglinks.list
+debugsources.list
+debugsourcefiles.list
+elfbins.list
+/installroot
+/RPMS

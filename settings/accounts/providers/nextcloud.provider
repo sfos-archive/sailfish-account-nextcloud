@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE provider>
+<provider version="1.0" id="nextcloud">
+    <name>Nextcloud</name>
+    <description>Nextcloud private cloud</description>
+    <icon>image://theme/graphic-service-nextcloud</icon>
+</provider>
