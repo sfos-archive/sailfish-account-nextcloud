@@ -82,8 +82,34 @@ Provides synchronisation of posts blobs with Nextcloud.
 #/usr/lib/buteo-plugins-qt5/libnextcloud-posts-client.so
 %config %{_sysconfdir}/buteo/profiles/client/nextcloud-posts.xml
 %config %{_sysconfdir}/buteo/profiles/sync/nextcloud.Posts.xml
+
+
+%package -n eventsview-extensions-nextcloud
+Summary:   Provides integration of Nextcloud notifications into Events view
+Group:     System/Libraries
+BuildRequires: pkgconfig(Qt5Gui)
+
+%description -n eventsview-extensions-nextcloud
+Provides integration of Nextcloud notifications into Events view
+
+%files -n eventsview-extensions-nextcloud
+%defattr(-,root,root,-)
+%{_datadir}/translations/eventsview-nextcloud_eng_en.qm
 %{_libdir}/qt5/qml/com/jolla/eventsview/nextcloud/*
 %{_datadir}/lipstick/eventfeed/*
+
+
+%package -n eventsview-extensions-nextcloud-ts-devel
+Summary:  Translation source for Events Nextcloud plugin
+Group:    System/Libraries
+Requires: eventsview-extensions-nextcloud
+
+%description -n eventsview-extensions-nextcloud-ts-devel
+Translation source for Events Nextcloud plugin.
+
+%files -n eventsview-extensions-nextcloud-ts-devel
+%defattr(-,root,root,-)
+%{_datadir}/translations/source/eventsview-nextcloud.ts
 
 
 %package -n buteo-sync-plugin-nextcloud-backup
