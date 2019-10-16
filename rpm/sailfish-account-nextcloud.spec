@@ -195,6 +195,7 @@ BuildRequires: pkgconfig(libsignon-qt5)
 BuildRequires: pkgconfig(accounts-qt5)
 BuildRequires: pkgconfig(socialcache)
 BuildRequires: pkgconfig(libsailfishkeyprovider)
+BuildRequires: pkgconfig(nemotransferengine-qt5)
 BuildRequires: qt5-qttools
 BuildRequires: qt5-qttools-linguist
 Requires: sailfishsilica-qt5
