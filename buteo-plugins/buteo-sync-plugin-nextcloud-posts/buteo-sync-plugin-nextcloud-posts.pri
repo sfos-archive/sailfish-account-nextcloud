@@ -1,6 +1,4 @@
 QT -= gui
-QT += systeminfo
-LIBS += -lssu
 
 DEFINES += NEXTCLOUDEVENTCACHE NEXTCLOUDWEBDAV
 include($$PWD/../../common/common.pri)
