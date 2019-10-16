@@ -57,6 +57,8 @@ BuildRequires: pkgconfig(Qt5Core)
 BuildRequires: pkgconfig(Qt5DBus)
 BuildRequires: pkgconfig(Qt5Sql)
 BuildRequires: pkgconfig(Qt5Network)
+BuildRequires: pkgconfig(Qt5Gui)
+BuildRequires: pkgconfig(Qt5Qml)
 BuildRequires: pkgconfig(mlite5)
 BuildRequires: pkgconfig(buteosyncfw5)
 BuildRequires: pkgconfig(libsignon-qt5)
@@ -150,6 +152,8 @@ Provides synchronisation of gallery images with Nextcloud.
 %package -n jolla-gallery-extension-nextcloud
 Summary:   Provides integration of Nextcloud images into Gallery application
 Group:     System/Libraries
+BuildRequires: pkgconfig(Qt5Gui)
+BuildRequires: pkgconfig(Qt5Qml)
 
 %description -n jolla-gallery-extension-nextcloud
 Provides integration of Nextcloud images into Gallery application.
@@ -189,6 +193,8 @@ BuildRequires: pkgconfig(Qt5Core)
 BuildRequires: pkgconfig(Qt5DBus)
 BuildRequires: pkgconfig(Qt5Sql)
 BuildRequires: pkgconfig(Qt5Network)
+BuildRequires: pkgconfig(Qt5Gui)
+BuildRequires: pkgconfig(Qt5Qml)
 BuildRequires: pkgconfig(mlite5)
 BuildRequires: pkgconfig(buteosyncfw5)
 BuildRequires: pkgconfig(libsignon-qt5)
