@@ -97,7 +97,6 @@ public:
             }
             it = m_preparedQueries.insert(statement, query);
         }
-
         return DatabaseQuery(*it);
     }
 
@@ -133,7 +132,7 @@ QVector<T> fetchMultiple(
     }
 
     DatabaseQuery selectQuery(d->prepare(queryString));
-    if (!selectQuery.isValid()) {
+    if (selectQuery.lastError().isValid()) {
         Database::setDatabaseError(error, DatabaseError::PrepareQueryError,
                                    QStringLiteral("Failed to prepare %1 query: %2\n%3")
                                              .arg(queryName)
@@ -180,7 +179,7 @@ T fetch(const DatabasePrivate *d,
     }
 
     DatabaseQuery selectQuery(d->prepare(queryString));
-    if (!selectQuery.isValid()) {
+    if (selectQuery.lastError().isValid()) {
         Database::setDatabaseError(error, DatabaseError::PrepareQueryError,
                                    QStringLiteral("Failed to prepare %1 query: %2\n%3")
                                              .arg(queryName)
@@ -226,7 +225,7 @@ void store(
     }
 
     DatabaseQuery storeQuery(d->prepare(queryString));
-    if (!storeQuery.isValid()) {
+    if (storeQuery.lastError().isValid()) {
         Database::setDatabaseError(error, DatabaseError::PrepareQueryError,
                                    QStringLiteral("Failed to prepare store %1 query: %2\n%3")
                                              .arg(queryName)
@@ -297,7 +296,7 @@ void deleteValue(
     }
 
     DatabaseQuery deleteQuery(d->prepare(queryString));
-    if (!deleteQuery.isValid()) {
+    if (deleteQuery.lastError().isValid()) {
         Database::setDatabaseError(error, DatabaseError::PrepareQueryError,
                                    QStringLiteral("Failed to prepare delete %1 query: %2\n%3")
                                              .arg(queryName)
