@@ -261,6 +261,25 @@ Translation source for Nextcloud Transfer Engine share plugin.
 %{_datadir}/translations/source/sailfish_transferengine_plugin_nextcloud.ts
 
 
+%package features-all
+Summary:   Meta package to include all Nextcloud account features
+Group:     System/Application
+Requires: %{name} = %{version}-%{release}
+Requires: transferengine-plugin-nextcloud
+Requires: jolla-gallery-extension-nextcloud
+Requires: eventsview-extensions-nextcloud
+Requires: buteo-sync-plugin-nextcloud-images
+Requires: buteo-sync-plugin-nextcloud-backup
+Requires: buteo-sync-plugin-nextcloud-posts
+
+%description features-all
+This package is here to include all Nextcloud account
+features to image (e.g. sharing, image sync, backups, etc).
+
+%files features-all
+# Empty as this is meta package.
+
+
 %prep
 %setup -q -n %{name}-%{version}
 
