@@ -117,6 +117,7 @@ public:
     void setAccountId(int id);
 
     Q_INVOKABLE QVariantMap at(int row) const;
+    Q_INVOKABLE void refresh();
 
 Q_SIGNALS:
     void eventCacheChanged();

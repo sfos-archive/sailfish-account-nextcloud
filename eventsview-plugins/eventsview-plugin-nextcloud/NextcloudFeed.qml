@@ -85,6 +85,19 @@ Item {
         id: evCache
     }
 
+    Timer {
+        id: refreshEventModelTimer
+        interval: 5 * 60 * 1000
+        repeat: true
+        running: root.showingInActiveView
+        onRunningChanged: {
+            if (running) {
+                eventModel.refresh()
+            }
+        }
+        onTriggered: eventModel.refresh()
+    }
+
     NextcloudEventsModel {
         id: eventModel
 

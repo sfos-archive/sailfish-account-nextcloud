@@ -489,6 +489,107 @@ void NextcloudEventsModel::loadData()
     m_eventCache->requestEvents(m_accountId);
 }
 
+// call this periodically to detect changes made to the database by another process.
+// this would go away if we had daemonized storage rather than direct-file database access...
+void NextcloudEventsModel::refresh()
+{
+    if (!m_eventCache) {
+        return;
+    }
+
+    if (m_accountId <= 0) {
+        return;
+    }
+
+    if (m_deferLoad) {
+        return;
+    }
+
+    QObject *contextObject = new QObject(this);
+    connect(m_eventCache, &SyncCache::EventCache::requestEventsFinished,
+            contextObject, [this, contextObject] (int accountId,
+                                                  const QVector<SyncCache::Event> &events) {
+        if (accountId != this->accountId()) {
+            return;
+        }
+        contextObject->deleteLater();
+
+        int row = 0;
+        const QVector<SyncCache::Event> oldEvents = m_data;
+        QVector<SyncCache::Event>::const_iterator newValuesIter(events.constBegin());
+        QVector<SyncCache::Event>::const_iterator oldValuesIter(oldEvents.constBegin());
+        while (newValuesIter != events.constEnd() || oldValuesIter != oldEvents.constEnd()) {
+            bool bothNeedIncrement = newValuesIter != events.constEnd()
+                    && oldValuesIter != oldEvents.constEnd()
+                    && newValuesIter->eventId == oldValuesIter->eventId;
+            bool newNeedsIncrement =
+                    // if they both need incrementing, then newIter needs incrementing
+                    bothNeedIncrement ? true
+                    // if they are both not at end, and newIter.timestamp > oldIter.timestamp, then newIter needs incrementing
+                    : ((newValuesIter != events.constEnd() &&
+                        oldValuesIter != oldEvents.constEnd() &&
+                        newValuesIter->timestamp > oldValuesIter->timestamp)
+                    // if only newIter is not at end, then newIter needs incrementing
+                    || (newValuesIter != events.constEnd() &&
+                        oldValuesIter == oldEvents.constEnd()));
+
+            if (bothNeedIncrement) {
+                // the current event exists in both old + new.
+                // this is either a row change, or an unchanged row (identical data)
+                QVector<int> changedRoles;
+                if (newValuesIter->eventText != oldValuesIter->eventText) {
+                    changedRoles.append(static_cast<int>(EventTextRole));
+                }
+                if (newValuesIter->eventUrl != oldValuesIter->eventUrl) {
+                    changedRoles.append(static_cast<int>(EventUrlRole));
+                }
+                if (!changedRoles.isEmpty()) {
+                    m_data.replace(row, *newValuesIter);
+                    emit dataChanged(createIndex(row, 0), createIndex(row, 0), changedRoles);
+                }
+            } else if (newNeedsIncrement) {
+                // the current key exists only in new.
+                // this is a row addition.
+                emit beginInsertRows(QModelIndex(), row, row);
+                m_data.insert(row, *newValuesIter);
+                emit endInsertRows();
+            } else {
+                // the current key exists only in old.
+                // this is a row removal.
+                emit beginRemoveRows(QModelIndex(), row, row);
+                m_data.removeAt(row);
+                emit endRemoveRows();
+            }
+
+            if (bothNeedIncrement) {
+                newValuesIter++;
+                oldValuesIter++;
+                row++; // we changed (or ignored) a value at the previous row.
+            } else if (newNeedsIncrement) {
+                newValuesIter++;
+                row++; // we added a new value at the previous row.
+            } else {
+                oldValuesIter++;
+                // no need to increment or decrement row, as we removed the old value associated with that row number.
+            }
+        }
+
+        if (oldEvents.size() != m_data.size()) {
+            emit rowCountChanged();
+        }
+    });
+    connect(m_eventCache, &SyncCache::EventCache::requestEventsFailed,
+            contextObject, [this, contextObject] (int accountId,
+                                                  const QString &errorMessage) {
+        if (accountId != this->accountId()) {
+            return;
+        }
+        contextObject->deleteLater();
+        qWarning() << "NextcloudEventsModel::refresh: failed:" << errorMessage;
+    });
+    m_eventCache->requestEvents(m_accountId);
+}
+
 //-----------------------------------------------------------------------------
 
 NextcloudEventImageDownloader::NextcloudEventImageDownloader(QObject *parent)
