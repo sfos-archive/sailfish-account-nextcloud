@@ -15,6 +15,9 @@ DEFINES -= NEXTCLOUDEVENTCACHE
 
 include ($$PWD/translations.pri)
 
+qml.files = nextcloud-delegate.qml
+qml.path = /usr/share/lipstick/eventfeed/
+
 import.files = \
     NextcloudFeed.qml \
     NextcloudFeedItem.qml \
@@ -30,7 +33,7 @@ SOURCES += \
     eventmodel.cpp \
     plugin.cpp
 
-OTHER_FILES += import.files
+OTHER_FILES += import.files qml.files
 
-INSTALLS += target import
+INSTALLS += target import qml
 

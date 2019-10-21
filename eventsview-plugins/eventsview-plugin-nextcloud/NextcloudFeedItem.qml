@@ -21,9 +21,8 @@ NotificationGroupMember {
     property string eventUrl
 
     width: parent.width
-    contentLeftMargin: Theme.paddingMedium
     contentWidth: width - contentLeftMargin
-    contentHeight: content.y + content.height + Theme.paddingLarge
+    contentHeight: Math.max(image.y + image.height, content.y + content.height) + Theme.paddingLarge
 
     onClicked: {
         if (eventUrl.length > 0) {
@@ -34,8 +33,8 @@ NotificationGroupMember {
     Image {
         id: image
         y: Theme.paddingLarge
-        width: Theme.iconSizeSmall
-        height: Theme.iconSizeSmall
+        width: Theme.itemSizeMedium
+        height: Theme.itemSizeMedium
     }
 
     Column {

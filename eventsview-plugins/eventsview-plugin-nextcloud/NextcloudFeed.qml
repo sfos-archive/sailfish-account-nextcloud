@@ -45,11 +45,12 @@ Item {
 
     NotificationGroupHeader {
         id: headerItem
-
-        name: root.providerName
+        //: Nextcloud notifications and announcements
+        //% "Nextcloud"
+        name: qsTrId("eventsview_plugin_nextcloud-la-nextcloud_notifictions")
         indicator.iconSource: "image://theme/graphic-service-nextcloud"
-        memberCount: totalItemCount
         totalItemCount: root._modelCount
+        memberCount: totalItemCount
         userRemovable: false
     }
 
@@ -88,7 +89,6 @@ Item {
         id: eventModel
 
         eventCache: evCache
-
         Component.onCompleted: {
             // Use the first found account, which is the one most recently added.
             var ids = accountManager.providerAccountIdentifiers(root.providerName)
@@ -109,7 +109,7 @@ Item {
             subject: model.eventText
             icon.source: imageDownloader.imagePath != ""
                          ? imageDownloader.imagePath
-                         : "image://theme/icon-l-nextcloud"
+                         : "image://theme/graphic-service-nextcloud" // placeholder is not square: "image://theme/icon-l-nextcloud"
             timestamp: model.timestamp
             eventUrl: model.eventUrl
 
