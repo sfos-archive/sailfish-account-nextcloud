@@ -17,6 +17,7 @@ NotificationGroupMember {
 
     property alias icon: image
     property alias subject: subjectLabel.text
+    property alias message: messageLabel.text
     property var timestamp
     property string eventUrl
 
@@ -56,6 +57,15 @@ NotificationGroupMember {
             elide: Text.ElideRight
             wrapMode: Text.Wrap
             font.pixelSize: Theme.fontSizeSmall
+        }
+
+        Label {
+            id: messageLabel
+            visible: text.length !== 0
+            width: parent.width
+            elide: Text.ElideRight
+            wrapMode: Text.Wrap
+            font.pixelSize: Theme.fontSizeExtraSmall
         }
 
         Label {

@@ -119,7 +119,8 @@ Item {
         delegate: NextcloudFeedItem {
             id: delegateItem
 
-            subject: model.eventText
+            subject: model.eventSubject
+            message: model.eventText
             icon.source: imageDownloader.imagePath != ""
                          ? imageDownloader.imagePath
                          : "image://theme/graphic-service-nextcloud" // placeholder is not square: "image://theme/icon-l-nextcloud"

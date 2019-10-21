@@ -317,6 +317,7 @@ QVariant NextcloudEventsModel::data(const QModelIndex &index, int role) const
     switch (role) {
         case AccountIdRole:     return m_data[row].accountId;
         case EventIdRole:       return m_data[row].eventId;
+        case EventSubjectRole:  return m_data[row].eventSubject;
         case EventTextRole:     return m_data[row].eventText;
         case EventUrlRole:      return m_data[row].eventUrl;
         case ImageUrlRole:      return m_data[row].imageUrl;
@@ -336,6 +337,7 @@ QHash<int, QByteArray> NextcloudEventsModel::roleNames() const
     static QHash<int, QByteArray> retn {
         { AccountIdRole,        "accountId" },
         { EventIdRole,          "eventId" },
+        { EventSubjectRole,     "eventSubject" },
         { EventTextRole,        "eventText" },
         { EventUrlRole,         "eventUrl" },
         { ImageUrlRole,         "imageUrl" },
@@ -537,6 +539,9 @@ void NextcloudEventsModel::refresh()
                 // the current event exists in both old + new.
                 // this is either a row change, or an unchanged row (identical data)
                 QVector<int> changedRoles;
+                if (newValuesIter->eventSubject != oldValuesIter->eventSubject) {
+                    changedRoles.append(static_cast<int>(EventSubjectRole));
+                }
                 if (newValuesIter->eventText != oldValuesIter->eventText) {
                     changedRoles.append(static_cast<int>(EventTextRole));
                 }

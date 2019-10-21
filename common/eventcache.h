@@ -28,6 +28,7 @@ class ProcessMutex;
 struct Event {
     int accountId = 0;
     QString eventId;
+    QString eventSubject;
     QString eventText;
     QUrl eventUrl;
     QUrl imageUrl;
