@@ -155,7 +155,7 @@ void NextcloudImageCache::signIn(int accountId)
         connect(m_auth, &AccountAuthenticator::signInCompleted,
                 this, &NextcloudImageCache::signOnResponse);
         connect(m_auth, &AccountAuthenticator::signInError,
-                this, &NextcloudEventCache::signOnError);
+                this, &NextcloudImageCache::signOnError);
     }
     m_auth->signIn(accountId, QStringLiteral("nextcloud-images"));
 }

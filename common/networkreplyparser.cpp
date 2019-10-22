@@ -7,15 +7,15 @@
 **
 ****************************************************************************************/
 
-#include "xmlreplyparser_p.h"
-
-#include <LogMacros.h>
+#include "networkreplyparser_p.h"
 
 #include <QList>
 #include <QXmlStreamReader>
-
 #include <QJsonDocument>
 #include <QJsonParseError>
+
+// Buteo
+#include <LogMacros.h>
 
 const QString XmlReplyParser::XmlElementTextKey = QStringLiteral("@text");
 
@@ -74,7 +74,7 @@ int ocsMetaStatusCode(const QVariantMap &ocsVariantMap)
 
 }
 
-void XmlReplyParser::debugDumpData(const QString &data)
+void NetworkReplyParser::debugDumpData(const QString &data)
 {
     if (Buteo::Logger::instance()->getLogLevel() < 7) {
         return;
@@ -96,132 +96,9 @@ void XmlReplyParser::debugDumpData(const QString &data)
     }
 }
 
-QVariantMap XmlReplyParser::xmlToVariantMap(QXmlStreamReader &reader)
-{
-    QVariantMap retn;
-    while (!reader.atEnd() && !reader.hasError() && reader.readNextStartElement()) {
-        QString elementName = reader.name().toString();
-        QVariantMap element = elementToVariantMap(reader);
-        retn.insert(elementName, element);
-    }
-    return retn;
-}
+//--- JsonReplyParser:
 
-QList<XmlReplyParser::Resource> XmlReplyParser::parsePropFindResponse(const QByteArray &propFindResponse, const QString &remotePath)
-{
-    /* We expect a response of the form:
-        <?xml version="1.0" encoding="UTF-8"?>
-        <d:multistatus xmlns:d="DAV:" xmlns:nc="http://nextcloud.org/ns" xmlns:oc="http://owncloud.org/ns" xmlns:s="http://sabredav.org/ns">
-           <d:response>
-              <d:href>/remote.php/dav/files/Username/</d:href>
-              <d:propstat>
-                 <d:prop>
-                    <d:getlastmodified>Tue, 17 Sep 2019 06:39:33 GMT</d:getlastmodified>
-                    <d:resourcetype>
-                       <d:collection />
-                    </d:resourcetype>
-                    <d:quota-used-bytes>2505506</d:quota-used-bytes>
-                    <d:quota-available-bytes>-3</d:quota-available-bytes>
-                    <d:getetag>"5d807fa5bea23"</d:getetag>
-                 </d:prop>
-                 <d:status>HTTP/1.1 200 OK</d:status>
-              </d:propstat>
-           </d:response>
-           <d:response>
-              <d:href>/remote.php/dav/files/Username/Documents/</d:href>
-              <d:propstat>
-                 <d:prop>
-                    <d:getlastmodified>Tue, 17 Sep 2019 06:39:33 GMT</d:getlastmodified>
-                    <d:resourcetype>
-                       <d:collection />
-                    </d:resourcetype>
-                    <d:quota-used-bytes>119824</d:quota-used-bytes>
-                    <d:quota-available-bytes>-3</d:quota-available-bytes>
-                    <d:getetag>"5d807fa5bea23"</d:getetag>
-                 </d:prop>
-                 <d:status>HTTP/1.1 200 OK</d:status>
-              </d:propstat>
-           </d:response>
-           <d:response>
-              <d:href>/remote.php/dav/files/Username/Storage-Share.png</d:href>
-              <d:propstat>
-                 <d:prop>
-                    <d:getlastmodified>Tue, 17 Sep 2019 06:39:33 GMT</d:getlastmodified>
-                    <d:getcontentlength>25671</d:getcontentlength>
-                    <d:resourcetype />
-                    <d:getetag>"2d391d9c53795329f51011d1af60158b"</d:getetag>
-                    <d:getcontenttype>image/png</d:getcontenttype>
-                 </d:prop>
-                 <d:status>HTTP/1.1 200 OK</d:status>
-              </d:propstat>
-           </d:response>
-        </d:multistatus>
-    */
-
-    debugDumpData(QString::fromUtf8(propFindResponse));
-
-    QXmlStreamReader reader(propFindResponse);
-    QVariantMap variantMap = XmlReplyParser::xmlToVariantMap(reader);
-
-    QVariantMap multistatusMap = variantMap.value(QStringLiteral("multistatus")).toMap();
-    QVariantList responses;
-
-    QVariant response = multistatusMap.value(QStringLiteral("response"));
-    if (response.type() == QVariant::List) {
-        // multiple directory entries.
-        responses = response.toList();
-    } else {
-        // only one directory entry.
-        responses << response.toMap();
-    }
-
-    // parse the information about each entry (response element)
-    QList<XmlReplyParser::Resource> result;
-    for (const QVariant &rv : responses) {
-        const QVariantMap rmap = rv.toMap();
-        const QString entryHref = QString::fromUtf8(
-                QByteArray::fromPercentEncoding(
-                        rmap.value(QStringLiteral("href")).toMap().value(
-                                XmlElementTextKey).toString().toUtf8()));
-        QVariantList propstats;
-        if (rmap.value(QStringLiteral("propstat")).type() == QVariant::List) {
-            propstats = rmap.value(QStringLiteral("propstat")).toList();
-        } else {
-            QVariantMap propstat = rmap.value(QStringLiteral("propstat")).toMap();
-            propstats << propstat;
-        }
-        bool resourcetypeCollection = false;
-        QDateTime lastModified;
-        QString contentType;
-        for (const QVariant &vpropstat : propstats) {
-            const QVariantMap propstat = vpropstat.toMap();
-            const QVariantMap &prop(propstat.value(QStringLiteral("prop")).toMap());
-            if (prop.contains(QStringLiteral("resourcetype"))) {
-                const QStringList resourceTypeKeys = prop.value(QStringLiteral("resourcetype")).toMap().keys();
-                resourcetypeCollection = resourceTypeKeys.contains(QStringLiteral("collection"), Qt::CaseInsensitive);
-            }
-            if (prop.contains(QStringLiteral("getlastmodified"))) {
-                lastModified = QDateTime::fromString(prop.value(QStringLiteral("getlastmodified")).toMap().value(XmlElementTextKey).toString(), Qt::RFC2822Date);
-            }
-            if (prop.contains(QStringLiteral("getcontenttype"))) {
-                contentType = prop.value(QStringLiteral("getcontenttype")).toMap().value(XmlElementTextKey).toString();
-            }
-        }
-
-        if (entryHref != remotePath) {
-            Resource resource;
-            resource.lastModified = lastModified;
-            resource.href = entryHref;
-            resource.contentType = contentType;
-            resource.isCollection = resourcetypeCollection;
-            result.append(resource);
-        }
-    }
-
-    return result;
-}
-
-QVariantMap XmlReplyParser::findCapabilityfromJson(const QString &capabilityName, const QByteArray &capabilityResponse)
+QVariantMap JsonReplyParser::findCapability(const QString &capabilityName, const QByteArray &capabilityResponse)
 {
     /* We expect a response of the form:
 
@@ -249,7 +126,7 @@ QVariantMap XmlReplyParser::findCapabilityfromJson(const QString &capabilityName
     }
     */
 
-    debugDumpData(QString::fromUtf8(capabilityResponse));
+    NetworkReplyParser::debugDumpData(QString::fromUtf8(capabilityResponse));
 
     QJsonParseError err;
     QJsonDocument doc = QJsonDocument::fromJson(capabilityResponse, &err);
@@ -279,7 +156,7 @@ QVariantMap XmlReplyParser::findCapabilityfromJson(const QString &capabilityName
     return capabilityMap.value(capabilityName).toMap();
 }
 
-QList<XmlReplyParser::Notification> XmlReplyParser::parseNotificationsFromJson(const QByteArray &replyData)
+QList<NetworkReplyParser::Notification> JsonReplyParser::parseNotificationResponse(const QByteArray &replyData)
 {
     /* Expected result:
     {
@@ -337,8 +214,8 @@ QList<XmlReplyParser::Notification> XmlReplyParser::parseNotificationsFromJson(c
     }
     */
 
-    debugDumpData(QString::fromUtf8(replyData));
-    QList<Notification> notifs;
+    NetworkReplyParser::debugDumpData(QString::fromUtf8(replyData));
+    QList<NetworkReplyParser::Notification> notifs;
 
     QJsonParseError err;
     QJsonDocument doc = QJsonDocument::fromJson(replyData, &err);
@@ -363,7 +240,7 @@ QList<XmlReplyParser::Notification> XmlReplyParser::parseNotificationsFromJson(c
     for (const QVariant &notifVariant : notificationList) {
         const QVariantMap notifMap = notifVariant.toMap();
 
-        Notification notif;
+        NetworkReplyParser::Notification notif;
         notif.notificationId = notifMap.value(QStringLiteral("notification_id")).toString();
         notif.app = notifMap.value(QStringLiteral("app")).toString();
         notif.userName = notifMap.value(QStringLiteral("user")).toString();
@@ -387,4 +264,131 @@ QList<XmlReplyParser::Notification> XmlReplyParser::parseNotificationsFromJson(c
     }
 
     return notifs;
+}
+
+//--- XmlReplyParser:
+
+QVariantMap XmlReplyParser::xmlToVariantMap(QXmlStreamReader &reader)
+{
+    QVariantMap retn;
+    while (!reader.atEnd() && !reader.hasError() && reader.readNextStartElement()) {
+        QString elementName = reader.name().toString();
+        QVariantMap element = elementToVariantMap(reader);
+        retn.insert(elementName, element);
+    }
+    return retn;
+}
+
+QList<NetworkReplyParser::Resource> XmlReplyParser::parsePropFindResponse(const QByteArray &propFindResponse, const QString &remotePath)
+{
+    /* We expect a response of the form:
+        <?xml version="1.0" encoding="UTF-8"?>
+        <d:multistatus xmlns:d="DAV:" xmlns:nc="http://nextcloud.org/ns" xmlns:oc="http://owncloud.org/ns" xmlns:s="http://sabredav.org/ns">
+           <d:response>
+              <d:href>/remote.php/dav/files/Username/</d:href>
+              <d:propstat>
+                 <d:prop>
+                    <d:getlastmodified>Tue, 17 Sep 2019 06:39:33 GMT</d:getlastmodified>
+                    <d:resourcetype>
+                       <d:collection />
+                    </d:resourcetype>
+                    <d:quota-used-bytes>2505506</d:quota-used-bytes>
+                    <d:quota-available-bytes>-3</d:quota-available-bytes>
+                    <d:getetag>"5d807fa5bea23"</d:getetag>
+                 </d:prop>
+                 <d:status>HTTP/1.1 200 OK</d:status>
+              </d:propstat>
+           </d:response>
+           <d:response>
+              <d:href>/remote.php/dav/files/Username/Documents/</d:href>
+              <d:propstat>
+                 <d:prop>
+                    <d:getlastmodified>Tue, 17 Sep 2019 06:39:33 GMT</d:getlastmodified>
+                    <d:resourcetype>
+                       <d:collection />
+                    </d:resourcetype>
+                    <d:quota-used-bytes>119824</d:quota-used-bytes>
+                    <d:quota-available-bytes>-3</d:quota-available-bytes>
+                    <d:getetag>"5d807fa5bea23"</d:getetag>
+                 </d:prop>
+                 <d:status>HTTP/1.1 200 OK</d:status>
+              </d:propstat>
+           </d:response>
+           <d:response>
+              <d:href>/remote.php/dav/files/Username/Storage-Share.png</d:href>
+              <d:propstat>
+                 <d:prop>
+                    <d:getlastmodified>Tue, 17 Sep 2019 06:39:33 GMT</d:getlastmodified>
+                    <d:getcontentlength>25671</d:getcontentlength>
+                    <d:resourcetype />
+                    <d:getetag>"2d391d9c53795329f51011d1af60158b"</d:getetag>
+                    <d:getcontenttype>image/png</d:getcontenttype>
+                 </d:prop>
+                 <d:status>HTTP/1.1 200 OK</d:status>
+              </d:propstat>
+           </d:response>
+        </d:multistatus>
+    */
+
+    NetworkReplyParser::debugDumpData(QString::fromUtf8(propFindResponse));
+
+    QXmlStreamReader reader(propFindResponse);
+    QVariantMap variantMap = XmlReplyParser::xmlToVariantMap(reader);
+
+    QVariantMap multistatusMap = variantMap.value(QStringLiteral("multistatus")).toMap();
+    QVariantList responses;
+
+    QVariant response = multistatusMap.value(QStringLiteral("response"));
+    if (response.type() == QVariant::List) {
+        // multiple directory entries.
+        responses = response.toList();
+    } else {
+        // only one directory entry.
+        responses << response.toMap();
+    }
+
+    // parse the information about each entry (response element)
+    QList<NetworkReplyParser::Resource> result;
+    for (const QVariant &rv : responses) {
+        const QVariantMap rmap = rv.toMap();
+        const QString entryHref = QString::fromUtf8(
+                QByteArray::fromPercentEncoding(
+                        rmap.value(QStringLiteral("href")).toMap().value(
+                                XmlElementTextKey).toString().toUtf8()));
+        QVariantList propstats;
+        if (rmap.value(QStringLiteral("propstat")).type() == QVariant::List) {
+            propstats = rmap.value(QStringLiteral("propstat")).toList();
+        } else {
+            QVariantMap propstat = rmap.value(QStringLiteral("propstat")).toMap();
+            propstats << propstat;
+        }
+        bool resourcetypeCollection = false;
+        QDateTime lastModified;
+        QString contentType;
+        for (const QVariant &vpropstat : propstats) {
+            const QVariantMap propstat = vpropstat.toMap();
+            const QVariantMap &prop(propstat.value(QStringLiteral("prop")).toMap());
+            if (prop.contains(QStringLiteral("resourcetype"))) {
+                const QStringList resourceTypeKeys = prop.value(QStringLiteral("resourcetype")).toMap().keys();
+                resourcetypeCollection = resourceTypeKeys.contains(QStringLiteral("collection"), Qt::CaseInsensitive);
+            }
+            if (prop.contains(QStringLiteral("getlastmodified"))) {
+                lastModified = QDateTime::fromString(prop.value(QStringLiteral("getlastmodified")).toMap().value(XmlElementTextKey).toString(), Qt::RFC2822Date);
+            }
+            if (prop.contains(QStringLiteral("getcontenttype"))) {
+                contentType = prop.value(QStringLiteral("getcontenttype")).toMap().value(XmlElementTextKey).toString();
+            }
+        }
+
+        if (entryHref != remotePath) {
+            NetworkReplyParser::Resource resource;
+            resource.lastModified = lastModified;
+            resource.href = entryHref;
+            resource.contentType = contentType;
+            resource.isCollection = resourcetypeCollection;
+            result.append(resource);
+        }
+    }
+
+    return result;
 }

@@ -8,8 +8,9 @@
 ****************************************************************************************/
 
 #include "syncer_p.h"
-#include "webdavrequestgenerator_p.h"
-#include "xmlreplyparser_p.h"
+
+#include "networkrequestgenerator_p.h"
+#include "networkreplyparser_p.h"
 
 #include <QtCore/QDateTime>
 #include <QtCore/QUrl>
@@ -40,6 +41,7 @@ Syncer::Syncer(QObject *parent, Buteo::SyncProfile *syncProfile)
 
 Syncer::~Syncer()
 {
+    delete m_requestGenerator;
 }
 
 bool Syncer::loadConfig()
@@ -97,6 +99,11 @@ bool Syncer::loadConfig()
 
 void Syncer::beginSync()
 {
+    delete m_requestGenerator;
+    m_requestGenerator = m_accessToken.isEmpty()
+                       ? new WebDavRequestGenerator(&m_qnam, m_username, m_password)
+                       : new WebDavRequestGenerator(&m_qnam, m_accessToken);
+
     if (!loadConfig()) {
         WebDavSyncer::finishWithError("Config load failed");
     } else {
@@ -186,14 +193,14 @@ void Syncer::handleDirListingReply()
     }
 
     if (m_backupRestoreOptions.operation == AccountSyncManager::BackupRestoreOptions::DirectoryListing) {
-        const QList<XmlReplyParser::Resource> resourceList = XmlReplyParser::parsePropFindResponse(
+        const QList<NetworkReplyParser::Resource> resourceList = XmlReplyParser::parsePropFindResponse(
                 replyData, remoteDirPath);
         QFile file(m_backupRestoreOptions.localDirPath + '/' + m_backupRestoreOptions.fileName);
         if (!file.open(QFile::WriteOnly | QFile::Text)) {
             WebDavSyncer::finishWithError("Cannot open " + file.fileName() + " for writing!");
             return;
         }
-        for (const XmlReplyParser::Resource &resource : resourceList) {
+        for (const NetworkReplyParser::Resource &resource : resourceList) {
             LOG_DEBUG("Found remote file or dir:" << resource.href);
             if (!resource.isCollection
                     && file.write(resource.href.toUtf8() + '\n') < 0) {
@@ -209,9 +216,9 @@ void Syncer::handleDirListingReply()
             WebDavSyncer::finishWithError("Upload request failed");
         }
     } else if (m_backupRestoreOptions.operation == AccountSyncManager::BackupRestoreOptions::Download) {
-        const QList<XmlReplyParser::Resource> resourceList = XmlReplyParser::parsePropFindResponse(
+        const QList<NetworkReplyParser::Resource> resourceList = XmlReplyParser::parsePropFindResponse(
                 replyData, remoteDirPath);
-        for (const XmlReplyParser::Resource &resource : resourceList) {
+        for (const NetworkReplyParser::Resource &resource : resourceList) {
             if (!resource.isCollection) {
                 int lastDirSep = resource.href.lastIndexOf('/');
                 QString fileName = resource.href.mid(lastDirSep + 1);

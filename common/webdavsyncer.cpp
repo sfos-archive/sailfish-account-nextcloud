@@ -9,7 +9,6 @@
 
 #include "webdavsyncer_p.h"
 #include "accountauthenticator_p.h"
-#include "webdavrequestgenerator_p.h"
 
 // buteo
 #include <SyncProfile.h>
@@ -27,7 +26,6 @@ WebDavSyncer::WebDavSyncer(QObject *parent, Buteo::SyncProfile *syncProfile, con
 WebDavSyncer::~WebDavSyncer()
 {
     delete m_auth;
-    delete m_requestGenerator;
 }
 
 void WebDavSyncer::abortSync()
@@ -62,11 +60,6 @@ void WebDavSyncer::sync(int, const QString &, const QString &serverUrl, const QS
     m_password = password;
     m_accessToken = accessToken;
     m_ignoreSslErrors = ignoreSslErrors;
-
-    delete m_requestGenerator;
-    m_requestGenerator = accessToken.isEmpty()
-                       ? new WebDavRequestGenerator(&m_qnam, username, password)
-                       : new WebDavRequestGenerator(&m_qnam, accessToken);
 
     beginSync();
 }

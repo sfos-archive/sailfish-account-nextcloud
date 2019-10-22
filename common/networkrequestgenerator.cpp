@@ -7,18 +7,12 @@
 **
 ****************************************************************************************/
 
-#include "webdavrequestgenerator_p.h"
+#include "networkrequestgenerator_p.h"
 
-#include <LogMacros.h>
-
-#include <QUrl>
-#include <QUrlQuery>
-#include <QNetworkRequest>
-#include <QNetworkReply>
-
-#include <QStringList>
 #include <QBuffer>
-#include <QByteArray>
+
+// Buteo
+#include <LogMacros.h>
 
 namespace {
     const QByteArray XmlContentType("application/xml; charset=utf-8");
@@ -53,20 +47,20 @@ namespace {
     }
 }
 
-WebDavRequestGenerator::WebDavRequestGenerator(QNetworkAccessManager *networkAccessManager, const QString &username, const QString &password)
+NetworkRequestGenerator::NetworkRequestGenerator(QNetworkAccessManager *networkAccessManager, const QString &username, const QString &password)
     : m_username(username)
     , m_password(password)
     , m_networkAccessManager(networkAccessManager)
 {
 }
 
-WebDavRequestGenerator::WebDavRequestGenerator(QNetworkAccessManager *networkAccessManager, const QString &accessToken)
+NetworkRequestGenerator::NetworkRequestGenerator(QNetworkAccessManager *networkAccessManager, const QString &accessToken)
     : m_accessToken(accessToken)
     , m_networkAccessManager(networkAccessManager)
 {
 }
 
-QNetworkReply *WebDavRequestGenerator::sendRequest(const QNetworkRequest &request, const QByteArray &requestType, const QByteArray &requestData) const
+QNetworkReply *NetworkRequestGenerator::sendRequest(const QNetworkRequest &request, const QByteArray &requestType, const QByteArray &requestData) const
 {
     QBuffer *requestDataBuffer = 0;
     if (!requestData.isEmpty()) {
@@ -87,7 +81,7 @@ QNetworkReply *WebDavRequestGenerator::sendRequest(const QNetworkRequest &reques
     return reply;
 }
 
-QNetworkRequest WebDavRequestGenerator::networkRequest(const QUrl &url, const QString &contentType, const QByteArray &requestData) const
+QNetworkRequest NetworkRequestGenerator::networkRequest(const QUrl &url, const QString &contentType, const QByteArray &requestData) const
 {
     QNetworkRequest request(url);
 
@@ -120,7 +114,19 @@ QNetworkRequest WebDavRequestGenerator::networkRequest(const QUrl &url, const QS
     return request;
 }
 
-QNetworkReply *WebDavRequestGenerator::capabilities(const QString &serverUrl)
+//--- JsonRequestGenerator:
+
+JsonRequestGenerator::JsonRequestGenerator(QNetworkAccessManager *networkAccessManager, const QString &username, const QString &password)
+    : NetworkRequestGenerator(networkAccessManager, username, password)
+{
+}
+
+JsonRequestGenerator::JsonRequestGenerator(QNetworkAccessManager *networkAccessManager, const QString &accessToken)
+    : NetworkRequestGenerator(networkAccessManager, accessToken)
+{
+}
+
+QNetworkReply *JsonRequestGenerator::capabilities(const QString &serverUrl)
 {
     if (Q_UNLIKELY(serverUrl.isEmpty())) {
         LOG_WARNING(Q_FUNC_INFO << "server url empty, aborting");
@@ -130,6 +136,30 @@ QNetworkReply *WebDavRequestGenerator::capabilities(const QString &serverUrl)
     QNetworkRequest request = networkRequest(networkRequestUrl(serverUrl, "/ocs/v2.php/cloud/capabilities"));
     request.setRawHeader("Accept", JsonContentType);
     return sendRequest(request, "GET");
+}
+
+QNetworkReply *JsonRequestGenerator::notificationList(const QString &serverUrl)
+{
+    if (Q_UNLIKELY(serverUrl.isEmpty())) {
+        LOG_WARNING(Q_FUNC_INFO << "server url empty, aborting");
+        return 0;
+    }
+
+    QNetworkRequest request = networkRequest(networkRequestUrl(serverUrl, "/ocs/v2.php/apps/notifications/api/v2/notifications"));
+    request.setRawHeader("Accept", JsonContentType);
+    return sendRequest(request, "GET");
+}
+
+//--- WebDavRequestGenerator:
+
+WebDavRequestGenerator::WebDavRequestGenerator(QNetworkAccessManager *networkAccessManager, const QString &username, const QString &password)
+    : NetworkRequestGenerator(networkAccessManager, username, password)
+{
+}
+
+WebDavRequestGenerator::WebDavRequestGenerator(QNetworkAccessManager *networkAccessManager, const QString &accessToken)
+    : NetworkRequestGenerator(networkAccessManager, accessToken)
+{
 }
 
 QNetworkReply *WebDavRequestGenerator::dirListing(const QString &serverUrl, const QString &remoteDirPath)
@@ -205,17 +235,5 @@ QNetworkReply *WebDavRequestGenerator::download(const QString &serverUrl, const 
 
     QNetworkRequest request = networkRequest(networkRequestUrl(serverUrl, remoteFilePath));
     request.setRawHeader("Depth", "1");
-    return sendRequest(request, "GET");
-}
-
-QNetworkReply *WebDavRequestGenerator::notificationList(const QString &serverUrl)
-{
-    if (Q_UNLIKELY(serverUrl.isEmpty())) {
-        LOG_WARNING(Q_FUNC_INFO << "server url empty, aborting");
-        return 0;
-    }
-
-    QNetworkRequest request = networkRequest(networkRequestUrl(serverUrl, "/ocs/v2.php/apps/notifications/api/v2/notifications"));
-    request.setRawHeader("Accept", JsonContentType);
     return sendRequest(request, "GET");
 }

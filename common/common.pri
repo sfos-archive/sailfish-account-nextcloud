@@ -10,13 +10,13 @@ contains (DEFINES, NEXTCLOUDWEBDAV) {
 
     HEADERS += \
         $$PWD/webdavsyncer_p.h \
-        $$PWD/webdavrequestgenerator_p.h \
-        $$PWD/xmlreplyparser_p.h
+        $$PWD/networkrequestgenerator_p.h \
+        $$PWD/networkreplyparser_p.h
 
     SOURCES += \
         $$PWD/webdavsyncer.cpp \
-        $$PWD/webdavrequestgenerator.cpp \
-        $$PWD/xmlreplyparser.cpp
+        $$PWD/networkrequestgenerator.cpp \
+        $$PWD/networkreplyparser.cpp
 }
 
 contains (DEFINES, NEXTCLOUDACCOUNTAUTH) {
