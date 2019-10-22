@@ -8,7 +8,6 @@
 ****************************************************************************************/
 
 #include "syncer_p.h"
-#include "accountauthenticator_p.h"
 #include "webdavrequestgenerator_p.h"
 #include "xmlreplyparser_p.h"
 
@@ -21,14 +20,9 @@
 #include <QtCore/QStandardPaths>
 #include <QtCore/QMimeDatabase>
 
-// accounts
-#include <Accounts/Manager>
-#include <Accounts/Account>
-
 // buteo
 #include <SyncProfile.h>
 #include <LogMacros.h>
-#include <ProfileEngineDefs.h>
 
 namespace {
     const int HTTP_UNAUTHORIZED_ACCESS = 401;

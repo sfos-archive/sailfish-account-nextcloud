@@ -8,7 +8,6 @@
 ****************************************************************************************/
 
 #include "syncer_p.h"
-#include "accountauthenticator_p.h"
 #include "webdavrequestgenerator_p.h"
 #include "replyparser_p.h"
 
@@ -18,9 +17,7 @@
 #include <QtCore/QByteArray>
 #include <QtCore/QStandardPaths>
 
-#include <Accounts/Manager>
-#include <Accounts/Account>
-
+// buteo
 #include <SyncProfile.h>
 #include <LogMacros.h>
 

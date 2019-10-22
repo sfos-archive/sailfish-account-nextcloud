@@ -11,9 +11,7 @@
 #include "accountauthenticator_p.h"
 #include "webdavrequestgenerator_p.h"
 
-#include <Accounts/Manager>
-#include <Accounts/Account>
-
+// buteo
 #include <SyncProfile.h>
 #include <LogMacros.h>
 

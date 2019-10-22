@@ -9,12 +9,8 @@
 
 #include "syncer_p.h"
 
-#include "accountauthenticator_p.h"
 #include "webdavrequestgenerator_p.h"
 #include "xmlreplyparser_p.h"
-
-#include "accountauthenticator_p.h"
-#include "webdavrequestgenerator_p.h"
 
 #include "eventcache.h"
 
@@ -25,14 +21,9 @@
 #include <QtCore/QByteArray>
 #include <QtCore/QStandardPaths>
 
-// accounts
-#include <Accounts/Manager>
-#include <Accounts/Account>
-
 // buteo
 #include <SyncProfile.h>
 #include <LogMacros.h>
-#include <ProfileEngineDefs.h>
 
 namespace {
     const int HTTP_UNAUTHORIZED_ACCESS = 401;
@@ -58,7 +49,6 @@ void Syncer::beginSync()
 
 bool Syncer::performCapabilitiesRequest()
 {
-    qWarning("performCapabilitiesRequest");
     QNetworkReply *reply = m_requestGenerator->capabilities(m_serverUrl);
     if (reply) {
         connect(reply, &QNetworkReply::finished,
