@@ -1,7 +1,7 @@
 QT -= gui
 
-DEFINES += NEXTCLOUDIMAGECACHE NEXTCLOUDWEBDAV
-include($$PWD/../../common/common.pri)
+include($$PWD/../../common/webdav.pri)
+include($$PWD/../../common/imagecache.pri)
 
 INCLUDEPATH += $$PWD
 

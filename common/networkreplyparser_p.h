@@ -52,6 +52,8 @@ public:
     };
 
     static void debugDumpData(const QString &data);
+
+    static bool debugEnabled;
 };
 
 class XmlReplyParser

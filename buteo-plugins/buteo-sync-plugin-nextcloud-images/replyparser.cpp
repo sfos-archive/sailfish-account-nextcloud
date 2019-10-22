@@ -11,8 +11,6 @@
 #include "networkreplyparser_p.h"
 #include "syncer_p.h"
 
-#include <LogMacros.h>
-
 #include <QList>
 
 ReplyParser::ReplyParser(Syncer *parent, int accountId, const QString &userId, const QUrl &serverUrl, const QString &webdavPath)
@@ -67,7 +65,6 @@ ReplyParser::ContentMetadata ReplyParser::parseAlbumContentMetadata(
             </d:response>
         </d:multistatus>
     */
-    NetworkReplyParser::debugDumpData(QString::fromUtf8(albumContentMetadataResponse));
     const QList<NetworkReplyParser::Resource> resourceList = XmlReplyParser::parsePropFindResponse(
             albumContentMetadataResponse, albumPath);
     ReplyParser::ContentMetadata contentMetadata;

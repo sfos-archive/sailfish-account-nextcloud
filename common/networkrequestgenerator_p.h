@@ -21,6 +21,8 @@ public:
     NetworkRequestGenerator(QNetworkAccessManager *networkAccessManager, const QString &username, const QString &password);
     NetworkRequestGenerator(QNetworkAccessManager *networkAccessManager, const QString &accessToken);
 
+    static bool debugEnabled;
+
 protected:
     QNetworkRequest networkRequest(const QUrl &url, const QString &contentType = QString(), const QByteArray &requestData = QByteArray()) const;
     QNetworkReply *sendRequest(const QNetworkRequest &request, const QByteArray &requestType, const QByteArray &requestData = QByteArray()) const;

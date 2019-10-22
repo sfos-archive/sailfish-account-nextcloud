@@ -9,6 +9,7 @@
 
 #include "webdavsyncer_p.h"
 #include "accountauthenticator_p.h"
+#include "networkreplyparser_p.h"
 
 // buteo
 #include <SyncProfile.h>

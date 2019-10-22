@@ -9,13 +9,11 @@
 
 #include "networkreplyparser_p.h"
 
+#include <QDebug>
 #include <QList>
 #include <QXmlStreamReader>
 #include <QJsonDocument>
 #include <QJsonParseError>
-
-// Buteo
-#include <LogMacros.h>
 
 const QString XmlReplyParser::XmlElementTextKey = QStringLiteral("@text");
 
@@ -74,9 +72,11 @@ int ocsMetaStatusCode(const QVariantMap &ocsVariantMap)
 
 }
 
+bool NetworkReplyParser::debugEnabled = false;
+
 void NetworkReplyParser::debugDumpData(const QString &data)
 {
-    if (Buteo::Logger::instance()->getLogLevel() < 7) {
+    if (!debugEnabled) {
         return;
     }
 
@@ -84,7 +84,7 @@ void NetworkReplyParser::debugDumpData(const QString &data)
     Q_FOREACH (const QChar &c, data) {
         if (c == '\r' || c == '\n') {
             if (!dbgout.isEmpty()) {
-                LOG_DEBUG(dbgout);
+                qDebug() << dbgout;
                 dbgout.clear();
             }
         } else {
@@ -92,7 +92,7 @@ void NetworkReplyParser::debugDumpData(const QString &data)
         }
     }
     if (!dbgout.isEmpty()) {
-        LOG_DEBUG(dbgout);
+        qDebug() << dbgout;
     }
 }
 
@@ -215,6 +215,7 @@ QList<NetworkReplyParser::Notification> JsonReplyParser::parseNotificationRespon
     */
 
     NetworkReplyParser::debugDumpData(QString::fromUtf8(replyData));
+
     QList<NetworkReplyParser::Notification> notifs;
 
     QJsonParseError err;

@@ -1,7 +1,7 @@
 QT -= gui
 
-DEFINES += NEXTCLOUDEVENTCACHE NEXTCLOUDWEBDAV
-include($$PWD/../../common/common.pri)
+include($$PWD/../../common/webdav.pri)
+include($$PWD/../../common/eventcache.pri)
 
 INCLUDEPATH += $$PWD
 

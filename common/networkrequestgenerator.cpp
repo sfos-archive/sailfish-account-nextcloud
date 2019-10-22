@@ -11,9 +11,6 @@
 
 #include <QBuffer>
 
-// Buteo
-#include <LogMacros.h>
-
 namespace {
     const QByteArray XmlContentType("application/xml; charset=utf-8");
     const QByteArray JsonContentType("application/json");
@@ -47,6 +44,8 @@ namespace {
     }
 }
 
+bool NetworkRequestGenerator::debugEnabled = false;
+
 NetworkRequestGenerator::NetworkRequestGenerator(QNetworkAccessManager *networkAccessManager, const QString &username, const QString &password)
     : m_username(username)
     , m_password(password)
@@ -68,12 +67,12 @@ QNetworkReply *NetworkRequestGenerator::sendRequest(const QNetworkRequest &reque
         requestDataBuffer->setData(requestData);
     }
 
-    LOG_DEBUG("Sending request:"
-              << request.url().toString() << requestType
-              << "token:" << m_accessToken
-              << "data:" << QString::fromUtf8(requestData));
-    QNetworkReply *reply = m_networkAccessManager->sendCustomRequest(request, requestType, requestDataBuffer);
+    if (debugEnabled) {
+        qDebug() << "Sending request:" << requestType << "to:" << request.url().toString()
+                 << "data:" << QString::fromUtf8(requestData);
+    }
 
+    QNetworkReply *reply = m_networkAccessManager->sendCustomRequest(request, requestType, requestDataBuffer);
     if (requestDataBuffer) {
         QObject::connect(reply, &QNetworkReply::finished,
                          requestDataBuffer, &QBuffer::deleteLater);
@@ -129,7 +128,7 @@ JsonRequestGenerator::JsonRequestGenerator(QNetworkAccessManager *networkAccessM
 QNetworkReply *JsonRequestGenerator::capabilities(const QString &serverUrl)
 {
     if (Q_UNLIKELY(serverUrl.isEmpty())) {
-        LOG_WARNING(Q_FUNC_INFO << "server url empty, aborting");
+        qWarning() << "server url empty, aborting";
         return 0;
     }
 
@@ -141,7 +140,7 @@ QNetworkReply *JsonRequestGenerator::capabilities(const QString &serverUrl)
 QNetworkReply *JsonRequestGenerator::notificationList(const QString &serverUrl)
 {
     if (Q_UNLIKELY(serverUrl.isEmpty())) {
-        LOG_WARNING(Q_FUNC_INFO << "server url empty, aborting");
+        qWarning() << "server url empty, aborting";
         return 0;
     }
 
@@ -165,12 +164,12 @@ WebDavRequestGenerator::WebDavRequestGenerator(QNetworkAccessManager *networkAcc
 QNetworkReply *WebDavRequestGenerator::dirListing(const QString &serverUrl, const QString &remoteDirPath)
 {
     if (Q_UNLIKELY(serverUrl.isEmpty())) {
-        LOG_WARNING(Q_FUNC_INFO << "server url empty, aborting");
+        qWarning() << "server url empty, aborting";
         return 0;
     }
 
     if (Q_UNLIKELY(remoteDirPath.isEmpty())) {
-        LOG_WARNING(Q_FUNC_INFO << "remotePath path empty, aborting");
+        qWarning() << "remotePath path empty, aborting";
         return 0;
     }
 
@@ -186,12 +185,12 @@ QNetworkReply *WebDavRequestGenerator::dirListing(const QString &serverUrl, cons
 QNetworkReply *WebDavRequestGenerator::dirCreation(const QString &serverUrl, const QString &remoteDirPath)
 {
     if (Q_UNLIKELY(serverUrl.isEmpty())) {
-        LOG_WARNING(Q_FUNC_INFO << "server url empty, aborting");
+        qWarning() << "server url empty, aborting";
         return 0;
     }
 
     if (Q_UNLIKELY(remoteDirPath.isEmpty())) {
-        LOG_WARNING(Q_FUNC_INFO << "remotePath path empty, aborting");
+        qWarning() << "remotePath path empty, aborting";
         return 0;
     }
 
@@ -202,17 +201,17 @@ QNetworkReply *WebDavRequestGenerator::dirCreation(const QString &serverUrl, con
 QNetworkReply *WebDavRequestGenerator::upload(const QString &serverUrl, const QString &dataContentType, const QByteArray &data, const QString &remoteDirPath)
 {
     if (Q_UNLIKELY(serverUrl.isEmpty())) {
-        LOG_WARNING(Q_FUNC_INFO << "server url empty, aborting");
+        qWarning() << "server url empty, aborting";
         return 0;
     }
 
     if (Q_UNLIKELY(remoteDirPath.isEmpty())) {
-        LOG_WARNING(Q_FUNC_INFO << "remotePath path empty, aborting");
+        qWarning() << "remotePath path empty, aborting";
         return 0;
     }
 
     if (Q_UNLIKELY(data.isEmpty())) {
-        LOG_WARNING(Q_FUNC_INFO << "bytes empty, aborting");
+        qWarning() << "bytes empty, aborting";
         return 0;
     }
 
@@ -224,12 +223,12 @@ QNetworkReply *WebDavRequestGenerator::upload(const QString &serverUrl, const QS
 QNetworkReply *WebDavRequestGenerator::download(const QString &serverUrl, const QString &remoteFilePath)
 {
     if (Q_UNLIKELY(serverUrl.isEmpty())) {
-        LOG_WARNING(Q_FUNC_INFO << "server url empty, aborting");
+        qWarning() << "server url empty, aborting";
         return 0;
     }
 
     if (Q_UNLIKELY(remoteFilePath.isEmpty())) {
-        LOG_WARNING(Q_FUNC_INFO << "remotePath path empty, aborting");
+        qWarning() << "remotePath path empty, aborting";
         return 0;
     }
 

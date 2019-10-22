@@ -9,6 +9,8 @@
 
 #include "nextcloudpostsclient.h"
 #include "syncer_p.h"
+#include "networkrequestgenerator_p.h"
+#include "networkreplyparser_p.h"
 
 // Buteo
 #include <PluginCbInterface.h>
@@ -37,6 +39,10 @@ NextcloudPostsClient::NextcloudPostsClient(
     , m_syncer(0)
     , m_accountId(0)
 {
+    if (Buteo::Logger::instance()->getLogLevel() >= 7) {
+        NetworkRequestGenerator::debugEnabled = true;
+        NetworkReplyParser::debugEnabled = true;
+    }
 }
 
 NextcloudPostsClient::~NextcloudPostsClient()
