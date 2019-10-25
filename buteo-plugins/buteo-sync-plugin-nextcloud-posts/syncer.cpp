@@ -138,7 +138,8 @@ void Syncer::handleNotificationListReply()
         SyncCache::Event event;
         event.accountId = m_accountId;
         event.eventId = notif.notificationId;
-        event.eventText = notif.subject;
+        event.eventSubject = notif.subject;
+        event.eventText = notif.message;
         event.eventUrl = notif.link;
         event.imageUrl = notif.icon;
         event.timestamp = notif.dateTime;

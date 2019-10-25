@@ -17,13 +17,13 @@ NotificationGroupMember {
 
     property alias icon: image
     property alias subject: subjectLabel.text
+    property alias message: messageLabel.text
     property var timestamp
     property string eventUrl
 
     width: parent.width
-    contentLeftMargin: Theme.paddingMedium
     contentWidth: width - contentLeftMargin
-    contentHeight: content.y + content.height + Theme.paddingLarge
+    contentHeight: Math.max(image.y + image.height, content.y + content.height) + Theme.paddingLarge
 
     onClicked: {
         if (eventUrl.length > 0) {
@@ -34,8 +34,8 @@ NotificationGroupMember {
     Image {
         id: image
         y: Theme.paddingLarge
-        width: Theme.iconSizeSmall
-        height: Theme.iconSizeSmall
+        width: Theme.itemSizeMedium
+        height: Theme.itemSizeMedium
     }
 
     Column {
@@ -57,6 +57,15 @@ NotificationGroupMember {
             elide: Text.ElideRight
             wrapMode: Text.Wrap
             font.pixelSize: Theme.fontSizeSmall
+        }
+
+        Label {
+            id: messageLabel
+            visible: text.length !== 0
+            width: parent.width
+            elide: Text.ElideRight
+            wrapMode: Text.Wrap
+            font.pixelSize: Theme.fontSizeExtraSmall
         }
 
         Label {

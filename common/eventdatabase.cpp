@@ -18,7 +18,27 @@
 #include <QtSql/QSqlDatabase>
 #include <QtSql/QSqlError>
 
+#include <QtDebug>
+
 using namespace SyncCache;
+
+static bool upgradeVersion1to2Fn(QSqlDatabase &database) {
+    QSqlQuery alterTableQuery(QStringLiteral("ALTER TABLE Events ADD eventSubject TEXT;"), database);
+    if (alterTableQuery.lastError().isValid()) {
+        qWarning() << "Failed to update events database schema for version 2:" << alterTableQuery.lastError().text();
+        return false;
+    }
+    alterTableQuery.finish();
+
+    QSqlQuery updateSubjectQuery(QStringLiteral("UPDATE Events SET eventSubject = eventText, eventText = '';"), database);
+    if (updateSubjectQuery.lastError().isValid()) {
+        qWarning() << "Failed to update events database values for version 2:" << updateSubjectQuery.lastError().text();
+        return false;
+    }
+    updateSubjectQuery.finish();
+
+    return true;
+}
 
 EventDatabasePrivate::EventDatabasePrivate(EventDatabase *parent)
     : DatabasePrivate(parent), m_eventDbParent(parent)
@@ -27,7 +47,7 @@ EventDatabasePrivate::EventDatabasePrivate(EventDatabase *parent)
 
 int EventDatabasePrivate::currentSchemaVersion() const
 {
-    return 1;
+    return 2;
 }
 
 QVector<const char *> EventDatabasePrivate::createStatements() const
@@ -36,6 +56,7 @@ QVector<const char *> EventDatabasePrivate::createStatements() const
             "\n CREATE TABLE Events ("
             "\n accountId INTEGER,"
             "\n eventId TEXT,"
+            "\n eventSubject TEXT,"
             "\n eventText TEXT,"
             "\n eventUrl TEXT,"
             "\n imageUrl TEXT,"
@@ -53,18 +74,14 @@ QVector<UpgradeOperation> EventDatabasePrivate::upgradeVersions() const
         0 // NULL-terminated
     };
 
-    // example for future: upgrading the schema can be done with upgrade version elements as follows:
-    //static const char *anotherUpgradeStatement = "\n UPDATE Events ... etc etc";
-    //static const char *upgradeVersion1to2[] = {
-    //     anotherUpgradeStatement,
-    //     "PRAGMA user_version=2",
-    //     0 // NULL-terminated
-    //};
-    //static bool twiddleSomeDataViaCpp(QSqlDatabase &database) { /* do queries on database... */ return true; }
+    static const char *upgradeVersion1to2[] = {
+        "PRAGMA user_version=2",
+        0 // NULL-terminated
+    };
 
     static QVector<UpgradeOperation> retn {
         { 0, upgradeVersion0to1 },
-    //  { twiddleSomeDataViaCpp, upgradeVersion1to2 },
+        { upgradeVersion1to2Fn, upgradeVersion1to2 },
     };
 
     return retn;
@@ -120,7 +137,7 @@ QVector<SyncCache::Event> EventDatabase::events(int accountId, DatabaseError *er
 {
     SYNCCACHE_DB_D(const EventDatabase);
 
-    const QString queryString = QStringLiteral("SELECT eventId, eventText, eventUrl, imageUrl, imagePath, timestamp FROM Events"
+    const QString queryString = QStringLiteral("SELECT eventId, eventSubject, eventText, eventUrl, imageUrl, imagePath, timestamp FROM Events"
                                                " WHERE accountId = :accountId"
                                                " ORDER BY timestamp DESC, eventId ASC");
 
@@ -133,6 +150,7 @@ QVector<SyncCache::Event> EventDatabase::events(int accountId, DatabaseError *er
         Event currEvent;
         currEvent.accountId = accountId;
         currEvent.eventId = selectQuery.value(whichValue++).toString();
+        currEvent.eventSubject = selectQuery.value(whichValue++).toString();
         currEvent.eventText = selectQuery.value(whichValue++).toString();
         currEvent.eventUrl = QUrl(selectQuery.value(whichValue++).toString());
         currEvent.imageUrl = QUrl(selectQuery.value(whichValue++).toString());
@@ -154,7 +172,7 @@ Event EventDatabase::event(int accountId, const QString &eventId, DatabaseError 
 {
     SYNCCACHE_DB_D(const EventDatabase);
 
-    const QString queryString = QStringLiteral("SELECT eventText, eventUrl, imageUrl, imagePath, timestamp FROM Events"
+    const QString queryString = QStringLiteral("SELECT eventSubject, eventText, eventUrl, imageUrl, imagePath, timestamp FROM Events"
                                                " WHERE accountId = :accountId AND eventId = :eventId");
 
     const QList<QPair<QString, QVariant> > bindValues {
@@ -167,6 +185,7 @@ Event EventDatabase::event(int accountId, const QString &eventId, DatabaseError 
         Event currEvent;
         currEvent.accountId = accountId;
         currEvent.eventId = eventId;
+        currEvent.eventSubject = selectQuery.value(whichValue++).toString();
         currEvent.eventText = selectQuery.value(whichValue++).toString();
         currEvent.eventUrl = QUrl(selectQuery.value(whichValue++).toString());
         currEvent.imageUrl = QUrl(selectQuery.value(whichValue++).toString());
@@ -197,9 +216,9 @@ void EventDatabase::storeEvent(const Event &event, DatabaseError *error)
         return;
     }
 
-    const QString insertString = QStringLiteral("INSERT INTO Events (accountId, eventId, eventText, eventUrl, imageUrl, imagePath, timestamp)"
-                                                " VALUES(:accountId, :eventId, :eventText, :eventUrl, :imageUrl, :imagePath, :timestamp)");
-    const QString updateString = QStringLiteral("UPDATE Events SET eventText = :eventText, eventUrl = :eventUrl, imageUrl = :imageUrl, imagePath = :imagePath, timestamp = :timestamp"
+    const QString insertString = QStringLiteral("INSERT INTO Events (accountId, eventId, eventSubject, eventText, eventUrl, imageUrl, imagePath, timestamp)"
+                                                " VALUES(:accountId, :eventId, :eventSubject, :eventText, :eventUrl, :imageUrl, :imagePath, :timestamp)");
+    const QString updateString = QStringLiteral("UPDATE Events SET eventSubject = :eventSubject, eventText = :eventText, eventUrl = :eventUrl, imageUrl = :imageUrl, imagePath = :imagePath, timestamp = :timestamp"
                                                 " WHERE accountId = :accountId AND eventId = :eventId");
 
     const bool insert = existingEvent.eventId.isEmpty();
@@ -208,6 +227,7 @@ void EventDatabase::storeEvent(const Event &event, DatabaseError *error)
     const QList<QPair<QString, QVariant> > bindValues {
         qMakePair<QString, QVariant>(QStringLiteral(":accountId"), event.accountId),
         qMakePair<QString, QVariant>(QStringLiteral(":eventId"), event.eventId),
+        qMakePair<QString, QVariant>(QStringLiteral(":eventSubject"), event.eventSubject),
         qMakePair<QString, QVariant>(QStringLiteral(":eventText"), event.eventText),
         qMakePair<QString, QVariant>(QStringLiteral(":eventUrl"), event.eventUrl),
         qMakePair<QString, QVariant>(QStringLiteral(":imageUrl"), event.imageUrl),

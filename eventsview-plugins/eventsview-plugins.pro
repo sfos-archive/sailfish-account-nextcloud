@@ -1,4 +1,2 @@
 TEMPLATE = subdirs
-SUBDIRS += \
-    eventsview-plugin-nextcloud \
-    eventsview-qml
+SUBDIRS += eventsview-plugin-nextcloud

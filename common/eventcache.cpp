@@ -261,6 +261,7 @@ void EventCacheThreadWorker::populateEventImage(int idempToken, int accountId, c
         Event eventToStore;
         eventToStore.accountId = event.accountId;
         eventToStore.eventId = event.eventId;
+        eventToStore.eventSubject = event.eventSubject;
         eventToStore.eventText = event.eventText;
         eventToStore.eventUrl = event.eventUrl;
         eventToStore.imageUrl = event.imageUrl;

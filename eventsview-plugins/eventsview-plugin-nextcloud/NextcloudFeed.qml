@@ -28,12 +28,14 @@ Item {
     signal hasRemovableItemsChanged()
     signal mainContentHeightChanged()
 
+    property int _modelCount: listView.model.count
     property int _expansionThreshold: 5
     property int _expansionMaximum: 10
     property bool _manuallyExpanded
 
+    visible: _modelCount > 0
     width: parent.width
-    height: listView.model.count === 0 ? 0 : expansionToggle.y + expansionToggle.height
+    height: _modelCount === 0 ? 0 : expansionToggle.y + expansionToggle.height
 
     onCollapsedChanged: {
         if (!collapsed) {
@@ -43,11 +45,12 @@ Item {
 
     NotificationGroupHeader {
         id: headerItem
-
-        name: root.providerName
+        //: Nextcloud notifications and announcements
+        //% "Nextcloud"
+        name: qsTrId("eventsview_plugin_nextcloud-la-nextcloud_notifictions")
         indicator.iconSource: "image://theme/graphic-service-nextcloud"
+        totalItemCount: root._modelCount
         memberCount: totalItemCount
-        totalItemCount: listView.model.count
         userRemovable: false
     }
 
@@ -65,7 +68,7 @@ Item {
         id: expansionToggle
 
         y: headerItem.height + listView.contentHeight
-        expandable: listView.model.count > _expansionThreshold
+        expandable: root._modelCount > _expansionThreshold
 
         onClicked: {
             if (!root._manuallyExpanded) {
@@ -82,11 +85,23 @@ Item {
         id: evCache
     }
 
+    Timer {
+        id: refreshEventModelTimer
+        interval: 5 * 60 * 1000
+        repeat: true
+        running: root.showingInActiveView
+        onRunningChanged: {
+            if (running) {
+                eventModel.refresh()
+            }
+        }
+        onTriggered: eventModel.refresh()
+    }
+
     NextcloudEventsModel {
         id: eventModel
 
         eventCache: evCache
-
         Component.onCompleted: {
             // Use the first found account, which is the one most recently added.
             var ids = accountManager.providerAccountIdentifiers(root.providerName)
@@ -104,10 +119,11 @@ Item {
         delegate: NextcloudFeedItem {
             id: delegateItem
 
-            subject: model.eventText
+            subject: model.eventSubject
+            message: model.eventText
             icon.source: imageDownloader.imagePath != ""
                          ? imageDownloader.imagePath
-                         : "image://theme/icon-l-nextcloud"
+                         : "image://theme/graphic-service-nextcloud" // placeholder is not square: "image://theme/icon-l-nextcloud"
             timestamp: model.timestamp
             eventUrl: model.eventUrl
 
