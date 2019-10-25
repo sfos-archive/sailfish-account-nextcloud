@@ -24,7 +24,7 @@ public:
     static bool debugEnabled;
 
 protected:
-    QNetworkRequest networkRequest(const QUrl &url, const QString &contentType = QString(), const QByteArray &requestData = QByteArray()) const;
+    QNetworkRequest networkRequest(const QUrl &url, const QString &contentType = QString(), const QByteArray &requestData = QByteArray(), bool basicAuth = false) const;
     QNetworkReply *sendRequest(const QNetworkRequest &request, const QByteArray &requestType, const QByteArray &requestData = QByteArray()) const;
 
     QString m_username;
@@ -41,6 +41,8 @@ public:
 
     QNetworkReply *capabilities(const QString &serverUrl);
     QNetworkReply *notificationList(const QString &serverUrl);
+    QNetworkReply *galleryConfig(const QString &serverUrl);
+    QNetworkReply *galleryList(const QString &serverUrl, const QString &location = QString());
 };
 
 class WebDavRequestGenerator : public NetworkRequestGenerator

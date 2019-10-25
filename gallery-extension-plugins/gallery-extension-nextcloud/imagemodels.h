@@ -55,6 +55,8 @@ public:
         QString photoId;
     };
 
+    QNetworkRequest templateRequest(int accountId, bool requiresBasicAuth = false) const;
+
 private Q_SLOTS:
     void performRequests();
     void signOnResponse(int accountId, const QString &serviceName, const QString &serverUrl, const QString &webdavPath, const QString &username, const QString &password, const QString &accessToken, bool ignoreSslErrors);
@@ -70,7 +72,6 @@ private:
 
     void signIn(int accountId);
     void performRequest(const PendingRequest &request);
-    QNetworkRequest templateRequest(int accountId) const;
 };
 Q_DECLARE_METATYPE(NextcloudImageCache::PendingRequest)
 Q_DECLARE_TYPEINFO(NextcloudImageCache::PendingRequest, Q_MOVABLE_TYPE);

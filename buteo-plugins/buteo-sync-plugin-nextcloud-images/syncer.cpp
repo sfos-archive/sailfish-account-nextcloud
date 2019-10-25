@@ -40,78 +40,76 @@ void Syncer::beginSync()
 {
     delete m_requestGenerator;
     m_requestGenerator = m_accessToken.isEmpty()
-                       ? new WebDavRequestGenerator(&m_qnam, m_username, m_password)
-                       : new WebDavRequestGenerator(&m_qnam, m_accessToken);
+                       ? new JsonRequestGenerator(&m_qnam, m_username, m_password)
+                       : new JsonRequestGenerator(&m_qnam, m_accessToken);
 
     delete m_replyParser;
     m_replyParser = new ReplyParser(this, m_accountId, NEXTCLOUD_USERID, m_serverUrl, m_webdavPath);
 
-    // Generate request for top-level Photos directory.
-    // Then, for every Album entry, generate a request for that directory.
-    // Parse the replies, calculate delta (additions/modifications/removals) and apply it locally.
-    const QString photosPath = QString::fromUtf8(
-            QByteArray::fromPercentEncoding(
-                    QStringLiteral("%1%2").arg(m_webdavPath, QStringLiteral("Photos/")).toUtf8()));
-    if (!performAlbumContentMetadataRequest(m_serverUrl, photosPath, QString())) {
-        LOG_WARNING("handleAlbumContentMetaDataReply: failed to trigger initial album request!");
-        finishWithHttpError(QStringLiteral("failed to trigger initial album request"), 0);
-    }
-}
-
-bool Syncer::performAlbumContentMetadataRequest(const QString &serverUrl, const QString &albumPath, const QString &parentAlbumPath)
-{
-    QNetworkReply *reply = m_requestGenerator->dirListing(serverUrl, albumPath);
+    QNetworkReply *reply = m_requestGenerator->galleryConfig(m_serverUrl);
     if (reply) {
-        m_requestQueue.append(reply);
-        reply->setProperty("albumPath", albumPath);
-        reply->setProperty("parentAlbumPath", parentAlbumPath);
         connect(reply, &QNetworkReply::finished,
-                this, &Syncer::handleAlbumContentMetaDataReply);
-        return true;
+                this, &Syncer::handleConfigReply);
+    } else {
+        finishWithError(QStringLiteral("Gallery config request failed"));
     }
-
-    return false;
 }
 
-void Syncer::handleAlbumContentMetaDataReply()
+void Syncer::handleConfigReply()
 {
+    // expect a response of the form:
+    // {"features":[],"mediatypes":["image/png","image/jpeg","image/gif","image/x-xbitmap","image/bmp","image/heic","image/heif"]}
     QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
-    m_requestQueue.removeAll(reply);
     reply->deleteLater();
-    const QByteArray replyData = reply->readAll();
     const int httpCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-    const QString albumPath = reply->property("albumPath").toString();
-    const QString parentAlbumPath = reply->property("parentAlbumPath").toString();
 
-    if (reply->error() == QNetworkReply::NoError) {
-        ReplyParser::ContentMetadata metadata = m_replyParser->parseAlbumContentMetadata(
-                replyData, albumPath, parentAlbumPath);
-
-        m_albums.insert(metadata.album.albumId, metadata.album);
-        Q_FOREACH (const SyncCache::Album &album, metadata.albums) {
-            if (album.albumId != albumPath && !performAlbumContentMetadataRequest(m_serverUrl, album.albumId, metadata.album.albumId)) {
-                LOG_WARNING("handleAlbumContentMetaDataReply: failed to trigger request for album:" << album.albumId);
-                finishWithHttpError(QStringLiteral("failed to trigger request for album %1").arg(album.albumId), 0);
-                return;
-            }
-        }
-        Q_FOREACH (const SyncCache::Photo &photo, metadata.photos) {
-            m_photos.insert(photo.photoId, photo);
-        }
-    } else {
-        LOG_WARNING("handleAlbumContentMetaDataReply: error:" << reply->error() << reply->errorString());
-        finishWithHttpError(QStringLiteral("album content metadata reply error: %1").arg(reply->errorString()), httpCode);
+    if (reply->error() != QNetworkReply::NoError) {
+        // TODO: fall back to plain old WebDAV requests
+        finishWithHttpError("Server does not support Gallery app", httpCode);
         return;
     }
 
-    if (m_requestQueue.isEmpty()) {
-        // Finished all requests.  Now determine changes and apply locally.
-        LOG_DEBUG("handleAlbumContentMetaDataReply: all replies handled.");
-        calculateAndApplyDelta();
+    QNetworkReply *listReply = m_requestGenerator->galleryList(m_serverUrl);
+    if (listReply) {
+        connect(listReply, &QNetworkReply::finished,
+                this, &Syncer::handleGalleryMetaDataReply);
+    } else {
+        LOG_WARNING("Failed to start gallery list request");
+        finishWithHttpError(QStringLiteral("Failed to start gallery list request"), 0);
     }
 }
 
-void Syncer::calculateAndApplyDelta()
+void Syncer::handleGalleryMetaDataReply()
+{
+    QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
+    reply->deleteLater();
+    const QByteArray replyData = reply->readAll();
+    const int httpCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+
+    if (reply->error() != QNetworkReply::NoError) {
+        LOG_WARNING("handleGalleryMetaDataReply: error:" << reply->error() << reply->errorString());
+        finishWithHttpError(QStringLiteral("gallery metadata reply error: %1").arg(reply->errorString()), httpCode);
+        return;
+    }
+
+    const ReplyParser::GalleryMetadata metadata = m_replyParser->parseGalleryMetadata(replyData);
+
+    QHash<QString, SyncCache::Album> albums;
+    for (const SyncCache::Album &album : metadata.albums) {
+        albums.insert(album.albumId, album);
+    }
+
+    QHash<QString, SyncCache::Photo> photos;
+    for (const SyncCache::Photo &photo : metadata.photos) {
+        photos.insert(photo.photoId, photo);
+    }
+
+    calculateAndApplyDelta(albums, photos);
+}
+
+void Syncer::calculateAndApplyDelta(
+        const QHash<QString, SyncCache::Album> &serverAlbums,
+        const QHash<QString, SyncCache::Photo> &serverPhotos)
 {
     LOG_DEBUG("calculateAndApplyDelta: entry");
     SyncCache::ImageDatabase db;
@@ -176,7 +174,7 @@ void Syncer::calculateAndApplyDelta()
     // remove deleted albums.
     if (error.errorCode == SyncCache::DatabaseError::NoError) {
         Q_FOREACH (const SyncCache::Album &album, currentAlbums) {
-            if (!m_albums.contains(album.albumId)) {
+            if (!serverAlbums.contains(album.albumId)) {
                 db.deleteAlbum(album, &error);
                 if (error.errorCode != SyncCache::DatabaseError::NoError) {
                     LOG_WARNING("calculateAndApplyDelta: failed to delete album:" << error.errorCode << error.errorMessage);
@@ -190,7 +188,7 @@ void Syncer::calculateAndApplyDelta()
 
     // add new albums, update modified albums.
     if (error.errorCode == SyncCache::DatabaseError::NoError) {
-        Q_FOREACH (const SyncCache::Album &album, m_albums) {
+        Q_FOREACH (const SyncCache::Album &album, serverAlbums) {
             if (currentAlbums.contains(album.albumId)) {
                 if (currentAlbums[album.albumId].photoCount != album.photoCount) {
                     SyncCache::Album currAlbum = currentAlbums[album.albumId];
@@ -217,7 +215,7 @@ void Syncer::calculateAndApplyDelta()
     // remove deleted photos.
     if (error.errorCode == SyncCache::DatabaseError::NoError) {
         Q_FOREACH (const SyncCache::Photo &photo, currentPhotos) {
-            if (!m_photos.contains(photo.photoId)) {
+            if (!serverPhotos.contains(photo.photoId)) {
                 db.deletePhoto(photo, &error);
                 if (error.errorCode != SyncCache::DatabaseError::NoError) {
                     LOG_WARNING("calculateAndApplyDelta: failed to delete photo:" << error.errorCode << error.errorMessage);
@@ -231,7 +229,7 @@ void Syncer::calculateAndApplyDelta()
 
     // add new photos, updated modified photos.
     if (error.errorCode == SyncCache::DatabaseError::NoError) {
-        Q_FOREACH (const SyncCache::Photo &photo, m_photos) {
+        Q_FOREACH (const SyncCache::Photo &photo, serverPhotos) {
             if (currentPhotos.contains(photo.photoId)) {
                 bool changed = false;
                 SyncCache::Photo currPhoto = currentPhotos[photo.photoId];

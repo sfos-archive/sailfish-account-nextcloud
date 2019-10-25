@@ -10,12 +10,13 @@
 #include "networkrequestgenerator_p.h"
 
 #include <QBuffer>
+#include <QUrlQuery>
 
 namespace {
     const QByteArray XmlContentType("application/xml; charset=utf-8");
     const QByteArray JsonContentType("application/json");
 
-    QUrl networkRequestUrl(const QString &url, const QString &path)
+    QUrl networkRequestUrl(const QString &url, const QString &path, const QUrlQuery &query = QUrlQuery())
     {
         QUrl ret(url);
         QString modifiedPath(path);
@@ -39,6 +40,9 @@ namespace {
             } else {
                 ret.setPath('/' + modifiedPath);
             }
+        }
+        if (!query.isEmpty()) {
+            ret.setQuery(query);
         }
         return ret;
     }
@@ -80,11 +84,11 @@ QNetworkReply *NetworkRequestGenerator::sendRequest(const QNetworkRequest &reque
     return reply;
 }
 
-QNetworkRequest NetworkRequestGenerator::networkRequest(const QUrl &url, const QString &contentType, const QByteArray &requestData) const
+QNetworkRequest NetworkRequestGenerator::networkRequest(const QUrl &url, const QString &contentType, const QByteArray &requestData, bool basicAuth) const
 {
     QNetworkRequest request(url);
 
-    if (url.path().startsWith(QStringLiteral("/ocs/"))) {
+    if (url.path().startsWith(QStringLiteral("/ocs/")) || basicAuth) {
         // Nextcloud APIs require Basic Authentication. Qt 5.6 QNetworkAccessManager does not
         // generate the expected request headers for this if user/pass are set in the URL, so
         // set them manually instead.
@@ -145,6 +149,34 @@ QNetworkReply *JsonRequestGenerator::notificationList(const QString &serverUrl)
     }
 
     QNetworkRequest request = networkRequest(networkRequestUrl(serverUrl, "/ocs/v2.php/apps/notifications/api/v2/notifications"));
+    request.setRawHeader("Accept", JsonContentType);
+    return sendRequest(request, "GET");
+}
+
+QNetworkReply *JsonRequestGenerator::galleryConfig(const QString &serverUrl)
+{
+    if (Q_UNLIKELY(serverUrl.isEmpty())) {
+        qWarning() << "server url empty, aborting";
+        return 0;
+    }
+    QNetworkRequest request = networkRequest(networkRequestUrl(serverUrl, "/index.php/apps/gallery/api/config"), QString(), QByteArray(), true);
+    request.setRawHeader("Accept", JsonContentType);
+    return sendRequest(request, "GET");
+}
+
+QNetworkReply *JsonRequestGenerator::galleryList(const QString &serverUrl, const QString &location)
+{
+    if (Q_UNLIKELY(serverUrl.isEmpty())) {
+        qWarning() << "server url empty, aborting";
+        return 0;
+    }
+
+    const QUrlQuery query(QStringLiteral("location=%1&mediatypes=%2&features=%3&etag=%4")
+                                    .arg(location.isEmpty() ? QStringLiteral("Photos") : location)
+                                    .arg(QStringLiteral("image/jpeg;image/gif;image/png;image/bmp"))
+                                    .arg(QString())
+                                    .arg(QString()));
+    QNetworkRequest request = networkRequest(networkRequestUrl(serverUrl, "/index.php/apps/gallery/api/files/list", query), QString(), QByteArray(), true);
     request.setRawHeader("Accept", JsonContentType);
     return sendRequest(request, "GET");
 }

@@ -18,7 +18,7 @@
 #include <QHash>
 
 class ReplyParser;
-class WebDavRequestGenerator;
+class JsonRequestGenerator;
 
 class Syncer : public WebDavSyncer
 {
@@ -31,18 +31,17 @@ public:
     void purgeAccount(int accountId) Q_DECL_OVERRIDE;
 
 private Q_SLOTS:
-    void handleAlbumContentMetaDataReply();
+    void handleConfigReply();
+    void handleGalleryMetaDataReply();
 
 private:
     void beginSync() Q_DECL_OVERRIDE;
-    bool performAlbumContentMetadataRequest(const QString &serverUrl, const QString &albumPath, const QString &parentAlbumPath);
-    void calculateAndApplyDelta();
+    void calculateAndApplyDelta(
+            const QHash<QString, SyncCache::Album> &albums,
+            const QHash<QString, SyncCache::Photo> &photos);
 
-    WebDavRequestGenerator *m_requestGenerator = nullptr;
+    JsonRequestGenerator *m_requestGenerator = nullptr;
     ReplyParser *m_replyParser = nullptr;
-    QList<QNetworkReply*> m_requestQueue;
-    QHash<QString, SyncCache::Album> m_albums;
-    QHash<QString, SyncCache::Photo> m_photos;
 };
 
 #endif // NEXTCLOUD_IMAGES_SYNCER_P_H
