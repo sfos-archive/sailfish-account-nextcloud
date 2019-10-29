@@ -14,14 +14,11 @@
 
 #include "imagecache.h"
 
-#include <QObject>
-#include <QString>
 #include <QList>
 #include <QHash>
-#include <QPair>
-#include <QNetworkAccessManager>
 
 class ReplyParser;
+class WebDavRequestGenerator;
 
 class Syncer : public WebDavSyncer
 {
@@ -41,6 +38,7 @@ private:
     bool performAlbumContentMetadataRequest(const QString &serverUrl, const QString &albumPath, const QString &parentAlbumPath);
     void calculateAndApplyDelta();
 
+    WebDavRequestGenerator *m_requestGenerator = nullptr;
     ReplyParser *m_replyParser = nullptr;
     QList<QNetworkReply*> m_requestQueue;
     QHash<QString, SyncCache::Album> m_albums;

@@ -8,8 +8,8 @@
 ****************************************************************************************/
 
 #include "syncer_p.h"
-#include "accountauthenticator_p.h"
-#include "webdavrequestgenerator_p.h"
+
+#include "networkrequestgenerator_p.h"
 #include "replyparser_p.h"
 
 #include <QtCore/QUrl>
@@ -18,9 +18,7 @@
 #include <QtCore/QByteArray>
 #include <QtCore/QStandardPaths>
 
-#include <Accounts/Manager>
-#include <Accounts/Account>
-
+// buteo
 #include <SyncProfile.h>
 #include <LogMacros.h>
 
@@ -35,10 +33,16 @@ Syncer::Syncer(QObject *parent, Buteo::SyncProfile *syncProfile)
 Syncer::~Syncer()
 {
     delete m_replyParser;
+    delete m_requestGenerator;
 }
 
 void Syncer::beginSync()
 {
+    delete m_requestGenerator;
+    m_requestGenerator = m_accessToken.isEmpty()
+                       ? new WebDavRequestGenerator(&m_qnam, m_username, m_password)
+                       : new WebDavRequestGenerator(&m_qnam, m_accessToken);
+
     delete m_replyParser;
     m_replyParser = new ReplyParser(this, m_accountId, NEXTCLOUD_USERID, m_serverUrl, m_webdavPath);
 

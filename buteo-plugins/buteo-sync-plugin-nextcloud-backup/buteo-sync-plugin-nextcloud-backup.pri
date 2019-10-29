@@ -1,8 +1,7 @@
-DEFINES += NEXTCLOUDWEBDAV
-include($$PWD/../../common/common.pri)
-
 PKGCONFIG += sailfishaccounts
 QT -= gui
+
+include($$PWD/../../common/webdav.pri)
 
 INCLUDEPATH += $$PWD
 

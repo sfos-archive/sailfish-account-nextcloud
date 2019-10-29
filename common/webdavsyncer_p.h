@@ -49,7 +49,6 @@ protected:
 
     Buteo::SyncProfile *m_syncProfile = nullptr;
     AccountAuthenticator *m_auth = nullptr;
-    WebDavRequestGenerator *m_requestGenerator = nullptr;
     QNetworkAccessManager m_qnam;
     bool m_syncAborted = false;
     bool m_syncError = false;

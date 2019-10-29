@@ -9,12 +9,8 @@
 
 #include "syncer_p.h"
 
-#include "accountauthenticator_p.h"
-#include "webdavrequestgenerator_p.h"
-#include "xmlreplyparser_p.h"
-
-#include "accountauthenticator_p.h"
-#include "webdavrequestgenerator_p.h"
+#include "networkrequestgenerator_p.h"
+#include "networkreplyparser_p.h"
 
 #include "eventcache.h"
 
@@ -25,14 +21,9 @@
 #include <QtCore/QByteArray>
 #include <QtCore/QStandardPaths>
 
-// accounts
-#include <Accounts/Manager>
-#include <Accounts/Account>
-
 // buteo
 #include <SyncProfile.h>
 #include <LogMacros.h>
-#include <ProfileEngineDefs.h>
 
 namespace {
     const int HTTP_UNAUTHORIZED_ACCESS = 401;
@@ -46,10 +37,16 @@ Syncer::Syncer(QObject *parent, Buteo::SyncProfile *syncProfile)
 
 Syncer::~Syncer()
 {
+    delete m_requestGenerator;
 }
 
 void Syncer::beginSync()
 {
+    delete m_requestGenerator;
+    m_requestGenerator = m_accessToken.isEmpty()
+                       ? new JsonRequestGenerator(&m_qnam, m_username, m_password)
+                       : new JsonRequestGenerator(&m_qnam, m_accessToken);
+
     if (!performCapabilitiesRequest()) {
         finishWithError("Capabilities request failed");
         return;
@@ -58,7 +55,6 @@ void Syncer::beginSync()
 
 bool Syncer::performCapabilitiesRequest()
 {
-    qWarning("performCapabilitiesRequest");
     QNetworkReply *reply = m_requestGenerator->capabilities(m_serverUrl);
     if (reply) {
         connect(reply, &QNetworkReply::finished,
@@ -81,7 +77,7 @@ void Syncer::handleCapabilitiesReply()
         return;
     }
 
-    if (XmlReplyParser::findCapabilityfromJson("notifications", replyData).isEmpty()) {
+    if (JsonReplyParser::findCapability("notifications", replyData).isEmpty()) {
         finishWithError("Server does not support Notifications app!");
         return;
     }
@@ -133,8 +129,8 @@ void Syncer::handleNotificationListReply()
     }
 
     bool storeSucceeded = true;
-    QList<XmlReplyParser::Notification> notifs = XmlReplyParser::parseNotificationsFromJson(replyData);
-    for (const XmlReplyParser::Notification &notif : notifs) {
+    QList<NetworkReplyParser::Notification> notifs = JsonReplyParser::parseNotificationResponse(replyData);
+    for (const NetworkReplyParser::Notification &notif : notifs) {
         SyncCache::Event event;
         event.accountId = m_accountId;
         event.eventId = notif.notificationId;

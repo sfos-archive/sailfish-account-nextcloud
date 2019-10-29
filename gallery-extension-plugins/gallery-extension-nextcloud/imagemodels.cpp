@@ -8,29 +8,11 @@
 ****************************************************************************************/
 
 #include "imagemodels.h"
-
-#include <sailfishkeyprovider.h>
+#include "accountauthenticator_p.h"
 
 #include <QtDebug>
 
 #define MAX_RETRY_SIGNON 3
-
-namespace {
-    QString skp_storedKey(const QString &provider, const QString &service, const QString &key)
-    {
-        QString retn;
-        char *value = NULL;
-        int success = SailfishKeyProvider_storedKey(provider.toLatin1(), service.toLatin1(), key.toLatin1(), &value);
-        if (value) {
-            if (success == 0) {
-                retn = QString::fromLatin1(value);
-            }
-            free(value);
-        }
-        return retn;
-    }
-}
-
 
 NextcloudImageCache::NextcloudImageCache(QObject *parent)
     : SyncCache::ImageCache(parent)
@@ -168,122 +150,27 @@ QNetworkRequest NextcloudImageCache::templateRequest(int accountId) const
 
 void NextcloudImageCache::signIn(int accountId)
 {
-    Accounts::Account *account = m_accounts.value(accountId);
-    if (account == Q_NULLPTR) {
-        account = Accounts::Account::fromId(&m_manager, accountId, this);
-        m_accounts.insert(accountId, account);
+    if (!m_auth) {
+        m_auth = new AccountAuthenticator(this);
+        connect(m_auth, &AccountAuthenticator::signInCompleted,
+                this, &NextcloudImageCache::signOnResponse);
+        connect(m_auth, &AccountAuthenticator::signInError,
+                this, &NextcloudImageCache::signOnError);
     }
-    if (account == Q_NULLPTR) {
-        qWarning() << "NextcloudImageCache: unable to load account" << accountId;
-        m_signOnFailCount[accountId] += 1;
-        cleanUpAccount(accountId);
-        QMetaObject::invokeMethod(this, "performRequests", Qt::QueuedConnection);
-        return;
-    }
-
-    // determine which service to sign in with.
-    Accounts::Service srv;
-    Accounts::ServiceList services = account->services();
-    Q_FOREACH (const Accounts::Service &s, services) {
-        if (s.serviceType().toLower() == QStringLiteral("sync")) {
-            srv = s;
-            break;
-        }
-    }
-
-    if (!srv.isValid()) {
-        qWarning() << "NextcloudImageCache: unable to find sync service for account" << accountId;
-        m_signOnFailCount[accountId] += 1;
-        cleanUpAccount(accountId);
-        QMetaObject::invokeMethod(this, "performRequests", Qt::QueuedConnection);
-        return;
-    }
-
-    // determine the remote URL from the account settings, and then sign in.
-    account->selectService(srv);
-    if (!account->enabled()) {
-        qWarning() << "NextcloudImageCache: sync service:" << srv.name() << "is not enabled for account:" << account->id();
-        m_signOnFailCount[accountId] += 1;
-        cleanUpAccount(accountId);
-        QMetaObject::invokeMethod(this, "performRequests", Qt::QueuedConnection);
-        return;
-    }
-
-    SignOn::Identity *ident = m_identities.value(accountId);
-    if (ident == Q_NULLPTR) {
-        ident = account->credentialsId() > 0 ? SignOn::Identity::existingIdentity(account->credentialsId()) : 0;
-        m_identities.insert(accountId, ident);
-    }
-
-    if (ident == Q_NULLPTR) {
-        qWarning() << "NextcloudImageCache: no valid credentials for account" << accountId;
-        m_signOnFailCount[accountId] += 1;
-        cleanUpAccount(accountId);
-        QMetaObject::invokeMethod(this, "performRequests", Qt::QueuedConnection);
-        return;
-    }
-
-    Accounts::AccountService accSrv(account, srv);
-    QString method = accSrv.authData().method();
-    QString mechanism = accSrv.authData().mechanism();
-    SignOn::AuthSession *session = ident->createSession(method);
-    if (!session) {
-        qWarning() << "NextcloudImageCache: unable to create authentication session with account" << accountId;
-        m_signOnFailCount[accountId] += 1;
-        cleanUpAccount(accountId);
-        QMetaObject::invokeMethod(this, "performRequests", Qt::QueuedConnection);
-        return;
-    }
-
-    QString providerName = account->providerName();
-    QString clientId;
-    QString clientSecret;
-    QString consumerKey;
-    QString consumerSecret;
-
-    clientId = skp_storedKey(providerName, QString(), QStringLiteral("client_id"));
-    clientSecret = skp_storedKey(providerName, QString(), QStringLiteral("client_secret"));
-    consumerKey = skp_storedKey(providerName, QString(), QStringLiteral("consumer_key"));
-    consumerSecret = skp_storedKey(providerName, QString(), QStringLiteral("consumer_secret"));
-
-    QVariantMap signonSessionData = accSrv.authData().parameters();
-    signonSessionData.insert("UiPolicy", SignOn::NoUserInteractionPolicy);
-    if (!clientId.isEmpty()) signonSessionData.insert("ClientId", clientId);
-    if (!clientSecret.isEmpty()) signonSessionData.insert("ClientSecret", clientSecret);
-    if (!consumerKey.isEmpty()) signonSessionData.insert("ConsumerKey", consumerKey);
-    if (!consumerSecret.isEmpty()) signonSessionData.insert("ConsumerSecret", consumerSecret);
-
-    connect(session, &SignOn::AuthSession::response,
-            this, &NextcloudImageCache::signOnResponse,
-            Qt::UniqueConnection);
-    connect(session, &SignOn::AuthSession::error,
-            this, &NextcloudImageCache::signOnError,
-            Qt::UniqueConnection);
-
-    session->setProperty("accountId", accountId);
-    session->setProperty("mechanism", mechanism);
-    session->setProperty("signonSessionData", signonSessionData);
-    session->process(SignOn::SessionData(signonSessionData), mechanism);
+    m_auth->signIn(accountId, QStringLiteral("nextcloud-images"));
 }
 
-void NextcloudImageCache::signOnResponse(const SignOn::SessionData &response)
+void NextcloudImageCache::signOnResponse(int accountId, const QString &serviceName,
+                                         const QString &serverUrl, const QString &webdavPath,
+                                         const QString &username, const QString &password,
+                                         const QString &accessToken, bool ignoreSslErrors)
 {
-    SignOn::AuthSession *session = qobject_cast<SignOn::AuthSession*>(sender());
-    QString username, password, accessToken;
-    Q_FOREACH (const QString &key, response.propertyNames()) {
-        if (key.toLower() == QStringLiteral("username")) {
-            username = response.getProperty(key).toString();
-        } else if (key.toLower() == QStringLiteral("secret")) {
-            password = response.getProperty(key).toString();
-        } else if (key.toLower() == QStringLiteral("password")) {
-            password = response.getProperty(key).toString();
-        } else if (key.toLower() == QStringLiteral("accesstoken")) {
-            accessToken = response.getProperty(key).toString();
-        }
-    }
+    Q_UNUSED(serviceName)
+    Q_UNUSED(serverUrl)
+    Q_UNUSED(webdavPath)
+    Q_UNUSED(ignoreSslErrors)
 
     // we need both username+password, OR accessToken.
-    int accountId = session->property("accountId").toInt();
     if (!accessToken.isEmpty()) {
         m_accountIdAccessTokens.insert(accountId, accessToken);
     } else {
@@ -291,36 +178,16 @@ void NextcloudImageCache::signOnResponse(const SignOn::SessionData &response)
     }
 
     m_pendingAccountRequests.removeAll(accountId);
-    cleanUpAccount(accountId, session);
     QMetaObject::invokeMethod(this, "performRequests", Qt::QueuedConnection);
 }
 
-void NextcloudImageCache::signOnError(const SignOn::Error &error)
+void NextcloudImageCache::signOnError(int accountId, const QString &serviceName)
 {
-    SignOn::AuthSession *session = qobject_cast<SignOn::AuthSession*>(sender());
-    int accountId = session->property("accountId").toInt();
-    qWarning() << "NextcloudImageCache: sign-on failed for account:" << accountId << ":" << error.type() << ":" << error.message();
+    qWarning() << "NextcloudImageCache: sign-on failed for account:" << accountId
+               << "service:" << serviceName;
     m_pendingAccountRequests.removeAll(accountId);
     m_signOnFailCount[accountId] += 1;
-    cleanUpAccount(accountId, session);
     QMetaObject::invokeMethod(this, "performRequests", Qt::QueuedConnection);
-}
-
-void NextcloudImageCache::cleanUpAccount(int accountId, SignOn::AuthSession *session)
-{
-    Accounts::Account *account = m_accounts.take(accountId);
-    SignOn::Identity *ident = m_identities.take(accountId);
-
-    if (account) {
-        account->deleteLater();
-    }
-
-    if (ident) {
-        ident->deleteLater();
-        if (session) {
-            ident->destroySession(session);
-        }
-    }
 }
 
 //-----------------------------------------------------------------------------

@@ -17,7 +17,7 @@
 #include <QObject>
 #include <QString>
 
-class ReplyParser;
+class JsonRequestGenerator;
 
 class Syncer : public WebDavSyncer
 {
@@ -37,6 +37,8 @@ private:
     void beginSync() Q_DECL_OVERRIDE;
     bool performCapabilitiesRequest();
     bool performNotificationListRequest();
+
+    JsonRequestGenerator *m_requestGenerator = nullptr;
 };
 
 #endif // NEXTCLOUD_POSTS_SYNCER_P_H

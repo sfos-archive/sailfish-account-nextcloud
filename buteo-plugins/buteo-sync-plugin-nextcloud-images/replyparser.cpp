@@ -8,10 +8,8 @@
 ****************************************************************************************/
 
 #include "replyparser_p.h"
-#include "xmlreplyparser_p.h"
+#include "networkreplyparser_p.h"
 #include "syncer_p.h"
-
-#include <LogMacros.h>
 
 #include <QList>
 
@@ -67,12 +65,11 @@ ReplyParser::ContentMetadata ReplyParser::parseAlbumContentMetadata(
             </d:response>
         </d:multistatus>
     */
-    XmlReplyParser::debugDumpData(QString::fromUtf8(albumContentMetadataResponse));
-    const QList<XmlReplyParser::Resource> resourceList = XmlReplyParser::parsePropFindResponse(
+    const QList<NetworkReplyParser::Resource> resourceList = XmlReplyParser::parsePropFindResponse(
             albumContentMetadataResponse, albumPath);
     ReplyParser::ContentMetadata contentMetadata;
 
-    for (const XmlReplyParser::Resource &resource : resourceList) {
+    for (const NetworkReplyParser::Resource &resource : resourceList) {
         if (resource.isCollection && resource.href != albumPath) {
             SyncCache::Album album;
             album.accountId = m_accountId;

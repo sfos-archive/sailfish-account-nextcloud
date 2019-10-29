@@ -9,9 +9,8 @@ QT += qml
 CONFIG += plugin link_pkgconfig c++11
 PKGCONFIG += libsignon-qt5 accounts-qt5 libsailfishkeyprovider
 
-DEFINES += NEXTCLOUDEVENTCACHE
-include($$PWD/../../common/common.pri)
-DEFINES -= NEXTCLOUDEVENTCACHE
+include($$PWD/../../common/auth.pri)
+include($$PWD/../../common/eventcache.pri)
 
 include ($$PWD/translations.pri)
 

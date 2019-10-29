@@ -8,8 +8,7 @@ QT += network
 CONFIG += link_pkgconfig
 PKGCONFIG += nemotransferengine-qt5
 
-DEFINES += NEXTCLOUDACCOUNTAUTH
-include($$PWD/../../common/common.pri)
+include($$PWD/../../common/auth.pri)
 
 HEADERS += nextcloudshareplugin.h \
            nextclouduploader.h \

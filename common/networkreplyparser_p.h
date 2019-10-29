@@ -7,8 +7,8 @@
 **
 ****************************************************************************************/
 
-#ifndef NEXTCLOUD_XMLREPLYPARSER_P_H
-#define NEXTCLOUD_XMLREPLYPARSER_P_H
+#ifndef NEXTCLOUD_NETWORKREPLYPARSER_P_H
+#define NEXTCLOUD_NETWORKREPLYPARSER_P_H
 
 #include <QVariantMap>
 #include <QDateTime>
@@ -16,8 +16,7 @@
 
 class QXmlStreamReader;
 
-// TODO rename to NextcloudReplyParser or such since this parses both XML and JSON.
-class XmlReplyParser
+class NetworkReplyParser
 {
 public:
     class Resource
@@ -52,17 +51,27 @@ public:
         QVariant messageRichParameters;
     };
 
-    static QVariantMap xmlToVariantMap(QXmlStreamReader &reader);
-
-    static QList<Resource> parsePropFindResponse(const QByteArray &propFindResponse, const QString &remotePath);
-    static QVariantMap findCapabilityfromJson(const QString &capabilityName, const QByteArray &capabilityResponse);
-    static QList<Notification> parseNotificationsFromJson(const QByteArray &replyData);
-
     static void debugDumpData(const QString &data);
+
+    static bool debugEnabled;
+};
+
+class XmlReplyParser
+{
+public:
+    static QVariantMap xmlToVariantMap(QXmlStreamReader &reader);
+    static QList<NetworkReplyParser::Resource> parsePropFindResponse(const QByteArray &propFindResponse, const QString &remotePath);
 
     static const QString XmlElementTextKey;
 };
 
-#endif // NEXTCLOUD_XMLREPLYPARSER_P_H
+class JsonReplyParser
+{
+public:
+    static QVariantMap findCapability(const QString &capabilityName, const QByteArray &capabilityResponse);
+    static QList<NetworkReplyParser::Notification> parseNotificationResponse(const QByteArray &replyData);
+};
+
+#endif // NEXTCLOUD_NETWORKREPLYPARSER_P_H
 
 

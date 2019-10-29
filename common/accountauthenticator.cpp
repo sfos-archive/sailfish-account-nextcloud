@@ -9,13 +9,7 @@
 
 #include "accountauthenticator_p.h"
 
-#ifdef NEXTCLOUDWEBDAV
-#include <LogMacros.h>
-#else
 #include <QtDebug>
-#define LOG_DEBUG(msg) qDebug() << msg
-#define LOG_WARNING(msg) qDebug() << msg
-#endif
 
 #ifdef USE_SAILFISHKEYPROVIDER
 #include <sailfishkeyprovider.h>
@@ -55,7 +49,7 @@ void AccountAuthenticator::signIn(int accountId, const QString &serviceName)
 {
     Accounts::Account *account = Accounts::Account::fromId(&m_manager, accountId, this);
     if (!account) {
-        LOG_WARNING(Q_FUNC_INFO << "unable to load account" << accountId);
+        qWarning() << "unable to load account" << accountId;
         emit signInError(accountId, serviceName);
         return;
     }
@@ -71,7 +65,8 @@ void AccountAuthenticator::signIn(int accountId, const QString &serviceName)
     }
 
     if (!srv.isValid()) {
-        LOG_WARNING(Q_FUNC_INFO << "unable to find sharing service for account" << accountId);
+        qWarning() << "unable to find service" << serviceName
+                   << "for account:" << accountId;
         account->deleteLater();
         emit signInError(accountId, serviceName);
         return;
@@ -80,7 +75,7 @@ void AccountAuthenticator::signIn(int accountId, const QString &serviceName)
     // determine the remote URL from the account settings, and then sign in.
     account->selectService(srv);
     if (!account->enabled()) {
-        LOG_WARNING(Q_FUNC_INFO << "Service:" << srv.name() << "is not enabled for account:" << accountId);
+        qWarning() << "Service:" << srv.name() << "is not enabled for account:" << accountId;
         account->deleteLater();
         emit signInError(accountId, serviceName);
         return;
@@ -90,7 +85,7 @@ void AccountAuthenticator::signIn(int accountId, const QString &serviceName)
     const QString serverAddress = account->value(QStringLiteral("server_address")).toString();
     const QString webdavPath = account->value(QStringLiteral("webdav_path")).toString(); // optional, may be empty.
     if (serverAddress.isEmpty()) {
-        LOG_WARNING(Q_FUNC_INFO << "no valid server url setting in account" << accountId);
+        qWarning() << "no valid server url setting in account" << accountId;
         account->deleteLater();
         emit signInError(accountId, serviceName);
         return;
@@ -98,7 +93,7 @@ void AccountAuthenticator::signIn(int accountId, const QString &serviceName)
 
     SignOn::Identity *ident = account->credentialsId() > 0 ? SignOn::Identity::existingIdentity(account->credentialsId()) : 0;
     if (!ident) {
-        LOG_WARNING(Q_FUNC_INFO << "no valid credentials for account" << accountId);
+        qWarning() << "no valid credentials for account" << accountId;
         account->deleteLater();
         emit signInError(accountId, serviceName);
         return;
@@ -109,7 +104,7 @@ void AccountAuthenticator::signIn(int accountId, const QString &serviceName)
     QString mechanism = accSrv.authData().mechanism();
     SignOn::AuthSession *session = ident->createSession(method);
     if (!session) {
-        LOG_WARNING(Q_FUNC_INFO << "unable to create authentication session with account" << accountId);
+        qWarning() << "unable to create authentication session with account" << accountId;
         account->deleteLater();
         ident->deleteLater();
         emit signInError(accountId, serviceName);
@@ -189,14 +184,14 @@ void AccountAuthenticator::signOnResponse(const SignOn::SessionData &response)
             } else if (!username.isEmpty() && !password.isEmpty()) {
                 emit signInCompleted(accountId, authData.serviceName, authData.serverAddress, authData.webdavPath, username, password, QString(), authData.ignoreSslErrors);
             } else {
-                LOG_WARNING(Q_FUNC_INFO << "authentication succeeded, but couldn't find valid credentials");
+                qWarning() << "authentication succeeded, but couldn't find valid credentials";
                 emit signInError(accountId, authData.serviceName);
             }
             return;
         }
     }
 
-    LOG_WARNING("Authentication succeeded but unknown auth session");
+    qWarning() << "Authentication succeeded but unknown auth session";
     emit signInError(accountId, QString());
 }
 
@@ -210,13 +205,13 @@ void AccountAuthenticator::signOnError(const SignOn::Error &error)
             authData.identity->destroySession(authData.authSession);
             authData.identity->deleteLater();
             authData.account->deleteLater();
-            LOG_WARNING(Q_FUNC_INFO << "authentication error:" << error.type() << ":" << error.message());
+            qWarning() << "authentication error:" << error.type() << ":" << error.message();
             emit signInError(accountId, authData.serviceName);
             return;
         }
     }
 
-    LOG_WARNING(Q_FUNC_INFO << "Unknown authentication session, authentication error:" << error.type() << ":" << error.message());
+    qWarning() << "Unknown authentication session, authentication error:" << error.type() << ":" << error.message();
     emit signInError(accountId, QString());
 }
 

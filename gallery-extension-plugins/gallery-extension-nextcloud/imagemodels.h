@@ -24,15 +24,7 @@
 #include <QtNetwork/QNetworkRequest>
 #include <QtQml/QQmlParserStatus>
 
-// accounts&sso
-#include <Accounts/Account>
-#include <Accounts/Manager>
-#include <Accounts/Service>
-#include <Accounts/AccountService>
-#include <SignOn/Identity>
-#include <SignOn/Error>
-#include <SignOn/SessionData>
-#include <SignOn/AuthSession>
+class AccountAuthenticator;
 
 class NextcloudImageCache : public SyncCache::ImageCache
 {
@@ -65,21 +57,18 @@ public:
 
 private Q_SLOTS:
     void performRequests();
-    void signOnResponse(const SignOn::SessionData &response);
-    void signOnError(const SignOn::Error &error);
+    void signOnResponse(int accountId, const QString &serviceName, const QString &serverUrl, const QString &webdavPath, const QString &username, const QString &password, const QString &accessToken, bool ignoreSslErrors);
+    void signOnError(int accountId, const QString &serviceName);
 
 private:
     QList<PendingRequest> m_pendingRequests;
     QList<int> m_pendingAccountRequests;
-    QHash<int, Accounts::Account*> m_accounts;
-    QHash<int, SignOn::Identity*> m_identities;
     QHash<int, int> m_signOnFailCount;
     QHash<int, QPair<QString, QString> > m_accountIdCredentials;
     QHash<int, QString> m_accountIdAccessTokens;
-    Accounts::Manager m_manager;
+    AccountAuthenticator *m_auth = Q_NULLPTR;
 
     void signIn(int accountId);
-    void cleanUpAccount(int accountId, SignOn::AuthSession *session = Q_NULLPTR);
     void performRequest(const PendingRequest &request);
     QNetworkRequest templateRequest(int accountId) const;
 };
