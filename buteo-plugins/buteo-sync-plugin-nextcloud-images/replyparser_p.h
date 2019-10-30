@@ -21,8 +21,7 @@ class Syncer;
 class ReplyParser
 {
 public:
-    struct ContentMetadata {
-        SyncCache::Album album;
+    struct GalleryMetadata {
         QVector<SyncCache::Album> albums;
         QVector<SyncCache::Photo> photos;
     };
@@ -30,10 +29,7 @@ public:
     ReplyParser(Syncer *parent, int accountId, const QString &userId, const QUrl &serverUrl, const QString &webdavPath);
     ~ReplyParser();
 
-    ContentMetadata parseAlbumContentMetadata(
-            const QByteArray &albumContentMetadataResponse,
-            const QString &albumPath,
-            const QString &parentAlbumPath);
+    GalleryMetadata parseGalleryMetadata(const QByteArray &galleryListResponse);
 
 private:
     Syncer *q;
@@ -43,7 +39,7 @@ private:
     QString m_webdavPath;
 };
 
-Q_DECLARE_METATYPE(ReplyParser::ContentMetadata)
+Q_DECLARE_METATYPE(ReplyParser::GalleryMetadata)
 
 #endif // NEXTCLOUD_IMAGES_REPLYPARSER_P_H
 

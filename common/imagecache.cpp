@@ -261,7 +261,7 @@ void ImageCacheThreadWorker::populateUserThumbnail(int idempToken, int accountId
     }
 
     // the thumbnail already exists.
-    const QString thumbnailPath = user.thumbnailPath.toLocalFile();
+    const QString thumbnailPath = user.thumbnailPath.toString();
     if (!user.thumbnailPath.isEmpty() && QFile::exists(thumbnailPath)) {
         emit populateUserThumbnailFinished(idempToken, thumbnailPath);
         return;
@@ -290,10 +290,10 @@ void ImageCacheThreadWorker::populateUserThumbnail(int idempToken, int accountId
         userToStore.thumbnailPath = filePath;
         m_db.storeUser(userToStore, &storeError);
         if (storeError.errorCode != DatabaseError::NoError) {
-            QFile::remove(filePath.toLocalFile());
+            QFile::remove(filePath.toString());
             emit populateUserThumbnailFailed(idempToken, storeError.errorMessage);
         } else {
-            emit populateUserThumbnailFinished(idempToken, filePath.toLocalFile());
+            emit populateUserThumbnailFinished(idempToken, filePath.toString());
         }
         watcher->deleteLater();
     });
@@ -309,7 +309,7 @@ void ImageCacheThreadWorker::populateAlbumThumbnail(int idempToken, int accountI
     }
 
     // the thumbnail already exists.
-    const QString thumbnailPath = album.thumbnailPath.toLocalFile();
+    const QString thumbnailPath = album.thumbnailPath.toString();
     if (!album.thumbnailPath.isEmpty() && QFile::exists(thumbnailPath)) {
         emit populateAlbumThumbnailFinished(idempToken, thumbnailPath);
         return;
@@ -340,10 +340,10 @@ void ImageCacheThreadWorker::populateAlbumThumbnail(int idempToken, int accountI
         albumToStore.thumbnailPath = filePath;
         m_db.storeAlbum(albumToStore, &storeError);
         if (storeError.errorCode != DatabaseError::NoError) {
-            QFile::remove(filePath.toLocalFile());
+            QFile::remove(filePath.toString());
             emit populateAlbumThumbnailFailed(idempToken, storeError.errorMessage);
         } else {
-            emit populateAlbumThumbnailFinished(idempToken, filePath.toLocalFile());
+            emit populateAlbumThumbnailFinished(idempToken, filePath.toString());
         }
         watcher->deleteLater();
     });
@@ -359,7 +359,7 @@ void ImageCacheThreadWorker::populatePhotoThumbnail(int idempToken, int accountI
     }
 
     // the thumbnail already exists.
-    const QString thumbnailPath = photo.thumbnailPath.toLocalFile();
+    const QString thumbnailPath = photo.thumbnailPath.toString();
     if (!photo.thumbnailPath.isEmpty() && QFile::exists(thumbnailPath)) {
         emit populatePhotoThumbnailFinished(idempToken, thumbnailPath);
         return;
@@ -373,7 +373,12 @@ void ImageCacheThreadWorker::populatePhotoThumbnail(int idempToken, int accountI
     if (!m_downloader) {
         m_downloader = new ImageDownloader(4, this);
     }
-    ImageDownloadWatcher *watcher = m_downloader->downloadImage(idempToken, photo.thumbnailUrl, photo.thumbnailUrl.fileName(), QStringLiteral("Thumbnails"), requestTemplate);
+    ImageDownloadWatcher *watcher = m_downloader->downloadImage(
+            idempToken,
+            photo.thumbnailUrl,
+            photo.fileName,
+            QStringLiteral(".thumbnails/%1").arg(photo.albumPath),
+            requestTemplate);
     connect(watcher, &ImageDownloadWatcher::downloadFailed, this, [this, watcher, idempToken] (const QString &errorMessage) {
         emit populatePhotoThumbnailFailed(idempToken, errorMessage);
         watcher->deleteLater();
@@ -399,10 +404,10 @@ void ImageCacheThreadWorker::populatePhotoThumbnail(int idempToken, int accountI
         photoToStore.imageHeight = photo.imageHeight;
         m_db.storePhoto(photoToStore, &storeError);
         if (storeError.errorCode != DatabaseError::NoError) {
-            QFile::remove(filePath.toLocalFile());
+            QFile::remove(filePath.toString());
             emit populatePhotoThumbnailFailed(idempToken, storeError.errorMessage);
         } else {
-            emit populatePhotoThumbnailFinished(idempToken, filePath.toLocalFile());
+            emit populatePhotoThumbnailFinished(idempToken, filePath.toString());
         }
         watcher->deleteLater();
     });

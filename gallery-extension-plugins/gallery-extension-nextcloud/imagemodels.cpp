@@ -97,17 +97,17 @@ void NextcloudImageCache::performRequests()
                 case PopulateUserThumbnailType:
                         SyncCache::ImageCache::populateUserThumbnail(
                                 req.idempToken, req.accountId, req.userId,
-                                templateRequest(req.accountId));
+                                templateRequest(req.accountId, true));
                         break;
                 case PopulateAlbumThumbnailType:
                         SyncCache::ImageCache::populateAlbumThumbnail(
                                 req.idempToken, req.accountId, req.userId, req.albumId,
-                                templateRequest(req.accountId));
+                                templateRequest(req.accountId, true));
                         break;
                 case PopulatePhotoThumbnailType:
                         SyncCache::ImageCache::populatePhotoThumbnail(
                                 req.idempToken, req.accountId, req.userId, req.albumId, req.photoId,
-                                templateRequest(req.accountId));
+                                templateRequest(req.accountId, true));
                         break;
                 case PopulatePhotoImageType:
                         SyncCache::ImageCache::populatePhotoImage(
@@ -133,7 +133,7 @@ void NextcloudImageCache::performRequests()
     }
 }
 
-QNetworkRequest NextcloudImageCache::templateRequest(int accountId) const
+QNetworkRequest NextcloudImageCache::templateRequest(int accountId, bool requiresBasicAuth) const
 {
     QUrl templateUrl(QStringLiteral("https://localhost:8080/"));
     if (m_accountIdCredentials.contains(accountId)) {
@@ -144,6 +144,9 @@ QNetworkRequest NextcloudImageCache::templateRequest(int accountId) const
     if (m_accountIdAccessTokens.contains(accountId)) {
         templateRequest.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
                                      QString(QLatin1String("Bearer ")).toUtf8() + m_accountIdAccessTokens.value(accountId).toUtf8());
+    } else if (requiresBasicAuth) {
+        const QByteArray credentials((m_accountIdCredentials.value(accountId).first + ':' + m_accountIdCredentials.value(accountId).second).toUtf8());
+        templateRequest.setRawHeader("Authorization", QByteArray("Basic ") + credentials.toBase64());
     }
     return templateRequest;
 }
@@ -1088,6 +1091,29 @@ void NextcloudImageDownloader::loadImage()
         });
         m_imageCache->populatePhotoImage(m_idempToken, m_accountId, m_userId, m_albumId, m_photoId, QNetworkRequest());
     } else if (m_downloadThumbnail) {
-        qWarning() << "NextcloudImageDownloader: Nextcloud doesn't provide thumbnails by default.";
+        m_idempToken = qHash(QStringLiteral("%1|%2|%3").arg(m_userId, m_albumId, m_photoId));
+        QObject *contextObject = new QObject(this);
+        connect(m_imageCache, &SyncCache::ImageCache::populatePhotoThumbnailFinished,
+                contextObject, [this, contextObject] (int idempToken, const QString &path) {
+            if (m_idempToken == idempToken) {
+                contextObject->deleteLater();
+                const QUrl imagePath = QUrl::fromLocalFile(path);
+                if (m_imagePath != imagePath) {
+                    m_imagePath = imagePath;
+                    emit imagePathChanged();
+                }
+            }
+        });
+        connect(m_imageCache, &SyncCache::ImageCache::populatePhotoThumbnailFailed,
+                contextObject, [this, contextObject] (int idempToken, const QString &errorMessage) {
+            if (m_idempToken == idempToken) {
+                contextObject->deleteLater();
+                qWarning() << "NextcloudImageDownloader::loadImage: failed:" << errorMessage;
+            }
+        });
+        NextcloudImageCache *nextcloudImageCache = qobject_cast<NextcloudImageCache*>(m_imageCache);
+        m_imageCache->populatePhotoThumbnail(m_idempToken, m_accountId, m_userId, m_albumId, m_photoId,
+                                             nextcloudImageCache ? nextcloudImageCache->templateRequest(m_accountId, true)
+                                                                 : QNetworkRequest());
     }
 }

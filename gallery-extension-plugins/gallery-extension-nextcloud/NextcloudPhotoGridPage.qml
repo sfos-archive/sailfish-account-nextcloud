@@ -31,8 +31,16 @@ Page {
             property string albumId: model.albumId
             property string photoId: model.photoId
 
-            source: model.imagePath.toString().length > 0 ? model.imagePath : model.thumbnailPath
             size: grid.cellSize
+
+            property NextcloudImageDownloader thumbDownloader: NextcloudImageDownloader {
+                imageCache: NextcloudImageCache
+                downloadThumbnail: true
+                accountId: delegateItem.accountId
+                userId: delegateItem.userId
+                albumId: delegateItem.albumId
+                photoId: delegateItem.photoId
+            }
 
             Image {
                 id: placeholderItem
@@ -51,6 +59,17 @@ Page {
                                            "albumId": delegateItem.albumId,
                                            "photoId": delegateItem.photoId})
                 }
+            }
+
+            Component.onCompleted: {
+                // do this manually rather than binding, to avoid flicker,
+                // as the model.thumbnailPath will be updated due to the
+                // thumbnail being downloaded, so avoid capturing it.
+                delegateItem.source = model.thumbnailPath.toString().length > 0
+                                    ? model.thumbnailPath
+                                    : model.imagePath.toString().length > 0
+                                        ? model.imagePath
+                                        : Qt.binding(function() { return thumbDownloader.imagePath })
             }
         }
     }
