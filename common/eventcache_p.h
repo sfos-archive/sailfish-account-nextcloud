@@ -110,7 +110,9 @@ public:
 public Q_SLOTS:
     void openDatabase(const QString &accountType);
 
-    void requestEvents(int accountId);
+    void requestEvents(int accountId, bool includeLocallyDeleted);
+    void deleteEvent(int accountId, const QString &eventId);
+    void flagEventForDeletion(int accountId, const QString &eventId);
 
     void populateEventImage(int idempToken, int accountId, const QString &eventId, const QNetworkRequest &requestTemplate);
 
@@ -120,6 +122,12 @@ Q_SIGNALS:
 
     void requestEventsFailed(int accountId, const QString &errorMessage);
     void requestEventsFinished(int accountId, const QVector<SyncCache::Event> &events);
+
+    void deleteEventFailed(int accountId, const QString &eventId, const QString &errorMessage);
+    void deleteEventFinished(int accountId, const QString &eventId);
+
+    void flagEventForDeletionFailed(int accountId, const QString &eventId, const QString &errorMessage);
+    void flagEventForDeletionFinished(int accountId, const QString &eventId);
 
     void populateEventImageFailed(int idempToken, const QString &errorMessage);
     void populateEventImageFinished(int idempToken, const QString &path);
@@ -143,7 +151,9 @@ public:
 Q_SIGNALS:
     void openDatabase(const QString &accountType);
 
-    void requestEvents(int accountId);
+    void requestEvents(int accountId, bool includeLocallyDeleted);
+    void deleteEvent(int accountId, const QString &eventId);
+    void flagEventForDeletion(int accountId, const QString &eventId);
 
     bool populateEventImage(int idempToken, int accountId, const QString &eventId, const QNetworkRequest &requestTemplate);
 
@@ -171,9 +181,11 @@ private:
     EventDatabase *m_eventDbParent;
     QVector<QString> m_filesToDelete;
     QVector<SyncCache::Event> m_deletedEvents;
+    QVector<SyncCache::Event> m_locallyDeletedEvents;
     QVector<SyncCache::Event> m_storedEvents;
     QVector<QString> m_tempFilesToDelete;
     QVector<SyncCache::Event> m_tempDeletedEvents;
+    QVector<SyncCache::Event> m_tempLocallyDeletedEvents;
     QVector<SyncCache::Event> m_tempStoredEvents;
 };
 

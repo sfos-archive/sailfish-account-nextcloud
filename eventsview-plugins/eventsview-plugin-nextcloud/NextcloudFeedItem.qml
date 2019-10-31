@@ -24,6 +24,7 @@ NotificationGroupMember {
     width: parent.width
     contentWidth: width - contentLeftMargin
     contentHeight: Math.max(image.y + image.height, content.y + content.height) + Theme.paddingLarge
+    deleteIconCenterY: image.y + image.height/2
 
     onClicked: {
         if (eventUrl.length > 0) {

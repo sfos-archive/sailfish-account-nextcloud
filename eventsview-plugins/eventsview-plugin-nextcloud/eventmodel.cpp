@@ -11,7 +11,15 @@
 #include "eventcache.h"
 #include "accountauthenticator_p.h"
 
-#include <QtDebug>
+#include <QtCore/QTimer>
+#include <QtCore/QDebug>
+#include <QtQml/QQmlInfo>
+#include <QtDBus/QDBusInterface>
+#include <QtDBus/QDBusPendingCallWatcher>
+#include <QtDBus/QDBusPendingReply>
+
+// mlite5
+#include <MGConfItem>
 
 #define MAX_RETRY_SIGNON 3
 
@@ -144,11 +152,14 @@ void NextcloudEventCache::signOnError(int accountId, const QString &serviceName)
 //-----------------------------------------------------------------------------
 
 NextcloudEventsModel::NextcloudEventsModel(QObject *parent)
-    : QAbstractListModel(parent), m_deferLoad(false), m_eventCache(Q_NULLPTR)
-    , m_accountId(0)
+    : QAbstractListModel(parent)
 {
     qRegisterMetaType<SyncCache::Event>();
     qRegisterMetaType<QVector<SyncCache::Event> >();
+}
+
+NextcloudEventsModel::~NextcloudEventsModel()
+{
 }
 
 void NextcloudEventsModel::classBegin()
@@ -190,6 +201,7 @@ QVariant NextcloudEventsModel::data(const QModelIndex &index, int role) const
         case ImageUrlRole:      return m_data[row].imageUrl;
         case ImagePathRole:     return m_data[row].imagePath;
         case TimestampRole:     return m_data[row].timestamp;
+        case DeletedLocallyRole: return m_data[row].deletedLocally;
         default:                return QVariant();
     }
 }
@@ -210,6 +222,7 @@ QHash<int, QByteArray> NextcloudEventsModel::roleNames() const
         { ImageUrlRole,         "imageUrl" },
         { ImagePathRole,        "imagePath" },
         { TimestampRole,        "timestamp" },
+        { DeletedLocallyRole,   "deletedLocally" },
     };
 
     return retn;
@@ -236,6 +249,15 @@ void NextcloudEventsModel::setEventCache(SyncCache::EventCache *cache)
     if (!m_deferLoad) {
         loadData();
     }
+
+    connect(m_eventCache, &SyncCache::EventCache::flagEventForDeletionFailed,
+            this, [this] (int accountId, const QString &eventId, const QString &errorMessage) {
+        if (accountId == this->accountId()) {
+            qmlInfo(this) << "Failed to locally delete event:" << eventId
+                          << "for account:" << this->accountId()
+                          << ":" << errorMessage;
+        }
+    });
 
     connect(m_eventCache, &SyncCache::EventCache::eventsStored,
             this, [this] (const QVector<SyncCache::Event> &events) {
@@ -290,6 +312,7 @@ void NextcloudEventsModel::setAccountId(int id)
     }
 
     m_accountId = id;
+    m_buteoProfileId = QString("nextcloud.Posts-%1").arg(id);
     emit accountIdChanged();
 
     if (!m_deferLoad) {
@@ -323,6 +346,13 @@ void NextcloudEventsModel::loadData()
         return;
     }
 
+    if (!m_notifCapabilityConf) {
+        m_notifCapabilityConf = new MGConfItem("/sailfish/sync/profiles/" + m_buteoProfileId + "/ocs-endpoints", this);
+        connect(m_notifCapabilityConf, &MGConfItem::valueChanged,
+                this, &NextcloudEventsModel::updateSupportedActions);
+    }
+    updateSupportedActions();
+
     QObject *contextObject = new QObject(this);
     connect(m_eventCache, &SyncCache::EventCache::requestEventsFinished,
             contextObject, [this, contextObject] (int accountId,
@@ -353,9 +383,31 @@ void NextcloudEventsModel::loadData()
             return;
         }
         contextObject->deleteLater();
-        qWarning() << "NextcloudEventsModel::loadData: failed:" << errorMessage;
+        qmlInfo(this) << "NextcloudEventsModel::loadData: failed:" << errorMessage;
     });
-    m_eventCache->requestEvents(m_accountId);
+    m_eventCache->requestEvents(m_accountId, false);
+}
+
+void NextcloudEventsModel::updateSupportedActions()
+{
+    if (m_accountId <= 0 || !m_notifCapabilityConf) {
+        return;
+    }
+
+    Actions supportedActions = 0;
+    QStringList capabilities = m_notifCapabilityConf->value().toStringList();
+
+    if (capabilities.contains(QStringLiteral("delete"))) {
+        supportedActions |= DeleteEvent;
+    }
+    if (capabilities.contains(QStringLiteral("delete-all"))) {
+        supportedActions |= DeleteAllEvents;
+    }
+
+    if (supportedActions != m_supportedActions) {
+        m_supportedActions = supportedActions;
+        emit supportedActionsChanged();
+    }
 }
 
 // call this periodically to detect changes made to the database by another process.
@@ -457,9 +509,92 @@ void NextcloudEventsModel::refresh()
             return;
         }
         contextObject->deleteLater();
-        qWarning() << "NextcloudEventsModel::refresh: failed:" << errorMessage;
+        qmlInfo(this) << "NextcloudEventsModel::refresh: failed:" << errorMessage;
     });
-    m_eventCache->requestEvents(m_accountId);
+    m_eventCache->requestEvents(m_accountId, false);
+}
+
+NextcloudEventsModel::Actions NextcloudEventsModel::supportedActions() const
+{
+    return m_supportedActions;
+}
+
+void NextcloudEventsModel::deleteEventAt(int row)
+{
+    if (row < 0 || row >= m_data.count()) {
+        return;
+    }
+    if (!m_supportedActions & DeleteEvent) {
+        qmlInfo(this) << "Notification delete action is not supported!";
+        return;
+    }
+
+    m_notificationsToDelete.insert(m_data[row].eventId);
+    startNotificationDeleteTimer();
+}
+
+void NextcloudEventsModel::deleteAllEvents()
+{
+    if (!m_supportedActions & DeleteAllEvents) {
+        qmlInfo(this) << "Notification delete-all action is not supported!";
+        return;
+    }
+
+    if (m_data.count() > 0) {
+        for (int i = 0; i < m_data.count(); ++i) {
+            m_notificationsToDelete.insert(m_data[i].eventId);
+        }
+        startNotificationDeleteTimer();
+    }
+}
+
+void NextcloudEventsModel::startNotificationDeleteTimer()
+{
+    // Batch notification deletions to avoid unnecessary sync requests.
+    if (!m_notificationDeleteTimer) {
+        m_notificationDeleteTimer = new QTimer(this);
+        m_notificationDeleteTimer->setSingleShot(true);
+        connect(m_notificationDeleteTimer, &QTimer::timeout,
+                this, &NextcloudEventsModel::notificationDeleteTimeout);
+        m_notificationDeleteTimer->setInterval(10 * 1000);
+    }
+    m_notificationDeleteTimer->start();
+}
+
+void NextcloudEventsModel::notificationDeleteTimeout()
+{
+    if (m_notificationsToDelete.isEmpty()) {
+        return;
+    }
+
+    const QStringList notificationIds = m_notificationsToDelete.toList();
+    for (const QString &notificationId : notificationIds) {
+        m_eventCache->flagEventForDeletion(m_accountId, notificationId);
+    }
+
+    if (!m_buteoInterface) {
+        m_buteoInterface = new QDBusInterface("com.meego.msyncd",
+                                              "/synchronizer",
+                                              "com.meego.msyncd",
+                                              QDBusConnection::sessionBus(),
+                                              this);
+    }
+
+    QDBusPendingCallWatcher *watcher = new QDBusPendingCallWatcher(
+                m_buteoInterface->asyncCall(QStringLiteral("startSync"), m_buteoProfileId), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished,
+            this, [this] (QDBusPendingCallWatcher *call) {
+        QDBusPendingReply<bool> reply = *call;
+        if (reply.isError()) {
+            qWarning() << "Failed to request buteo to delete notifications for profile:"
+                       << this->m_buteoProfileId
+                       << reply.error().name()
+                       << reply.error().message();
+        }
+       call->deleteLater();
+    });
+
+    m_notificationsToDelete.clear();
 }
 
 //-----------------------------------------------------------------------------

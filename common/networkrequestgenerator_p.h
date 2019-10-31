@@ -41,8 +41,12 @@ public:
 
     QNetworkReply *capabilities(const QString &serverUrl);
     QNetworkReply *notificationList(const QString &serverUrl);
+
     QNetworkReply *galleryConfig(const QString &serverUrl);
     QNetworkReply *galleryList(const QString &serverUrl, const QString &location = QString());
+
+    QNetworkReply *deleteNotification(const QString &serverUrl, const QString &notificationId);
+    QNetworkReply *deleteAllNotifications(const QString &serverUrl);
 };
 
 class WebDavRequestGenerator : public NetworkRequestGenerator
@@ -51,14 +55,10 @@ public:
     WebDavRequestGenerator(QNetworkAccessManager *networkAccessManager, const QString &username, const QString &password);
     WebDavRequestGenerator(QNetworkAccessManager *networkAccessManager, const QString &accessToken);
 
-    QNetworkReply *capabilities(const QString &serverUrl);
-
     QNetworkReply *dirListing(const QString &serverUrl, const QString &remoteDirPath);
     QNetworkReply *dirCreation(const QString &serverUrl, const QString &remoteDirPath);
     QNetworkReply *upload(const QString &serverUrl, const QString &dataContentType, const QByteArray &data, const QString &remoteDirPath);
     QNetworkReply *download(const QString &serverUrl, const QString &remoteFilePath);
-
-    QNetworkReply *notificationList(const QString &serverUrl);
 };
 
 #endif // NEXTCLOUD_NETWORKREQUESTGENERATOR_P_H

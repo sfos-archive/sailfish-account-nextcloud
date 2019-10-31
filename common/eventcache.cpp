@@ -215,14 +215,36 @@ void EventCacheThreadWorker::openDatabase(const QString &accountType)
     }
 }
 
-void EventCacheThreadWorker::requestEvents(int accountId)
+void EventCacheThreadWorker::requestEvents(int accountId, bool includeLocallyDeleted)
 {
     DatabaseError error;
-    QVector<SyncCache::Event> events = m_db.events(accountId, &error);
+    QVector<SyncCache::Event> events = m_db.events(accountId, &error, includeLocallyDeleted);
     if (error.errorCode != DatabaseError::NoError) {
         emit requestEventsFailed(accountId, error.errorMessage);
     } else {
         emit requestEventsFinished(accountId, events);
+    }
+}
+
+void EventCacheThreadWorker::deleteEvent(int accountId, const QString &eventId)
+{
+    DatabaseError error;
+    m_db.deleteEvent(accountId, eventId, &error);
+    if (error.errorCode != DatabaseError::NoError) {
+        emit deleteEventFailed(accountId, eventId, error.errorMessage);
+    } else {
+        emit deleteEventFinished(accountId, eventId);
+    }
+}
+
+void EventCacheThreadWorker::flagEventForDeletion(int accountId, const QString &eventId)
+{
+    DatabaseError error;
+    m_db.flagEventForDeletion(accountId, eventId, &error);
+    if (error.errorCode != DatabaseError::NoError) {
+        emit flagEventForDeletionFailed(accountId, eventId, error.errorMessage);
+    } else {
+        emit flagEventForDeletionFinished(accountId, eventId);
     }
 }
 
@@ -291,12 +313,18 @@ EventCachePrivate::EventCachePrivate(EventCache *parent)
 
     connect(this, &EventCachePrivate::openDatabase, m_worker, &EventCacheThreadWorker::openDatabase);
     connect(this, &EventCachePrivate::requestEvents, m_worker, &EventCacheThreadWorker::requestEvents);
+    connect(this, &EventCachePrivate::deleteEvent, m_worker, &EventCacheThreadWorker::deleteEvent);
+    connect(this, &EventCachePrivate::flagEventForDeletion, m_worker, &EventCacheThreadWorker::flagEventForDeletion);
     connect(this, &EventCachePrivate::populateEventImage, m_worker, &EventCacheThreadWorker::populateEventImage);
 
     connect(m_worker, &EventCacheThreadWorker::openDatabaseFailed, parent, &EventCache::openDatabaseFailed);
     connect(m_worker, &EventCacheThreadWorker::openDatabaseFinished, parent, &EventCache::openDatabaseFinished);
     connect(m_worker, &EventCacheThreadWorker::requestEventsFailed, parent, &EventCache::requestEventsFailed);
     connect(m_worker, &EventCacheThreadWorker::requestEventsFinished, parent, &EventCache::requestEventsFinished);
+    connect(m_worker, &EventCacheThreadWorker::deleteEventFailed, parent, &EventCache::deleteEventFailed);
+    connect(m_worker, &EventCacheThreadWorker::deleteEventFinished, parent, &EventCache::deleteEventFinished);
+    connect(m_worker, &EventCacheThreadWorker::flagEventForDeletionFailed, parent, &EventCache::flagEventForDeletionFailed);
+    connect(m_worker, &EventCacheThreadWorker::flagEventForDeletionFinished, parent, &EventCache::flagEventForDeletionFinished);
 
     connect(m_worker, &EventCacheThreadWorker::populateEventImageFailed, parent, &EventCache::populateEventImageFailed);
     connect(m_worker, &EventCacheThreadWorker::populateEventImageFinished, parent, &EventCache::populateEventImageFinished);
@@ -331,10 +359,22 @@ void EventCache::openDatabase(const QString &databaseFile)
     emit d->openDatabase(databaseFile);
 }
 
-void EventCache::requestEvents(int accountId)
+void EventCache::requestEvents(int accountId, bool includeLocallyDeleted)
 {
     Q_D(EventCache);
-    emit d->requestEvents(accountId);
+    emit d->requestEvents(accountId, includeLocallyDeleted);
+}
+
+void EventCache::deleteEvent(int accountId, const QString &eventId)
+{
+    Q_D(EventCache);
+    emit d->deleteEvent(accountId, eventId);
+}
+
+void EventCache::flagEventForDeletion(int accountId, const QString &eventId)
+{
+    Q_D(EventCache);
+    emit d->flagEventForDeletion(accountId, eventId);
 }
 
 void EventCache::populateEventImage(int idempToken, int accountId, const QString &eventId, const QNetworkRequest &requestTemplate)

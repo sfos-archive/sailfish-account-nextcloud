@@ -29,16 +29,20 @@ public:
 
     void purgeAccount(int accountId) Q_DECL_OVERRIDE;
 
-private Q_SLOTS:
-    void handleCapabilitiesReply();
-    void handleNotificationListReply();
-
 private:
     void beginSync() Q_DECL_OVERRIDE;
     bool performCapabilitiesRequest();
+    void handleCapabilitiesReply();
     bool performNotificationListRequest();
+    void handleNotificationListReply();
+    bool performNotificationDeleteRequest(const QStringList &notificationIds);
+    void handleNotificationDeleteReply();
+    bool performNotificationDeleteAllRequest();
+    void handleNotificationDeleteAllReply();
 
     JsonRequestGenerator *m_requestGenerator = nullptr;
+    bool m_deleteAllNotifsSupported = false;
+    QSet<QString> m_currentDeleteNotificationIds;
 };
 
 #endif // NEXTCLOUD_POSTS_SYNCER_P_H

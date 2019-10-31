@@ -40,6 +40,24 @@ static bool upgradeVersion1to2Fn(QSqlDatabase &database) {
     return true;
 }
 
+static bool upgradeVersion2to3Fn(QSqlDatabase &database) {
+    QSqlQuery alterTableQuery(QStringLiteral("ALTER TABLE Events ADD deletedLocally BOOL;"), database);
+    if (alterTableQuery.lastError().isValid()) {
+        qWarning() << "Failed to update events database schema for version 3:" << alterTableQuery.lastError().text();
+        return false;
+    }
+    alterTableQuery.finish();
+
+    QSqlQuery updateDeleteLocallyQuery(QStringLiteral("UPDATE Events SET deletedLocally = 0;"), database);
+    if (updateDeleteLocallyQuery.lastError().isValid()) {
+        qWarning() << "Failed to update events database values for version 3:" << updateDeleteLocallyQuery.lastError().text();
+        return false;
+    }
+    updateDeleteLocallyQuery.finish();
+
+    return true;
+}
+
 EventDatabasePrivate::EventDatabasePrivate(EventDatabase *parent)
     : DatabasePrivate(parent), m_eventDbParent(parent)
 {
@@ -47,7 +65,7 @@ EventDatabasePrivate::EventDatabasePrivate(EventDatabase *parent)
 
 int EventDatabasePrivate::currentSchemaVersion() const
 {
-    return 2;
+    return 3;
 }
 
 QVector<const char *> EventDatabasePrivate::createStatements() const
@@ -62,6 +80,7 @@ QVector<const char *> EventDatabasePrivate::createStatements() const
             "\n imageUrl TEXT,"
             "\n imagePath TEXT,"
             "\n timestamp TEXT,"
+            "\n deletedLocally BOOL,"
             "\n PRIMARY KEY (accountId, eventId));";
     static QVector<const char *> retn { createEventsTable };
     return retn;
@@ -79,9 +98,14 @@ QVector<UpgradeOperation> EventDatabasePrivate::upgradeVersions() const
         0 // NULL-terminated
     };
 
+    static const char *upgradeVersion2to3[] = {
+        "PRAGMA user_version=3",
+        0 // NULL-terminated
+    };
     static QVector<UpgradeOperation> retn {
         { 0, upgradeVersion0to1 },
         { upgradeVersion1to2Fn, upgradeVersion1to2 },
+        { upgradeVersion2to3Fn, upgradeVersion2to3 },
     };
 
     return retn;
@@ -96,9 +120,11 @@ void EventDatabasePrivate::transactionCommittedPreUnlock()
 {
     m_tempFilesToDelete = m_filesToDelete;
     m_tempDeletedEvents = m_deletedEvents;
+    m_tempLocallyDeletedEvents = m_locallyDeletedEvents;
     m_tempStoredEvents = m_storedEvents;
     m_filesToDelete.clear();
     m_deletedEvents.clear();
+    m_locallyDeletedEvents.clear();
     m_storedEvents.clear();
 }
 
@@ -112,6 +138,9 @@ void EventDatabasePrivate::transactionCommittedPostUnlock()
     if (!m_tempDeletedEvents.isEmpty()) {
         emit m_eventDbParent->eventsDeleted(m_tempDeletedEvents);
     }
+    if (!m_tempLocallyDeletedEvents.isEmpty()) {
+        emit m_eventDbParent->eventsDeleted(m_tempLocallyDeletedEvents);
+    }
     if (!m_tempStoredEvents.isEmpty()) {
         emit m_eventDbParent->eventsStored(m_tempStoredEvents);
     }
@@ -121,6 +150,7 @@ void EventDatabasePrivate::transactionRolledBackPreUnlocked()
 {
     m_filesToDelete.clear();
     m_deletedEvents.clear();
+    m_locallyDeletedEvents.clear();
     m_storedEvents.clear();
 }
 
@@ -133,13 +163,16 @@ EventDatabase::EventDatabase(QObject *parent)
     qRegisterMetaType<QVector<SyncCache::Event> >();
 }
 
-QVector<SyncCache::Event> EventDatabase::events(int accountId, DatabaseError *error) const
+QVector<SyncCache::Event> EventDatabase::events(int accountId, DatabaseError *error, bool includeLocallyDeleted) const
 {
     SYNCCACHE_DB_D(const EventDatabase);
 
-    const QString queryString = QStringLiteral("SELECT eventId, eventSubject, eventText, eventUrl, imageUrl, imagePath, timestamp FROM Events"
-                                               " WHERE accountId = :accountId"
-                                               " ORDER BY timestamp DESC, eventId ASC");
+    QString queryString = QStringLiteral("SELECT eventId, eventSubject, eventText, eventUrl, imageUrl, imagePath, timestamp, deletedLocally FROM Events"
+                                         " WHERE accountId = :accountId");
+    if (!includeLocallyDeleted) {
+        queryString += QStringLiteral(" AND deletedLocally = 0");
+    }
+    queryString += QStringLiteral(" ORDER BY timestamp DESC, eventId ASC");
 
     const QList<QPair<QString, QVariant> > bindValues {
         qMakePair<QString, QVariant>(QStringLiteral(":accountId"), accountId)
@@ -156,6 +189,7 @@ QVector<SyncCache::Event> EventDatabase::events(int accountId, DatabaseError *er
         currEvent.imageUrl = QUrl(selectQuery.value(whichValue++).toString());
         currEvent.imagePath = QUrl(selectQuery.value(whichValue++).toString());
         currEvent.timestamp = QDateTime::fromString(selectQuery.value(whichValue++).toString(), Qt::ISODate);
+        currEvent.deletedLocally = selectQuery.value(whichValue++).toBool();
         return currEvent;
     };
 
@@ -172,7 +206,7 @@ Event EventDatabase::event(int accountId, const QString &eventId, DatabaseError 
 {
     SYNCCACHE_DB_D(const EventDatabase);
 
-    const QString queryString = QStringLiteral("SELECT eventSubject, eventText, eventUrl, imageUrl, imagePath, timestamp FROM Events"
+    const QString queryString = QStringLiteral("SELECT eventSubject, eventText, eventUrl, imageUrl, imagePath, timestamp, deletedLocally FROM Events"
                                                " WHERE accountId = :accountId AND eventId = :eventId");
 
     const QList<QPair<QString, QVariant> > bindValues {
@@ -191,6 +225,7 @@ Event EventDatabase::event(int accountId, const QString &eventId, DatabaseError 
         currEvent.imageUrl = QUrl(selectQuery.value(whichValue++).toString());
         currEvent.imagePath = QUrl(selectQuery.value(whichValue++).toString());
         currEvent.timestamp = QDateTime::fromString(selectQuery.value(whichValue++).toString(), Qt::ISODate);
+        currEvent.deletedLocally = selectQuery.value(whichValue++).toBool();
         return currEvent;
     };
 
@@ -216,9 +251,9 @@ void EventDatabase::storeEvent(const Event &event, DatabaseError *error)
         return;
     }
 
-    const QString insertString = QStringLiteral("INSERT INTO Events (accountId, eventId, eventSubject, eventText, eventUrl, imageUrl, imagePath, timestamp)"
-                                                " VALUES(:accountId, :eventId, :eventSubject, :eventText, :eventUrl, :imageUrl, :imagePath, :timestamp)");
-    const QString updateString = QStringLiteral("UPDATE Events SET eventSubject = :eventSubject, eventText = :eventText, eventUrl = :eventUrl, imageUrl = :imageUrl, imagePath = :imagePath, timestamp = :timestamp"
+    const QString insertString = QStringLiteral("INSERT INTO Events (accountId, eventId, eventSubject, eventText, eventUrl, imageUrl, imagePath, timestamp, deletedLocally)"
+                                                " VALUES(:accountId, :eventId, :eventSubject, :eventText, :eventUrl, :imageUrl, :imagePath, :timestamp, :deletedLocally)");
+    const QString updateString = QStringLiteral("UPDATE Events SET eventSubject = :eventSubject, eventText = :eventText, eventUrl = :eventUrl, imageUrl = :imageUrl, imagePath = :imagePath, timestamp = :timestamp, deletedLocally = :deletedLocally"
                                                 " WHERE accountId = :accountId AND eventId = :eventId");
 
     const bool insert = existingEvent.eventId.isEmpty();
@@ -233,6 +268,7 @@ void EventDatabase::storeEvent(const Event &event, DatabaseError *error)
         qMakePair<QString, QVariant>(QStringLiteral(":imageUrl"), event.imageUrl),
         qMakePair<QString, QVariant>(QStringLiteral(":imagePath"), event.imagePath),
         qMakePair<QString, QVariant>(QStringLiteral(":timestamp"), event.timestamp.toString(Qt::ISODate)),
+        qMakePair<QString, QVariant>(QStringLiteral(":deletedLocally"), event.deletedLocally),
     };
 
     auto storeResultHandler = [d, event]() -> void {
@@ -248,16 +284,16 @@ void EventDatabase::storeEvent(const Event &event, DatabaseError *error)
             error);
 }
 
-void EventDatabase::deleteEvent(const Event &event, DatabaseError *error)
+void EventDatabase::deleteEvent(int accountId, const QString &eventId, DatabaseError *error)
 {
     SYNCCACHE_DB_D(EventDatabase);
 
     DatabaseError err;
-    const Event existingEvent = this->event(event.accountId, event.eventId, &err);
+    const Event existingEvent = this->event(accountId, eventId, &err);
     if (err.errorCode != DatabaseError::NoError) {
         setDatabaseError(error, err.errorCode,
                          QStringLiteral("Error while querying existing event %1 for delete: %2")
-                                   .arg(event.eventId, err.errorMessage));
+                                   .arg(eventId, err.errorMessage));
         return;
     }
 
@@ -272,8 +308,8 @@ void EventDatabase::deleteEvent(const Event &event, DatabaseError *error)
                                                " WHERE accountId = :accountId AND eventId = :eventId");
 
     const QList<QPair<QString, QVariant> > bindValues {
-        qMakePair<QString, QVariant>(QStringLiteral(":accountId"), event.accountId),
-        qMakePair<QString, QVariant>(QStringLiteral(":eventId"), event.eventId)
+        qMakePair<QString, QVariant>(QStringLiteral(":accountId"), accountId),
+        qMakePair<QString, QVariant>(QStringLiteral(":eventId"), eventId)
     };
 
     auto deleteResultHandler = [d, existingEvent]() -> void {
@@ -289,6 +325,46 @@ void EventDatabase::deleteEvent(const Event &event, DatabaseError *error)
             queryString,
             bindValues,
             deleteResultHandler,
+            QStringLiteral("event"),
+            error);
+}
+
+void EventDatabase::flagEventForDeletion(int accountId, const QString &eventId, SyncCache::DatabaseError *error)
+{
+    SYNCCACHE_DB_D(EventDatabase);
+
+    DatabaseError err;
+    const Event existingEvent = this->event(accountId, eventId, &err);
+    if (err.errorCode != DatabaseError::NoError) {
+        setDatabaseError(error, err.errorCode,
+                         QStringLiteral("Error while querying existing event %1 for flagging: %2")
+                                   .arg(eventId, err.errorMessage));
+        return;
+    }
+
+    if (existingEvent.eventId.isEmpty()) {
+        // does not exist in database
+        return;
+    }
+
+    const QString queryString = QStringLiteral("UPDATE Events SET deletedLocally = :deletedLocally"
+                                               " WHERE accountId = :accountId AND eventId = :eventId");
+
+    const QList<QPair<QString, QVariant> > bindValues {
+        qMakePair<QString, QVariant>(QStringLiteral(":accountId"), accountId),
+        qMakePair<QString, QVariant>(QStringLiteral(":eventId"), eventId),
+        qMakePair<QString, QVariant>(QStringLiteral(":deletedLocally"), true),
+    };
+
+    auto locallyDeleteResultHandler = [d, existingEvent]() -> void {
+        d->m_locallyDeletedEvents.append(existingEvent);
+    };
+
+    DatabaseImpl::store<SyncCache::Event>(
+            d,
+            queryString,
+            bindValues,
+            locallyDeleteResultHandler,
             QStringLiteral("event"),
             error);
 }
