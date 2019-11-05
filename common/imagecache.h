@@ -17,6 +17,7 @@
 #include <QtCore/QString>
 #include <QtCore/QUrl>
 #include <QtCore/QVector>
+#include <QtCore/QDateTime>
 #include <QtCore/QScopedPointer>
 #include <QtNetwork/QNetworkRequest>
 
@@ -25,13 +26,18 @@ namespace SyncCache {
 class ProcessMutex;
 
 struct User {
+    User& operator=(const User &other);
+
     int accountId = 0;
     QString userId;
     QUrl thumbnailUrl;
     QUrl thumbnailPath;
+    QString thumbnailFileName;
 };
 
 struct Album {
+    Album& operator=(const Album &other);
+
     int accountId = 0;
     QString userId;
     QString albumId;
@@ -40,15 +46,18 @@ struct Album {
     int photoCount = 0;
     QUrl thumbnailUrl;
     QUrl thumbnailPath;
+    QString thumbnailFileName;
 };
 
 struct Photo {
+    Photo& operator=(const Photo &other);
+
     int accountId = 0;
     QString userId;
     QString albumId;
     QString photoId;
-    QString createdTimestamp;
-    QString updatedTimestamp;
+    QDateTime createdTimestamp;
+    QDateTime updatedTimestamp;
     QString fileName;
     QString albumPath;
     QString description;
@@ -58,6 +67,12 @@ struct Photo {
     QUrl imagePath;
     int imageWidth = 0;
     int imageHeight = 0;
+    int fileSize = 0;
+    QString fileType;
+};
+
+struct PhotoCounter {
+    int count = 0;
 };
 
 class ImageDatabase : public Database
@@ -74,6 +89,8 @@ public:
     SyncCache::User user(int accountId, const QString &userId, SyncCache::DatabaseError *error) const;
     SyncCache::Album album(int accountId, const QString &userId, const QString &albumId, SyncCache::DatabaseError *error) const;
     SyncCache::Photo photo(int accountId, const QString &userId, const QString &albumId, const QString &photoId, SyncCache::DatabaseError *error) const;
+
+    SyncCache::PhotoCounter photoCount(SyncCache::DatabaseError *error) const;
 
     void storeUser(const SyncCache::User &user, SyncCache::DatabaseError *error);
     void storeAlbum(const SyncCache::Album &album, SyncCache::DatabaseError *error);
@@ -108,6 +125,7 @@ public Q_SLOTS:
     virtual void requestUsers();
     virtual void requestAlbums(int accountId, const QString &userId);
     virtual void requestPhotos(int accountId, const QString &userId, const QString &albumId);
+    virtual void requestPhotoCount();
 
     virtual void populateUserThumbnail(int idempToken, int accountId, const QString &userId, const QNetworkRequest &requestTemplate);
     virtual void populateAlbumThumbnail(int idempToken, int accountId, const QString &userId, const QString &albumId, const QNetworkRequest &requestTemplate);
@@ -126,6 +144,9 @@ Q_SIGNALS:
 
     void requestPhotosFailed(int accountId, const QString &userId, const QString &albumId, const QString &errorMessage);
     void requestPhotosFinished(int accountId, const QString &userId, const QString &albumId, const QVector<SyncCache::Photo> &photos);
+
+    void requestPhotoCountFailed(const QString &errorMessage);
+    void requestPhotoCountFinished(int photoCount);
 
     void populateUserThumbnailFailed(int idempToken, const QString &errorMessage);
     void populateUserThumbnailFinished(int idempToken, const QString &path);

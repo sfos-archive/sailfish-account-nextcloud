@@ -32,7 +32,7 @@ SOURCES += \
     eventmodel.cpp \
     plugin.cpp
 
-OTHER_FILES += *.qml
+OTHER_FILES += $$import.files $$qml.files
 
 INSTALLS += target import qml
 

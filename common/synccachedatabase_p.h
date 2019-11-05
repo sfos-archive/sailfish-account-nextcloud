@@ -43,6 +43,7 @@ public:
     bool next() { return m_query.next(); }
     bool isValid() { return m_query.isValid(); }
     void finish() { return m_query.finish(); }
+    QString executedQuery() const { return m_query.executedQuery(); }
     void setForwardOnly(bool forwardOnly) { m_query.setForwardOnly(forwardOnly); }
 
     QVariant lastInsertId() const { return m_query.lastInsertId(); }
@@ -150,7 +151,7 @@ QVector<T> fetchMultiple(
                                    QStringLiteral("Failed to execute %1 query: %2\n%3")
                                              .arg(queryName)
                                              .arg(selectQuery.lastError().text())
-                                             .arg(queryString));
+                                             .arg(selectQuery.executedQuery()));
         return retn;
     }
 
@@ -197,7 +198,7 @@ T fetch(const DatabasePrivate *d,
                                    QStringLiteral("Failed to execute %1 query: %2\n%3")
                                              .arg(queryName)
                                              .arg(selectQuery.lastError().text())
-                                             .arg(queryString));
+                                             .arg(selectQuery.executedQuery()));
         return retn;
     }
 
@@ -248,7 +249,7 @@ void store(
                                    QStringLiteral("Failed to execute store %1 query: %2\n%3")
                                              .arg(queryName)
                                              .arg(storeQuery.lastError().text())
-                                             .arg(queryString));
+                                             .arg(storeQuery.executedQuery()));
         if (!wasInTransaction) {
             DatabaseError rollbackError;
             d->m_parent->rollbackTransaction(&rollbackError);
@@ -318,7 +319,7 @@ void deleteValue(
                                    QStringLiteral("Failed to execute delete %1 query: %2\n%3")
                                              .arg(queryName)
                                              .arg(deleteQuery.lastError().text())
-                                             .arg(queryString));
+                                             .arg(deleteQuery.executedQuery()));
         if (!wasInTransaction) {
             DatabaseError rollbackError;
             d->m_parent->rollbackTransaction(&rollbackError);

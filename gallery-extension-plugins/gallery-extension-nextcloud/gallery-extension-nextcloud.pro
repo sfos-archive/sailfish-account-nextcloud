@@ -21,6 +21,7 @@ import.files = \
     NextcloudAlbumDelegate.qml \
     NextcloudPhotoGridPage.qml \
     NextcloudFullscreenPhotoPage.qml \
+    NextcloudImageDetailsPage.qml \
     qmldir
 
 import.path = $$TARGETPATH
@@ -31,6 +32,6 @@ qml.path = /usr/share/jolla-gallery/mediasources/
 
 HEADERS += imagemodels.h
 SOURCES += imagemodels.cpp nextcloudplugin.cpp
-OTHER_FILES += import.files qml.files
+OTHER_FILES += *.qml
 
 INSTALLS += target import qml

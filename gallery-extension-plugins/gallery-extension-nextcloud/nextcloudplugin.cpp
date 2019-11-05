@@ -55,6 +55,7 @@ public:
         qmlRegisterType<NextcloudUsersModel> (uri, 1, 0, "NextcloudUsersModel");
         qmlRegisterType<NextcloudAlbumsModel>(uri, 1, 0, "NextcloudAlbumsModel");
         qmlRegisterType<NextcloudPhotosModel>(uri, 1, 0, "NextcloudPhotosModel");
+        qmlRegisterType<NextcloudPhotoCounter>(uri, 1, 0, "NextcloudPhotoCounter");
         qmlRegisterType<NextcloudImageDownloader>(uri, 1, 0, "NextcloudImageDownloader");
     }
 };

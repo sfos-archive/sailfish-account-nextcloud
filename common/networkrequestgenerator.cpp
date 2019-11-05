@@ -172,7 +172,7 @@ QNetworkReply *JsonRequestGenerator::galleryList(const QString &serverUrl, const
     }
 
     const QUrlQuery query(QStringLiteral("location=%1&mediatypes=%2&features=%3&etag=%4")
-                                    .arg(location.isEmpty() ? QStringLiteral("Photos") : location)
+                                    .arg(location.isEmpty() ? QStringLiteral("/") : location)
                                     .arg(QStringLiteral("image/jpeg;image/gif;image/png;image/bmp"))
                                     .arg(QString())
                                     .arg(QString()));

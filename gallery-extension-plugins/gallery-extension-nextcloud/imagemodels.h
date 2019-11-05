@@ -115,8 +115,9 @@ Q_SIGNALS:
 
 private:
     void loadData();
-    bool m_deferLoad;
-    SyncCache::ImageCache* m_imageCache;
+
+    bool m_deferLoad = false;
+    SyncCache::ImageCache *m_imageCache = nullptr;
     QVector<SyncCache::User> m_data;
 };
 
@@ -151,6 +152,7 @@ public:
         PhotoCountRole,
         ThumbnailUrlRole,
         ThumbnailPathRole,
+        ThumbnailFileNameRole,
     };
     Q_ENUM(Roles)
 
@@ -173,9 +175,10 @@ Q_SIGNALS:
 
 private:
     void loadData();
-    bool m_deferLoad;
-    SyncCache::ImageCache* m_imageCache;
-    int m_accountId;
+
+    bool m_deferLoad = false;
+    SyncCache::ImageCache *m_imageCache = nullptr;
+    int m_accountId = 0;
     QString m_userId;
     QVector<SyncCache::Album> m_data;
 };
@@ -218,7 +221,9 @@ public:
         ImageUrlRole,
         ImagePathRole,
         ImageWidthRole,
-        ImageHeightRole
+        ImageHeightRole,
+        FileSizeRole,
+        FileTypeRole
     };
     Q_ENUM(Roles)
 
@@ -245,12 +250,35 @@ Q_SIGNALS:
 
 private:
     void loadData();
-    bool m_deferLoad;
-    SyncCache::ImageCache* m_imageCache;
-    int m_accountId;
+
+    bool m_deferLoad = false;
+    SyncCache::ImageCache *m_imageCache = nullptr;
+    int m_accountId = 0;
     QString m_userId;
     QString m_albumId;
     QVector<SyncCache::Photo> m_data;
+};
+
+class NextcloudPhotoCounter : public QObject
+{
+    Q_OBJECT
+    Q_PROPERTY(SyncCache::ImageCache* imageCache READ imageCache WRITE setImageCache NOTIFY imageCacheChanged)
+    Q_PROPERTY(int count READ count NOTIFY countChanged)
+public:
+    explicit NextcloudPhotoCounter(QObject *parent = nullptr);
+
+    SyncCache::ImageCache *imageCache() const;
+    void setImageCache(SyncCache::ImageCache *cache);
+
+    int count();
+
+Q_SIGNALS:
+    void countChanged();
+    void imageCacheChanged();
+
+private:
+    SyncCache::ImageCache *m_imageCache = nullptr;
+    int m_count = 0;
 };
 
 class NextcloudImageDownloader : public QObject, public QQmlParserStatus
@@ -308,16 +336,19 @@ Q_SIGNALS:
 
 private:
     void loadImage();
-    bool m_deferLoad;
-    SyncCache::ImageCache* m_imageCache;
-    int m_accountId;
+    void populateFinished(int idempToken, const QString &path);
+    void populateFailed(int idempToken, const QString &errorMessage);
+
+    bool m_deferLoad = false;
+    SyncCache::ImageCache *m_imageCache = nullptr;
+    int m_accountId = 0;
     QString m_userId;
     QString m_albumId;
     QString m_photoId;
-    bool m_downloadThumbnail;
-    bool m_downloadImage;
+    bool m_downloadThumbnail = false;
+    bool m_downloadImage = false;
     QUrl m_imagePath;
-    int m_idempToken;
+    int m_idempToken = 0;
 };
 
 #endif // NEXTCLOUD_GALLERY_IMAGEMODELS_H

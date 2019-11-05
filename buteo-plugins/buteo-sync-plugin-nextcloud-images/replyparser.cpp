@@ -71,42 +71,62 @@ ReplyParser::GalleryMetadata ReplyParser::parseGalleryMetadata(
     const QJsonObject albums = obj.value("albums").toObject();
 
     QHash<QString, int> albumPhotoCount;
+    QHash<QString, QPair<QUrl,QString> > albumThumbnails;
+
     for (QJsonArray::const_iterator it = files.constBegin(); it != files.constEnd(); ++it) {
         const QJsonObject photoData = (*it).toObject();
-        if (!photoData.value("mimetype").toString().startsWith(QStringLiteral("image/"), Qt::CaseInsensitive)) {
+        const QString mimeType = photoData.value("mimetype").toString();
+        if (!mimeType.startsWith(QStringLiteral("image/"), Qt::CaseInsensitive)) {
             continue; // TODO: support video also.
         }
         const QString photoPath = photoData.value("path").toString();
-        const QString albumPath = photoPath.mid(0, photoPath.lastIndexOf('/'));
+        const int lastDirSep = photoPath.lastIndexOf('/');
+        const QString albumPath = lastDirSep < 0 ? QString() : photoPath.mid(0, lastDirSep); // may be empty if home directory
         SyncCache::Photo photo;
         photo.accountId = m_accountId;
         photo.userId = m_userId;
         photo.albumId = QStringLiteral("%1%2").arg(m_webdavPath, albumPath);
         photo.photoId = QStringLiteral("%1%2").arg(m_webdavPath, photoPath);
-        photo.updatedTimestamp = QDateTime::fromTime_t(photoData.value("mtime").toVariant().toUInt()).toString(Qt::RFC2822Date);
+        photo.updatedTimestamp = QDateTime::fromTime_t(photoData.value("mtime").toVariant().toUInt());
         photo.createdTimestamp = photo.updatedTimestamp;
-        photo.fileName = photoPath.mid(photoPath.lastIndexOf('/'));
+        photo.fileName = photoPath.mid(photoPath.lastIndexOf('/') + 1);
         photo.albumPath = albumPath;
         photo.thumbnailUrl = m_serverUrl;
         photo.thumbnailUrl.setPath(QStringLiteral("/index.php/apps/gallery/api/preview/%1/128/128").arg(photoData.value("nodeid").toInt()));
         photo.imageUrl = m_serverUrl;
         photo.imageUrl.setPath(photo.photoId);
+        photo.fileSize = photoData.value("size").toInt();
+        photo.fileType = mimeType;
         retn.photos.append(photo);
         albumPhotoCount[photo.albumId]++;
+
+        if (!albumThumbnails.contains(photo.albumId)) {
+            albumThumbnails.insert(photo.albumId, qMakePair(photo.thumbnailUrl, photo.fileName));
+        }
     }
 
     for (QJsonObject::const_iterator it = albums.constBegin(); it != albums.constEnd(); ++it) {
-        const QString albumName = it.key();
+        const QString albumName = it.key(); // may be empty if home directory
         SyncCache::Album album;
+        album.albumId = QStringLiteral("%1%2").arg(m_webdavPath, albumName);
+        album.photoCount = albumPhotoCount.value(album.albumId);
+        if (album.photoCount == 0) {
+            continue;   // ignore empty albums
+        }
+
         album.accountId = m_accountId;
         album.userId = m_userId;
-        album.albumId = QStringLiteral("%1%2").arg(m_webdavPath, albumName);
-        album.parentAlbumId = albumName.contains('/') ? QStringLiteral("%1%2").arg(m_webdavPath, albumName.mid(0, albumName.lastIndexOf('/'))) : QString();
+        album.parentAlbumId = albumName.contains('/')
+                ? QStringLiteral("%1%2").arg(m_webdavPath, albumName.mid(0, albumName.lastIndexOf('/')))
+                : m_webdavPath;
         album.albumName = albumName;
-        album.photoCount = albumPhotoCount.value(album.albumId);
+
+        const QPair<QUrl,QString> &thumbnail = albumThumbnails.value(album.albumId);
+        album.thumbnailUrl = thumbnail.first;
+        album.thumbnailFileName = thumbnail.second;
+
         retn.albums.append(album);
     }
 
     return retn;
 }
-

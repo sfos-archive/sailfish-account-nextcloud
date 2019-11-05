@@ -21,13 +21,20 @@ MediaSource {
     //% "Nextcloud"
     title: qsTrId("jolla_gallery_nextcloud-la-user_photos")
     icon: "/usr/lib/qt5/qml/com/jolla/gallery/nextcloud/NextcloudGalleryIcon.qml"
-    model: nextcloudPhotos // FIXME: all photos, regardless of account
-    count: model.count
+    model: nextcloudUsers.count == 1
+          ? nextcloudAlbums
+          : nextcloudUsers
+    count: photoCounter.count
     ready: nextcloudUsers.count > 0
-    page: nextcloudUsers.count == 1 ? "/usr/lib/qt5/qml/com/jolla/gallery/nextcloud/NextcloudAlbumsPage.qml"
-                                    : "/usr/lib/qt5/qml/com/jolla/gallery/nextcloud/NextcloudUsersPage.qml"
+    page: nextcloudUsers.count == 1
+          ? "/usr/lib/qt5/qml/com/jolla/gallery/nextcloud/NextcloudAlbumsPage.qml"
+          : "/usr/lib/qt5/qml/com/jolla/gallery/nextcloud/NextcloudUsersPage.qml"
 
     property bool applicationActive: Qt.application.active
+
+    property NextcloudPhotoCounter photoCounter: NextcloudPhotoCounter {
+        imageCache: NextcloudImageCache
+    }
 
     property NextcloudUsersModel nextcloudUsers: NextcloudUsersModel {
         imageCache: NextcloudImageCache
@@ -35,13 +42,7 @@ MediaSource {
 
     property NextcloudAlbumsModel nextcloudAlbums: NextcloudAlbumsModel {
         imageCache: NextcloudImageCache
-        accountId: nextcloudUsers.count > 0 ? nextcloudUsers.at(0).accountId : ""
+        accountId: nextcloudUsers.count > 0 ? nextcloudUsers.at(0).accountId : 0
         userId: nextcloudUsers.count > 0 ? nextcloudUsers.at(0).userId : ""
-    }
-
-    property NextcloudPhotosModel nextcloudPhotos: NextcloudPhotosModel {
-        imageCache: NextcloudImageCache
-        accountId: nextcloudAlbums.accountId
-        userId: nextcloudAlbums.userId
     }
 }

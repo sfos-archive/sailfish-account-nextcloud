@@ -10,7 +10,8 @@
 #include "imagemodels.h"
 #include "accountauthenticator_p.h"
 
-#include <QtDebug>
+#include <QtCore/QDebug>
+#include <QtQml/QQmlInfo>
 
 #define MAX_RETRY_SIGNON 3
 
@@ -196,7 +197,7 @@ void NextcloudImageCache::signOnError(int accountId, const QString &serviceName)
 //-----------------------------------------------------------------------------
 
 NextcloudUsersModel::NextcloudUsersModel(QObject *parent)
-    : QAbstractListModel(parent), m_deferLoad(false), m_imageCache(Q_NULLPTR)
+    : QAbstractListModel(parent)
 {
     qRegisterMetaType<SyncCache::User>();
     qRegisterMetaType<QVector<SyncCache::User> >();
@@ -372,8 +373,7 @@ void NextcloudUsersModel::loadData()
 //-----------------------------------------------------------------------------
 
 NextcloudAlbumsModel::NextcloudAlbumsModel(QObject *parent)
-    : QAbstractListModel(parent), m_deferLoad(false), m_imageCache(Q_NULLPTR)
-    , m_accountId(0)
+    : QAbstractListModel(parent)
 {
     qRegisterMetaType<SyncCache::Album>();
     qRegisterMetaType<QVector<SyncCache::Album> >();
@@ -418,6 +418,7 @@ QVariant NextcloudAlbumsModel::data(const QModelIndex &index, int role) const
         case PhotoCountRole:    return m_data[row].photoCount;
         case ThumbnailUrlRole:  return m_data[row].thumbnailUrl;
         case ThumbnailPathRole: return m_data[row].thumbnailPath;
+        case ThumbnailFileNameRole: return m_data[row].thumbnailFileName;
         default:                return QVariant();
     }
 }
@@ -438,6 +439,7 @@ QHash<int, QByteArray> NextcloudAlbumsModel::roleNames() const
         { PhotoCountRole,       "photoCount" },
         { ThumbnailUrlRole,     "thumbnailUrl" },
         { ThumbnailPathRole,    "thumbnailPath" },
+        { ThumbnailFileNameRole, "thumbnailFileName" },
     };
 
     return retn;
@@ -619,8 +621,7 @@ void NextcloudAlbumsModel::loadData()
 //-----------------------------------------------------------------------------
 
 NextcloudPhotosModel::NextcloudPhotosModel(QObject *parent)
-    : QAbstractListModel(parent), m_deferLoad(false), m_imageCache(Q_NULLPTR)
-    , m_accountId(0)
+    : QAbstractListModel(parent)
 {
     qRegisterMetaType<SyncCache::Photo>();
     qRegisterMetaType<QVector<SyncCache::Photo> >();
@@ -673,6 +674,8 @@ QVariant NextcloudPhotosModel::data(const QModelIndex &index, int role) const
         case ImagePathRole:         return m_data[row].imagePath;
         case ImageWidthRole:        return m_data[row].imageWidth;
         case ImageHeightRole:       return m_data[row].imageHeight;
+        case FileSizeRole:          return m_data[row].fileSize;
+        case FileTypeRole:          return m_data[row].fileType;
         default:                    return QVariant();
     }
 }
@@ -700,6 +703,8 @@ QHash<int, QByteArray> NextcloudPhotosModel::roleNames() const
         { ImagePathRole,        "imagePath" },
         { ImageWidthRole,       "imageWidth" },
         { ImageHeightRole,      "imageHeight" },
+        { FileSizeRole,         "fileSize" },
+        { FileTypeRole,         "fileType" },
     };
 
     return retn;
@@ -849,15 +854,7 @@ QVariantMap NextcloudPhotosModel::at(int row) const
 
 void NextcloudPhotosModel::loadData()
 {
-    if (!m_imageCache) {
-        return;
-    }
-
-    if (m_accountId <= 0) {
-        return;
-    }
-
-    if (m_userId.isEmpty()) {
+    if (!m_imageCache || m_accountId < 0) {
         return;
     }
 
@@ -906,14 +903,57 @@ void NextcloudPhotosModel::loadData()
 
 //-----------------------------------------------------------------------------
 
+NextcloudPhotoCounter::NextcloudPhotoCounter(QObject *parent)
+    : QObject(parent)
+{
+}
+
+SyncCache::ImageCache* NextcloudPhotoCounter::imageCache() const
+{
+    return m_imageCache;
+}
+
+void NextcloudPhotoCounter::setImageCache(SyncCache::ImageCache *cache)
+{
+    if (m_imageCache == cache) {
+        return;
+    }
+
+    if (m_imageCache) {
+        disconnect(m_imageCache, 0, this, 0);
+    }
+
+    m_imageCache = cache;
+    emit imageCacheChanged();
+
+    connect(m_imageCache, &SyncCache::ImageCache::requestPhotoCountFinished,
+            this, [this] (int photoCount) {
+        if (m_count != photoCount) {
+            m_count = photoCount;
+            emit countChanged();
+        }
+    });
+    connect(m_imageCache, &SyncCache::ImageCache::requestPhotoCountFailed,
+            this, [this] (const QString &errorMessage) {
+        qmlInfo(this) << "Request total photo count failed:" << errorMessage;
+    });
+
+    connect(m_imageCache, &SyncCache::ImageCache::photosStored,
+            m_imageCache, &SyncCache::ImageCache::requestPhotoCount);
+    connect(m_imageCache, &SyncCache::ImageCache::photosDeleted,
+            m_imageCache, &SyncCache::ImageCache::requestPhotoCount);
+    m_imageCache->requestPhotoCount();
+}
+
+int NextcloudPhotoCounter::count()
+{
+    return m_count;
+}
+
+//-----------------------------------------------------------------------------
+
 NextcloudImageDownloader::NextcloudImageDownloader(QObject *parent)
     : QObject(parent)
-    , m_deferLoad(false)
-    , m_imageCache(Q_NULLPTR)
-    , m_accountId(0)
-    , m_downloadThumbnail(false)
-    , m_downloadImage(false)
-    , m_idempToken(0)
 {
 }
 
@@ -1038,7 +1078,9 @@ void NextcloudImageDownloader::setDownloadThumbnail(bool v)
     if (m_downloadThumbnail != v) {
         m_downloadThumbnail = v;
         emit downloadThumbnailChanged();
-        loadImage();
+        if (!m_deferLoad) {
+            loadImage();
+        }
     }
 }
 
@@ -1052,7 +1094,9 @@ void NextcloudImageDownloader::setDownloadImage(bool v)
     if (m_downloadImage != v) {
         m_downloadImage = v;
         emit downloadImageChanged();
-        loadImage();
+        if (!m_deferLoad) {
+            loadImage();
+        }
     }
 }
 
@@ -1070,50 +1114,58 @@ void NextcloudImageDownloader::loadImage()
 
     if (m_downloadImage) {
         m_idempToken = qHash(QStringLiteral("%1|%2|%3").arg(m_userId, m_albumId, m_photoId));
-        QObject *contextObject = new QObject(this);
+
         connect(m_imageCache, &SyncCache::ImageCache::populatePhotoImageFinished,
-                contextObject, [this, contextObject] (int idempToken, const QString &path) {
-            if (m_idempToken == idempToken) {
-                contextObject->deleteLater();
-                const QUrl imagePath = QUrl::fromLocalFile(path);
-                if (m_imagePath != imagePath) {
-                    m_imagePath = imagePath;
-                    emit imagePathChanged();
-                }
-            }
-        });
+                this, &NextcloudImageDownloader::populateFinished,
+                Qt::UniqueConnection);
         connect(m_imageCache, &SyncCache::ImageCache::populatePhotoImageFailed,
-                contextObject, [this, contextObject] (int idempToken, const QString &errorMessage) {
-            if (m_idempToken == idempToken) {
-                contextObject->deleteLater();
-                qWarning() << "NextcloudImageDownloader::loadImage: failed:" << errorMessage;
-            }
-        });
+                this, &NextcloudImageDownloader::populateFailed,
+                Qt::UniqueConnection);
+
         m_imageCache->populatePhotoImage(m_idempToken, m_accountId, m_userId, m_albumId, m_photoId, QNetworkRequest());
+
     } else if (m_downloadThumbnail) {
         m_idempToken = qHash(QStringLiteral("%1|%2|%3").arg(m_userId, m_albumId, m_photoId));
-        QObject *contextObject = new QObject(this);
-        connect(m_imageCache, &SyncCache::ImageCache::populatePhotoThumbnailFinished,
-                contextObject, [this, contextObject] (int idempToken, const QString &path) {
-            if (m_idempToken == idempToken) {
-                contextObject->deleteLater();
-                const QUrl imagePath = QUrl::fromLocalFile(path);
-                if (m_imagePath != imagePath) {
-                    m_imagePath = imagePath;
-                    emit imagePathChanged();
-                }
-            }
-        });
-        connect(m_imageCache, &SyncCache::ImageCache::populatePhotoThumbnailFailed,
-                contextObject, [this, contextObject] (int idempToken, const QString &errorMessage) {
-            if (m_idempToken == idempToken) {
-                contextObject->deleteLater();
-                qWarning() << "NextcloudImageDownloader::loadImage: failed:" << errorMessage;
-            }
-        });
         NextcloudImageCache *nextcloudImageCache = qobject_cast<NextcloudImageCache*>(m_imageCache);
-        m_imageCache->populatePhotoThumbnail(m_idempToken, m_accountId, m_userId, m_albumId, m_photoId,
-                                             nextcloudImageCache ? nextcloudImageCache->templateRequest(m_accountId, true)
-                                                                 : QNetworkRequest());
+        const QNetworkRequest networkRequest = nextcloudImageCache
+                ? nextcloudImageCache->templateRequest(m_accountId, true)
+                : QNetworkRequest();
+
+        if (m_photoId.isEmpty()) {
+            connect(m_imageCache, &SyncCache::ImageCache::populateAlbumThumbnailFinished,
+                    this, &NextcloudImageDownloader::populateFinished,
+                    Qt::UniqueConnection);
+            connect(m_imageCache, &SyncCache::ImageCache::populateAlbumThumbnailFailed,
+                    this, &NextcloudImageDownloader::populateFailed,
+                    Qt::UniqueConnection);
+            m_imageCache->populateAlbumThumbnail(m_idempToken, m_accountId, m_userId, m_albumId, networkRequest);
+
+        } else {
+            connect(m_imageCache, &SyncCache::ImageCache::populatePhotoThumbnailFinished,
+                    this, &NextcloudImageDownloader::populateFinished,
+                    Qt::UniqueConnection);
+            connect(m_imageCache, &SyncCache::ImageCache::populatePhotoThumbnailFailed,
+                    this, &NextcloudImageDownloader::populateFailed,
+                    Qt::UniqueConnection);
+            m_imageCache->populatePhotoThumbnail(m_idempToken, m_accountId, m_userId, m_albumId, m_photoId, networkRequest);
+        }
+    }
+}
+
+void NextcloudImageDownloader::populateFinished(int idempToken, const QString &path)
+{
+    if (m_idempToken == idempToken) {
+        const QUrl imagePath = QUrl::fromLocalFile(path);
+        if (m_imagePath != imagePath) {
+            m_imagePath = imagePath;
+            emit imagePathChanged();
+        }
+    }
+}
+
+void NextcloudImageDownloader::populateFailed(int idempToken, const QString &errorMessage)
+{
+    if (m_idempToken == idempToken) {
+        qWarning() << "NextcloudImageDownloader::loadImage: failed:" << errorMessage;
     }
 }
