@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <service id="nextcloud-posts">
     <type>posts</type>
-    <name>Nextcloud Posts</name>
+    <name>Notifications</name>
     <icon>image://theme/icon-m-events</icon>
     <provider>nextcloud</provider>
 

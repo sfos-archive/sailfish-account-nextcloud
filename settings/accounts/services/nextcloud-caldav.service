@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <service id="nextcloud-caldav">
     <type>caldav</type>
-    <name>CalDAV</name>
+    <name>Calendar</name>
     <icon>image://theme/graphic-service-generic-cdav</icon>
     <provider>nextcloud</provider>
 

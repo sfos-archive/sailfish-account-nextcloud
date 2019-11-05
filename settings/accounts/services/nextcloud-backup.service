@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <service id="nextcloud-backup">
     <type>storage</type>
-    <name>Nextcloud Backup Storage</name>
+    <name>Backups</name>
     <icon>image://theme/icon-m-storage</icon>
     <provider>nextcloud</provider>
 
