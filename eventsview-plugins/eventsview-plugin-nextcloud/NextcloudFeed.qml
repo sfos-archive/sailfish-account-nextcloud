@@ -32,6 +32,7 @@ Item {
     property int _expansionThreshold: 5
     property int _expansionMaximum: 10
     property bool _manuallyExpanded
+    property string _hostUrl
 
     visible: _modelCount > 0
     width: parent.width
@@ -47,11 +48,35 @@ Item {
         id: headerItem
         //: Nextcloud notifications and announcements
         //% "Nextcloud"
-        name: qsTrId("eventsview_plugin_nextcloud-la-nextcloud_notifictions")
+        name: qsTrId("eventsview_plugin_nextcloud-la-nextcloud_notifications")
         indicator.iconSource: "image://theme/graphic-service-nextcloud"
         totalItemCount: root._modelCount
         memberCount: totalItemCount
-        userRemovable: false
+        userRemovable: eventModel.supportedActions & NextcloudEventsModel.DeleteAllEvents
+
+        onRemoveRequested: {
+            removeComponent.createObject(root, { "target": root })
+        }
+
+        onTriggered: {
+            if (root._hostUrl.length > 0) {
+                Qt.openUrlExternally(root._hostUrl)
+            }
+        }
+    }
+
+    Component {
+        id: removeComponent
+        RemoveAnimation {
+            running: true
+
+            onStopped: {
+                if (target === root) {
+                    // Delay deleting all events until animation has finished to avoid UI stutter.
+                    eventModel.deleteAllEvents()
+                }
+            }
+        }
     }
 
     ListView {
@@ -68,7 +93,13 @@ Item {
         id: expansionToggle
 
         y: headerItem.height + listView.contentHeight
-        expandable: root._modelCount > _expansionThreshold
+        expandable: eventModel.count > _expansionThreshold
+                    || eventModel.count > _expansionMaximum
+
+        title: !item._manuallyExpanded
+               ? defaultTitle
+                //% "Show more in Nextcloud"
+               : qsTrId("lipstick-jolla-home-la-show-more-in-nextcloud")
 
         onClicked: {
             if (!root._manuallyExpanded) {
@@ -76,7 +107,9 @@ Item {
                 root._manuallyExpanded = true
                 root.expanded(itemPosY)
             } else {
-                root.expandedClicked()
+                if (root._hostUrl.length > 0) {
+                    Qt.openUrlExternally(root._hostUrl)
+                }
             }
         }
     }
@@ -126,6 +159,12 @@ Item {
                          : "image://theme/graphic-service-nextcloud" // placeholder is not square: "image://theme/icon-l-nextcloud"
             timestamp: model.timestamp
             eventUrl: model.eventUrl
+            userRemovable: eventModel.supportedActions & NextcloudEventsModel.DeleteEvent
+
+            onRemoveRequested: {
+                removeComponent.createObject(delegateItem, { "target": delegateItem })
+                eventModel.deleteEventAt(model.index)
+            }
 
             NextcloudEventImageDownloader {
                 id: imageDownloader
@@ -138,5 +177,20 @@ Item {
 
     AccountManager {
         id: accountManager
+    }
+
+    Account {
+        id: account
+
+        identifier: eventModel.accountId
+
+        onStatusChanged: {
+            if (status === Account.Initialized) {
+                var config = account.configurationValues("nextcloud-posts")
+                if (config) {
+                    root._hostUrl = config.server_address || ""
+                }
+            }
+        }
     }
 }

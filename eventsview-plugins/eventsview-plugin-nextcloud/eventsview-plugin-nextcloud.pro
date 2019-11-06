@@ -7,7 +7,7 @@ TARGETPATH = $$[QT_INSTALL_QML]/$$MODULENAME
 
 QT += qml
 CONFIG += plugin link_pkgconfig c++11
-PKGCONFIG += libsignon-qt5 accounts-qt5 libsailfishkeyprovider
+PKGCONFIG += libsignon-qt5 accounts-qt5 libsailfishkeyprovider mlite5
 
 include($$PWD/../../common/auth.pri)
 include($$PWD/../../common/eventcache.pri)
@@ -32,7 +32,7 @@ SOURCES += \
     eventmodel.cpp \
     plugin.cpp
 
-OTHER_FILES += import.files qml.files
+OTHER_FILES += *.qml
 
 INSTALLS += target import qml
 

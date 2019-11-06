@@ -181,6 +181,20 @@ QNetworkReply *JsonRequestGenerator::galleryList(const QString &serverUrl, const
     return sendRequest(request, "GET");
 }
 
+QNetworkReply *JsonRequestGenerator::deleteNotification(const QString &serverUrl, const QString &notificationId)
+{
+    QNetworkRequest request = networkRequest(
+                networkRequestUrl(serverUrl, "/ocs/v2.php/apps/notifications/api/v2/notifications/" + notificationId));
+    return sendRequest(request, "DELETE");
+}
+
+QNetworkReply *JsonRequestGenerator::deleteAllNotifications(const QString &serverUrl)
+{
+    QNetworkRequest request = networkRequest(
+                networkRequestUrl(serverUrl, "/ocs/v2.php/apps/notifications/api/v2/notifications"));
+    return sendRequest(request, "DELETE");
+}
+
 //--- WebDavRequestGenerator:
 
 WebDavRequestGenerator::WebDavRequestGenerator(QNetworkAccessManager *networkAccessManager, const QString &username, const QString &password)

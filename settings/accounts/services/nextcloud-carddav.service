@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <service id="nextcloud-carddav">
     <type>carddav</type>
-    <name>CardDAV</name>
+    <name>Contacts</name>
     <icon>image://theme/graphic-service-contacts</icon>
     <provider>nextcloud</provider>
 

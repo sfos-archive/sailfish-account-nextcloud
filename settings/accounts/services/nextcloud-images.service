@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <service id="nextcloud-images">
     <type>sync</type>
-    <name>Nextcloud Images Sync</name>
+    <name>Images</name>
     <icon>image://theme/icon-m-sync</icon>
     <provider>nextcloud</provider>
 

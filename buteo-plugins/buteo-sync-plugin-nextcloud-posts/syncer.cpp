@@ -21,6 +21,9 @@
 #include <QtCore/QByteArray>
 #include <QtCore/QStandardPaths>
 
+// mlite5
+#include <MGConfItem>
+
 // buteo
 #include <SyncProfile.h>
 #include <LogMacros.h>
@@ -28,6 +31,8 @@
 namespace {
     const int HTTP_UNAUTHORIZED_ACCESS = 401;
     const QString NEXTCLOUD_USERID = QStringLiteral("nextcloud");
+
+    const QString NotificationsEndpointsKey = QStringLiteral("ocs-endpoints");
 }
 
 Syncer::Syncer(QObject *parent, Buteo::SyncProfile *syncProfile)
@@ -77,9 +82,18 @@ void Syncer::handleCapabilitiesReply()
         return;
     }
 
-    if (JsonReplyParser::findCapability("notifications", replyData).isEmpty()) {
+    const QVariantMap capabilityMap = JsonReplyParser::findCapability(QStringLiteral("notifications"), replyData);
+    if (capabilityMap.isEmpty()) {
         finishWithError("Server does not support Notifications app!");
         return;
+    }
+
+    const QStringList ocsEndPointsList = capabilityMap.value(NotificationsEndpointsKey).toStringList();
+    m_deleteAllNotifsSupported = ocsEndPointsList.contains(QStringLiteral("delete-all"));
+
+    MGConfItem capabilityConf("/sailfish/sync/profiles/" + m_syncProfile->name() + "/" + NotificationsEndpointsKey);
+    if (capabilityConf.value() != ocsEndPointsList) {
+        capabilityConf.set(ocsEndPointsList);
     }
 
     if (!performNotificationListRequest()) {
@@ -128,40 +142,163 @@ void Syncer::handleNotificationListReply()
         return;
     }
 
-    bool storeSucceeded = true;
-    QList<NetworkReplyParser::Notification> notifs = JsonReplyParser::parseNotificationResponse(replyData);
-    for (const NetworkReplyParser::Notification &notif : notifs) {
-        SyncCache::Event event;
-        event.accountId = m_accountId;
-        event.eventId = notif.notificationId;
-        event.eventSubject = notif.subject;
-        event.eventText = notif.message;
-        event.eventUrl = notif.link;
-        event.imageUrl = notif.icon;
-        event.timestamp = notif.dateTime;
+    bool transactionsSucceeded = true;
 
-        db.storeEvent(event, &error);
-        if (error.errorCode != SyncCache::DatabaseError::NoError) {
-            storeSucceeded = false;
-            break;
-            LOG_WARNING("failed to store post addition:" << error.errorCode << error.errorMessage);
-            break;
+    // Find local events
+    const QVector<SyncCache::Event> localEvents = db.events(m_accountId, &error);
+    if (error.errorCode != SyncCache::DatabaseError::NoError) {
+        transactionsSucceeded = false;
+        LOG_WARNING("Unable to fetch stored events:" << error.errorCode << error.errorMessage);
+    }
+
+    QList<NetworkReplyParser::Notification> remoteEvents;
+    QSet<QString> locallyDeletedEventIds;
+    QSet<QString> remoteEventIds;
+
+    if (transactionsSucceeded) {
+        // Find remote events
+        remoteEvents = JsonReplyParser::parseNotificationResponse(replyData);
+        for (const NetworkReplyParser::Notification &notif : remoteEvents) {
+            remoteEventIds.insert(notif.notificationId);
+        }
+
+        for (const SyncCache::Event &event : localEvents) {
+            // Find events that are locally marked for deletion
+            if (event.deletedLocally) {
+                LOG_DEBUG("Event deleted locally:" << event.eventId << event.eventSubject << event.eventText);
+                locallyDeletedEventIds.insert(event.eventId);
+            }
+
+            // Delete local events that were deleted remotely
+            if (!remoteEventIds.contains(event.eventId)) {
+                LOG_DEBUG("Event deleted remotely:" << event.eventId << event.eventSubject << event.eventText);
+                db.deleteEvent(event.accountId, event.eventId, &error);
+                if (error.errorCode != SyncCache::DatabaseError::NoError) {
+                    transactionsSucceeded = false;
+                    LOG_WARNING("Failed to delete event" << event.eventId << ":"
+                                << error.errorCode << error.errorMessage);
+                    break;
+                }
+            }
         }
     }
 
-    bool commitSucceeded = storeSucceeded && db.commitTransaction(&error);
+    const bool deleteAllRemoteEvents = !locallyDeletedEventIds.isEmpty()
+            && locallyDeletedEventIds == remoteEventIds;
+    if (!deleteAllRemoteEvents && transactionsSucceeded) {
+        // Store all events found remotely, except for those already deleted locally.
+        for (const NetworkReplyParser::Notification &notif : remoteEvents) {
+            if (locallyDeletedEventIds.contains(notif.notificationId)) {
+                continue;
+            }
+
+            SyncCache::Event event;
+            event.accountId = m_accountId;
+            event.eventId = notif.notificationId;
+            event.eventSubject = notif.subject;
+            event.eventText = notif.message;
+            event.eventUrl = notif.link;
+            event.imageUrl = notif.icon;
+            event.timestamp = notif.dateTime;
+
+            db.storeEvent(event, &error);
+            LOG_DEBUG("Adding event:" << event.eventId << event.eventSubject << event.eventText);
+
+            if (error.errorCode != SyncCache::DatabaseError::NoError) {
+                transactionsSucceeded = false;
+                LOG_WARNING("Failed to store event" << event.eventId << ":"
+                            << error.errorCode << error.errorMessage);
+                break;
+            }
+        }
+    }
+
+    bool commitSucceeded = transactionsSucceeded && db.commitTransaction(&error);
     if (!commitSucceeded) {
         SyncCache::DatabaseError rollbackError;
         db.rollbackTransaction(&rollbackError);
     }
 
     if (commitSucceeded) {
-        emit finishWithSuccess();
-    } else if (storeSucceeded) {
+        // Request server to remove any notifications that have been deleted locally
+        if (deleteAllRemoteEvents && m_deleteAllNotifsSupported) {
+            if (!performNotificationDeleteAllRequest()) {
+                finishWithError("Notifications delete request failed");
+            }
+        } else if (!locallyDeletedEventIds.isEmpty()) {
+            if (!performNotificationDeleteRequest(locallyDeletedEventIds.toList())) {
+                finishWithError("Notifications delete-all request failed");
+            }
+        } else {
+            finishWithSuccess();
+        }
+
+    } else if (transactionsSucceeded) {
         emit finishWithError(QStringLiteral("Failed to commit Posts transaction: %1: %2").arg(error.errorCode).arg(error.errorMessage));
     } else {
         emit finishWithError(QStringLiteral("Failed to store Posts: %1: %2").arg(error.errorCode).arg(error.errorMessage));
     }
+}
+
+bool Syncer::performNotificationDeleteRequest(const QStringList &notificationIds)
+{
+    m_currentDeleteNotificationIds.clear();
+
+    for (const QString &notificationId : notificationIds) {
+        QNetworkReply *reply = m_requestGenerator->deleteNotification(m_serverUrl, notificationId);
+        if (reply) {
+            reply->setProperty("notificationId", notificationId);
+            m_currentDeleteNotificationIds.insert(notificationId);
+            connect(reply, &QNetworkReply::finished,
+                    this, &Syncer::handleNotificationDeleteReply);
+        } else {
+            LOG_WARNING("Failed to start request to delete notification:" << reply->errorString());
+        }
+    }
+
+    return true;
+}
+
+void Syncer::handleNotificationDeleteReply()
+{
+    QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
+    const int httpCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    reply->deleteLater();
+
+    if (reply->error() != QNetworkReply::NoError) {
+        finishWithHttpError("Notifications delete request failed: " + reply->errorString(), httpCode);
+        return;
+    }
+
+    m_currentDeleteNotificationIds.remove(reply->property("notificationId").toString());
+    if (m_currentDeleteNotificationIds.isEmpty()) {
+        finishWithSuccess();
+    }
+}
+
+bool Syncer::performNotificationDeleteAllRequest()
+{
+    QNetworkReply *reply = m_requestGenerator->deleteAllNotifications(m_serverUrl);
+    if (reply) {
+        connect(reply, &QNetworkReply::finished,
+                this, &Syncer::handleNotificationDeleteAllReply);
+    }
+
+    return true;
+}
+
+void Syncer::handleNotificationDeleteAllReply()
+{
+    QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
+    const int httpCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    reply->deleteLater();
+
+    if (reply->error() != QNetworkReply::NoError) {
+        finishWithHttpError("Notifications delete-all request failed: " + reply->errorString(), httpCode);
+        return;
+    }
+
+    finishWithSuccess();
 }
 
 void Syncer::purgeAccount(int accountId)
@@ -193,7 +330,7 @@ void Syncer::purgeAccount(int accountId)
     }
 
     Q_FOREACH (const SyncCache::Event &event, events) {
-        db.deleteEvent(event, &error);
+        db.deleteEvent(event.accountId, event.eventId, &error);
         if (error.errorCode != SyncCache::DatabaseError::NoError) {
             deleteSucceeded = false;
             break;

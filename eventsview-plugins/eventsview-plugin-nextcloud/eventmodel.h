@@ -17,6 +17,7 @@
 #include <QtCore/QVector>
 #include <QtCore/QList>
 #include <QtCore/QHash>
+#include <QtCore/QSet>
 #include <QtCore/QPair>
 #include <QtCore/QByteArray>
 #include <QtCore/QString>
@@ -25,6 +26,9 @@
 #include <QtQml/QQmlParserStatus>
 
 class AccountAuthenticator;
+class QTimer;
+class MGConfItem;
+class QDBusInterface;
 
 class NextcloudEventCache : public SyncCache::EventCache
 {
@@ -74,9 +78,19 @@ class NextcloudEventsModel : public QAbstractListModel, public QQmlParserStatus
     Q_PROPERTY(SyncCache::EventCache* eventCache READ eventCache WRITE setEventCache NOTIFY eventCacheChanged)
     Q_PROPERTY(int accountId READ accountId WRITE setAccountId NOTIFY accountIdChanged)
     Q_PROPERTY(int count READ rowCount NOTIFY rowCountChanged)
+    Q_PROPERTY(Actions supportedActions READ supportedActions NOTIFY supportedActionsChanged)
 
 public:
+    enum Action {
+        DeleteEvent = 0x01,
+        DeleteAllEvents = 0x02
+    };
+    Q_ENUM(Action)
+    Q_DECLARE_FLAGS(Actions, Action)
+    Q_FLAG(Actions)
+
     explicit NextcloudEventsModel(QObject *parent = Q_NULLPTR);
+    ~NextcloudEventsModel();
 
     // QQmlParserStatus
     void classBegin() Q_DECL_OVERRIDE;
@@ -97,6 +111,7 @@ public:
         ImageUrlRole,
         ImagePathRole,
         TimestampRole,
+        DeletedLocallyRole,
     };
     Q_ENUM(Roles)
 
@@ -106,20 +121,40 @@ public:
     int accountId() const;
     void setAccountId(int id);
 
+    Actions supportedActions() const;
+
     Q_INVOKABLE QVariantMap at(int row) const;
     Q_INVOKABLE void refresh();
+
+    Q_INVOKABLE void deleteEventAt(int row);
+    Q_INVOKABLE void deleteAllEvents();
 
 Q_SIGNALS:
     void eventCacheChanged();
     void accountIdChanged();
     void rowCountChanged();
+    void supportedActionsChanged();
 
 private:
     void loadData();
-    bool m_deferLoad;
-    SyncCache::EventCache* m_eventCache;
-    int m_accountId;
+    void initRequests();
+    void updateSupportedActions();
+
+    void startNotificationDeleteTimer();
+    void notificationDeleteTimeout();
+
+    bool m_deferLoad = false;
+    int m_accountId = 0;
+    NextcloudEventsModel::Actions m_supportedActions = 0;
     QVector<SyncCache::Event> m_data;
+    SyncCache::EventCache* m_eventCache = Q_NULLPTR;
+
+    QTimer* m_notificationDeleteTimer = Q_NULLPTR;
+    QSet<QString> m_notificationsToDelete;
+
+    MGConfItem* m_notifCapabilityConf = Q_NULLPTR;
+    QDBusInterface* m_buteoInterface = Q_NULLPTR;
+    QString m_buteoProfileId;
 };
 
 class NextcloudEventImageDownloader : public QObject, public QQmlParserStatus

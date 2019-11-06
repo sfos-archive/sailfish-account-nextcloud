@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <service id="nextcloud-sharing">
     <type>sharing</type>
-    <name>Nextcloud Sharing</name>
+    <name>Sharing</name>
     <icon>image://theme/icon-m-share</icon>
     <provider>nextcloud</provider>
 

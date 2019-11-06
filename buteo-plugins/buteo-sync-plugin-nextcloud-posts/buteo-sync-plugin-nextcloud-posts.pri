@@ -3,6 +3,9 @@ QT -= gui
 include($$PWD/../../common/webdav.pri)
 include($$PWD/../../common/eventcache.pri)
 
+CONFIG += link_pkgconfig
+PKGCONFIG += mlite5
+
 INCLUDEPATH += $$PWD
 
 SOURCES += \
