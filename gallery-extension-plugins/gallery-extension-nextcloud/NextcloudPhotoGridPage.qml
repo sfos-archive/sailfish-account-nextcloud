@@ -12,7 +12,7 @@ Page {
     property string albumId
     property string albumName
 
-    NextcloudPhotosModel {
+    NextcloudPhotoModel {
         id: photosModel
 
         imageCache: NextcloudImageCache

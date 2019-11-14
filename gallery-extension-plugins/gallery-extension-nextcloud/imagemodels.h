@@ -19,7 +19,7 @@
 #include <QtCore/QPair>
 #include <QtQml/QQmlParserStatus>
 
-class NextcloudUsersModel : public QAbstractListModel, public QQmlParserStatus
+class NextcloudUserModel : public QAbstractListModel, public QQmlParserStatus
 {
     Q_OBJECT
     Q_INTERFACES(QQmlParserStatus)
@@ -27,7 +27,7 @@ class NextcloudUsersModel : public QAbstractListModel, public QQmlParserStatus
     Q_PROPERTY(int count READ rowCount NOTIFY rowCountChanged)
 
 public:
-    explicit NextcloudUsersModel(QObject *parent = nullptr);
+    explicit NextcloudUserModel(QObject *parent = nullptr);
 
     // QQmlParserStatus
     void classBegin() override;
@@ -64,7 +64,7 @@ private:
     QVector<SyncCache::User> m_data;
 };
 
-class NextcloudAlbumsModel : public QAbstractListModel, public QQmlParserStatus
+class NextcloudAlbumModel : public QAbstractListModel, public QQmlParserStatus
 {
     Q_OBJECT
     Q_INTERFACES(QQmlParserStatus)
@@ -74,7 +74,7 @@ class NextcloudAlbumsModel : public QAbstractListModel, public QQmlParserStatus
     Q_PROPERTY(int count READ rowCount NOTIFY rowCountChanged)
 
 public:
-    explicit NextcloudAlbumsModel(QObject *parent = nullptr);
+    explicit NextcloudAlbumModel(QObject *parent = nullptr);
 
     // QQmlParserStatus
     void classBegin() override;
@@ -126,7 +126,7 @@ private:
     QVector<SyncCache::Album> m_data;
 };
 
-class NextcloudPhotosModel : public QAbstractListModel, public QQmlParserStatus
+class NextcloudPhotoModel : public QAbstractListModel, public QQmlParserStatus
 {
     Q_OBJECT
     Q_INTERFACES(QQmlParserStatus)
@@ -137,7 +137,7 @@ class NextcloudPhotosModel : public QAbstractListModel, public QQmlParserStatus
     Q_PROPERTY(int count READ rowCount NOTIFY rowCountChanged)
 
 public:
-    explicit NextcloudPhotosModel(QObject *parent = nullptr);
+    explicit NextcloudPhotoModel(QObject *parent = nullptr);
 
     // QQmlParserStatus
     void classBegin() override;

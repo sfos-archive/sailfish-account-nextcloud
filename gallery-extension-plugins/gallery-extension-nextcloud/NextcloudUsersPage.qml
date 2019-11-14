@@ -34,7 +34,7 @@ Page {
             width: parent.width
             height: Math.max(thumbnail.height, titleLabel.height, countLabel.height)
 
-            NextcloudPhotosModel {
+            NextcloudPhotoModel {
                 id: photosModel
                 imageCache: NextcloudImageCache
                 accountId: delegateItem.accountId
@@ -42,7 +42,7 @@ Page {
                 // TODO: getThumbnailForRow()
             }
 
-            NextcloudAlbumsModel {
+            NextcloudAlbumModel {
                 id: nextcloudAlbums
 
                 imageCache: NextcloudImageCache
