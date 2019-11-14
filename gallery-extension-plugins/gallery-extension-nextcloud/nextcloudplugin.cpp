@@ -6,6 +6,8 @@
 #include <QTranslator>
 #include <QLocale>
 
+#include "imagecache.h"
+#include "imagedownloader.h"
 #include "imagemodels.h"
 
 static QObject *synccacheimages_api_factory(QQmlEngine *, QJSEngine *)

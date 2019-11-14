@@ -30,8 +30,17 @@ target.path = $$TARGETPATH
 qml.files = NextcloudCacheMediaSource.qml
 qml.path = /usr/share/jolla-gallery/mediasources/
 
-HEADERS += imagemodels.h
-SOURCES += imagemodels.cpp nextcloudplugin.cpp
-OTHER_FILES += *.qml
+HEADERS += \
+    imagemodels.h \
+    imagecache.h \
+    imagedownloader.h
+
+SOURCES += \
+    imagemodels.cpp \
+    imagecache.cpp \
+    imagedownloader.cpp \
+    nextcloudplugin.cpp
+
+OTHER_FILES += $$import.files $$qml.files
 
 INSTALLS += target import qml

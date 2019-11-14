@@ -37,8 +37,8 @@ class NextcloudEventCache : public SyncCache::EventCache
 public:
     explicit NextcloudEventCache(QObject *parent = nullptr);
 
-    void openDatabase(const QString &) Q_DECL_OVERRIDE;
-    void populateEventImage(int idempToken, int accountId, const QString &eventId, const QNetworkRequest &) Q_DECL_OVERRIDE;
+    void openDatabase(const QString &) override;
+    void populateEventImage(int idempToken, int accountId, const QString &eventId, const QNetworkRequest &) override;
 
     enum PendingRequestType {
         PopulateEventImageType
@@ -93,14 +93,14 @@ public:
     ~NextcloudEventsModel();
 
     // QQmlParserStatus
-    void classBegin() Q_DECL_OVERRIDE;
-    void componentComplete() Q_DECL_OVERRIDE;
+    void classBegin() override;
+    void componentComplete() override;
 
     // QQmlAbstractListModel
-    QModelIndex index(int row, int column, const QModelIndex &parent) const Q_DECL_OVERRIDE;
-    QVariant data(const QModelIndex &index, int role) const Q_DECL_OVERRIDE;
-    int rowCount(const QModelIndex &parent = QModelIndex()) const Q_DECL_OVERRIDE;
-    QHash<int, QByteArray> roleNames() const Q_DECL_OVERRIDE;
+    QModelIndex index(int row, int column, const QModelIndex &parent) const override;
+    QVariant data(const QModelIndex &index, int role) const override;
+    int rowCount(const QModelIndex &parent = QModelIndex()) const override;
+    QHash<int, QByteArray> roleNames() const override;
 
     enum Roles {
         AccountIdRole = Qt::UserRole + 1,
@@ -170,8 +170,8 @@ public:
     explicit NextcloudEventImageDownloader(QObject *parent = nullptr);
 
     // QQmlParserStatus
-    void classBegin() Q_DECL_OVERRIDE;
-    void componentComplete() Q_DECL_OVERRIDE;
+    void classBegin() override;
+    void componentComplete() override;
 
     SyncCache::EventCache *eventCache() const;
     void setEventCache(SyncCache::EventCache *cache);
