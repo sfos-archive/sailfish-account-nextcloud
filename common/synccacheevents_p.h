@@ -7,10 +7,10 @@
 **
 ****************************************************************************************/
 
-#ifndef NEXTCLOUD_EVENTCACHE_P_H
-#define NEXTCLOUD_EVENTCACHE_P_H
+#ifndef NEXTCLOUD_SYNCCACHEEVENTS_P_H
+#define NEXTCLOUD_SYNCCACHEEVENTS_P_H
 
-#include "eventcache.h"
+#include "synccacheevents.h"
 #include "synccachedatabase_p.h"
 
 #include <QtCore/QObject>
@@ -167,14 +167,14 @@ class EventDatabasePrivate : public DatabasePrivate
 public:
     EventDatabasePrivate(EventDatabase *parent);
 
-    int currentSchemaVersion() const Q_DECL_OVERRIDE;
-    QVector<const char *> createStatements() const Q_DECL_OVERRIDE;
-    QVector<UpgradeOperation> upgradeVersions() const Q_DECL_OVERRIDE;
+    int currentSchemaVersion() const override;
+    QVector<const char *> createStatements() const override;
+    QVector<UpgradeOperation> upgradeVersions() const override;
 
-    void preTransactionCommit() Q_DECL_OVERRIDE;
-    void transactionCommittedPreUnlock() Q_DECL_OVERRIDE;
-    void transactionCommittedPostUnlock() Q_DECL_OVERRIDE;
-    void transactionRolledBackPreUnlocked() Q_DECL_OVERRIDE;
+    void preTransactionCommit() override;
+    void transactionCommittedPreUnlock() override;
+    void transactionCommittedPostUnlock() override;
+    void transactionRolledBackPreUnlocked() override;
 
 private:
     friend class SyncCache::EventDatabase;
@@ -191,4 +191,4 @@ private:
 
 } // namespace SyncCache
 
-#endif // NEXTCLOUD_EVENTCACHE_P_H
+#endif // NEXTCLOUD_SYNCCACHEEVENTS_P_H

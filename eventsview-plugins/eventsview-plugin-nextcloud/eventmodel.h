@@ -10,7 +10,7 @@
 #ifndef NEXTCLOUD_EVENTSVIEW_EVENTMODEL_H
 #define NEXTCLOUD_EVENTSVIEW_EVENTMODEL_H
 
-#include "eventcache.h"
+#include "synccacheevents.h"
 
 #include <QtCore/QAbstractListModel>
 #include <QtCore/QObject>

@@ -12,7 +12,7 @@
 
 #include "webdavsyncer_p.h"
 
-#include "eventcache.h"
+#include "synccacheevents.h"
 
 #include <QObject>
 #include <QString>
