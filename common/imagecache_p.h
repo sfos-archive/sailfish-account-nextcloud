@@ -33,7 +33,7 @@ class ImageDownloadWatcher : public QObject
     Q_OBJECT
 
 public:
-    ImageDownloadWatcher(int idempToken, const QUrl &imageUrl, QObject *parent = Q_NULLPTR);
+    ImageDownloadWatcher(int idempToken, const QUrl &imageUrl, QObject *parent = nullptr);
     ~ImageDownloadWatcher();
 
     int idempToken() const;
@@ -75,7 +75,7 @@ class ImageDownloader : public QObject
     Q_OBJECT
 
 public:
-    ImageDownloader(int maxActive = 4, QObject *parent = Q_NULLPTR);
+    ImageDownloader(int maxActive = 4, QObject *parent = nullptr);
     ~ImageDownloader();
 
     void setImageDirectory(const QString &path);
@@ -105,7 +105,7 @@ class ImageCacheThreadWorker : public QObject
     Q_OBJECT
 
 public:
-    ImageCacheThreadWorker(QObject *parent = Q_NULLPTR);
+    ImageCacheThreadWorker(QObject *parent = nullptr);
     ~ImageCacheThreadWorker();
 
 public Q_SLOTS:

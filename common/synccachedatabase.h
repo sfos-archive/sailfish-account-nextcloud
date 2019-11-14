@@ -57,7 +57,7 @@ public:
     static void setDatabaseError(DatabaseError *error, DatabaseError::ErrorCode code, const QString &message);
 
 protected:
-    explicit Database(DatabasePrivate *dptr, QObject *parent = Q_NULLPTR);
+    explicit Database(DatabasePrivate *dptr, QObject *parent = nullptr);
     Q_DECLARE_PRIVATE(Database)
     Q_DISABLE_COPY(Database)
     QScopedPointer<DatabasePrivate> d_ptr;

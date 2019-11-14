@@ -259,7 +259,7 @@ QHash<int, QByteArray> NextcloudUsersModel::roleNames() const
     return retn;
 }
 
-SyncCache::ImageCache* NextcloudUsersModel::imageCache() const
+SyncCache::ImageCache *NextcloudUsersModel::imageCache() const
 {
     return m_imageCache;
 }
@@ -445,7 +445,7 @@ QHash<int, QByteArray> NextcloudAlbumsModel::roleNames() const
     return retn;
 }
 
-SyncCache::ImageCache* NextcloudAlbumsModel::imageCache() const
+SyncCache::ImageCache *NextcloudAlbumsModel::imageCache() const
 {
     return m_imageCache;
 }
@@ -710,7 +710,7 @@ QHash<int, QByteArray> NextcloudPhotosModel::roleNames() const
     return retn;
 }
 
-SyncCache::ImageCache* NextcloudPhotosModel::imageCache() const
+SyncCache::ImageCache *NextcloudPhotosModel::imageCache() const
 {
     return m_imageCache;
 }
@@ -908,7 +908,7 @@ NextcloudPhotoCounter::NextcloudPhotoCounter(QObject *parent)
 {
 }
 
-SyncCache::ImageCache* NextcloudPhotoCounter::imageCache() const
+SyncCache::ImageCache *NextcloudPhotoCounter::imageCache() const
 {
     return m_imageCache;
 }
@@ -970,7 +970,7 @@ void NextcloudImageDownloader::componentComplete()
     }
 }
 
-SyncCache::ImageCache* NextcloudImageDownloader::imageCache() const
+SyncCache::ImageCache *NextcloudImageDownloader::imageCache() const
 {
     return m_imageCache;
 }

@@ -228,7 +228,7 @@ QHash<int, QByteArray> NextcloudEventsModel::roleNames() const
     return retn;
 }
 
-SyncCache::EventCache* NextcloudEventsModel::eventCache() const
+SyncCache::EventCache *NextcloudEventsModel::eventCache() const
 {
     return m_eventCache;
 }
@@ -602,7 +602,7 @@ void NextcloudEventsModel::notificationDeleteTimeout()
 NextcloudEventImageDownloader::NextcloudEventImageDownloader(QObject *parent)
     : QObject(parent)
     , m_deferLoad(false)
-    , m_eventCache(Q_NULLPTR)
+    , m_eventCache(nullptr)
     , m_accountId(0)
     , m_idempToken(0)
 {
@@ -621,7 +621,7 @@ void NextcloudEventImageDownloader::componentComplete()
     }
 }
 
-SyncCache::EventCache* NextcloudEventImageDownloader::eventCache() const
+SyncCache::EventCache *NextcloudEventImageDownloader::eventCache() const
 {
     return m_eventCache;
 }

@@ -35,7 +35,7 @@ class NextcloudEventCache : public SyncCache::EventCache
     Q_OBJECT
 
 public:
-    explicit NextcloudEventCache(QObject *parent = Q_NULLPTR);
+    explicit NextcloudEventCache(QObject *parent = nullptr);
 
     void openDatabase(const QString &) Q_DECL_OVERRIDE;
     void populateEventImage(int idempToken, int accountId, const QString &eventId, const QNetworkRequest &) Q_DECL_OVERRIDE;
@@ -62,7 +62,7 @@ private:
     QHash<int, int> m_signOnFailCount;
     QHash<int, QPair<QString, QString> > m_accountIdCredentials;
     QHash<int, QString> m_accountIdAccessTokens;
-    AccountAuthenticator *m_auth = Q_NULLPTR;
+    AccountAuthenticator *m_auth = nullptr;
 
     void signIn(int accountId);
     void performRequest(const PendingRequest &request);
@@ -89,7 +89,7 @@ public:
     Q_DECLARE_FLAGS(Actions, Action)
     Q_FLAG(Actions)
 
-    explicit NextcloudEventsModel(QObject *parent = Q_NULLPTR);
+    explicit NextcloudEventsModel(QObject *parent = nullptr);
     ~NextcloudEventsModel();
 
     // QQmlParserStatus
@@ -115,7 +115,7 @@ public:
     };
     Q_ENUM(Roles)
 
-    SyncCache::EventCache* eventCache() const;
+    SyncCache::EventCache *eventCache() const;
     void setEventCache(SyncCache::EventCache *cache);
 
     int accountId() const;
@@ -147,13 +147,13 @@ private:
     int m_accountId = 0;
     NextcloudEventsModel::Actions m_supportedActions = 0;
     QVector<SyncCache::Event> m_data;
-    SyncCache::EventCache* m_eventCache = Q_NULLPTR;
+    SyncCache::EventCache *m_eventCache = nullptr;
 
-    QTimer* m_notificationDeleteTimer = Q_NULLPTR;
+    QTimer *m_notificationDeleteTimer = nullptr;
     QSet<QString> m_notificationsToDelete;
 
-    MGConfItem* m_notifCapabilityConf = Q_NULLPTR;
-    QDBusInterface* m_buteoInterface = Q_NULLPTR;
+    MGConfItem *m_notifCapabilityConf = nullptr;
+    QDBusInterface *m_buteoInterface = nullptr;
     QString m_buteoProfileId;
 };
 
@@ -167,13 +167,13 @@ class NextcloudEventImageDownloader : public QObject, public QQmlParserStatus
     Q_PROPERTY(QUrl imagePath READ imagePath NOTIFY imagePathChanged)
 
 public:
-    explicit NextcloudEventImageDownloader(QObject *parent = Q_NULLPTR);
+    explicit NextcloudEventImageDownloader(QObject *parent = nullptr);
 
     // QQmlParserStatus
     void classBegin() Q_DECL_OVERRIDE;
     void componentComplete() Q_DECL_OVERRIDE;
 
-    SyncCache::EventCache* eventCache() const;
+    SyncCache::EventCache *eventCache() const;
     void setEventCache(SyncCache::EventCache *cache);
 
     int accountId() const;
@@ -194,7 +194,7 @@ private:
     void loadImage();
 
     bool m_deferLoad;
-    SyncCache::EventCache* m_eventCache;
+    SyncCache::EventCache *m_eventCache;
     int m_accountId;
     QString m_eventId;
     QUrl m_imagePath;

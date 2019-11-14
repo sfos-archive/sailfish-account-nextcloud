@@ -31,7 +31,7 @@ class NextcloudImageCache : public SyncCache::ImageCache
     Q_OBJECT
 
 public:
-    explicit NextcloudImageCache(QObject *parent = Q_NULLPTR);
+    explicit NextcloudImageCache(QObject *parent = nullptr);
 
     void openDatabase(const QString &) Q_DECL_OVERRIDE;
     void populateUserThumbnail(int idempToken, int accountId, const QString &userId, const QNetworkRequest &) Q_DECL_OVERRIDE;
@@ -68,7 +68,7 @@ private:
     QHash<int, int> m_signOnFailCount;
     QHash<int, QPair<QString, QString> > m_accountIdCredentials;
     QHash<int, QString> m_accountIdAccessTokens;
-    AccountAuthenticator *m_auth = Q_NULLPTR;
+    AccountAuthenticator *m_auth = nullptr;
 
     void signIn(int accountId);
     void performRequest(const PendingRequest &request);
@@ -84,7 +84,7 @@ class NextcloudUsersModel : public QAbstractListModel, public QQmlParserStatus
     Q_PROPERTY(int count READ rowCount NOTIFY rowCountChanged)
 
 public:
-    explicit NextcloudUsersModel(QObject *parent = Q_NULLPTR);
+    explicit NextcloudUsersModel(QObject *parent = nullptr);
 
     // QQmlParserStatus
     void classBegin() Q_DECL_OVERRIDE;
@@ -104,7 +104,7 @@ public:
     };
     Q_ENUM(Roles)
 
-    SyncCache::ImageCache* imageCache() const;
+    SyncCache::ImageCache *imageCache() const;
     void setImageCache(SyncCache::ImageCache *cache);
 
     Q_INVOKABLE QVariantMap at(int row) const;
@@ -131,7 +131,7 @@ class NextcloudAlbumsModel : public QAbstractListModel, public QQmlParserStatus
     Q_PROPERTY(int count READ rowCount NOTIFY rowCountChanged)
 
 public:
-    explicit NextcloudAlbumsModel(QObject *parent = Q_NULLPTR);
+    explicit NextcloudAlbumsModel(QObject *parent = nullptr);
 
     // QQmlParserStatus
     void classBegin() Q_DECL_OVERRIDE;
@@ -156,7 +156,7 @@ public:
     };
     Q_ENUM(Roles)
 
-    SyncCache::ImageCache* imageCache() const;
+    SyncCache::ImageCache *imageCache() const;
     void setImageCache(SyncCache::ImageCache *cache);
 
     int accountId() const;
@@ -194,7 +194,7 @@ class NextcloudPhotosModel : public QAbstractListModel, public QQmlParserStatus
     Q_PROPERTY(int count READ rowCount NOTIFY rowCountChanged)
 
 public:
-    explicit NextcloudPhotosModel(QObject *parent = Q_NULLPTR);
+    explicit NextcloudPhotosModel(QObject *parent = nullptr);
 
     // QQmlParserStatus
     void classBegin() Q_DECL_OVERRIDE;
@@ -227,7 +227,7 @@ public:
     };
     Q_ENUM(Roles)
 
-    SyncCache::ImageCache* imageCache() const;
+    SyncCache::ImageCache *imageCache() const;
     void setImageCache(SyncCache::ImageCache *cache);
 
     int accountId() const;
@@ -295,13 +295,13 @@ class NextcloudImageDownloader : public QObject, public QQmlParserStatus
     Q_PROPERTY(QUrl imagePath READ imagePath NOTIFY imagePathChanged)
 
 public:
-    explicit NextcloudImageDownloader(QObject *parent = Q_NULLPTR);
+    explicit NextcloudImageDownloader(QObject *parent = nullptr);
 
     // QQmlParserStatus
     void classBegin() Q_DECL_OVERRIDE;
     void componentComplete() Q_DECL_OVERRIDE;
 
-    SyncCache::ImageCache* imageCache() const;
+    SyncCache::ImageCache *imageCache() const;
     void setImageCache(SyncCache::ImageCache *cache);
 
     int accountId() const;

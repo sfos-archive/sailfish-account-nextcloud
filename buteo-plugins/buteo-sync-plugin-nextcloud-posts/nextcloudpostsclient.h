@@ -51,7 +51,7 @@ private:
     Buteo::SyncProfile::SyncDirection syncDirection();
     Buteo::SyncProfile::ConflictResolutionPolicy conflictResolutionPolicy();
 
-    Syncer* m_syncer;
+    Syncer *m_syncer;
     Sync::SyncStatus m_syncStatus;
     Buteo::SyncResults m_results;
     Buteo::SyncProfile::SyncDirection m_syncDirection;

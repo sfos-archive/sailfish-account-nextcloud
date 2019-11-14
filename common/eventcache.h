@@ -42,7 +42,7 @@ class EventDatabase : public Database
     Q_OBJECT
 
 public:
-    EventDatabase(QObject *parent = Q_NULLPTR);
+    EventDatabase(QObject *parent = nullptr);
 
     QVector<SyncCache::Event> events(int accountId, SyncCache::DatabaseError *error, bool includeLocallyDeleted = true) const;
     SyncCache::Event event(int accountId, const QString &eventId, SyncCache::DatabaseError *error) const;
@@ -62,7 +62,7 @@ class EventCache : public QObject
     Q_OBJECT
 
 public:
-    EventCache(QObject *parent = Q_NULLPTR);
+    EventCache(QObject *parent = nullptr);
     ~EventCache();
 
 public Q_SLOTS:

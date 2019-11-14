@@ -162,7 +162,7 @@ ImageDownloadWatcher *ImageDownloader::downloadImage(int idempToken, const QUrl 
 
 void ImageDownloader::triggerDownload()
 {
-    while (m_active.size() && (m_active.head() == Q_NULLPTR || !m_active.head()->m_timeoutTimer->isActive())) {
+    while (m_active.size() && (m_active.head() == nullptr || !m_active.head()->m_timeoutTimer->isActive())) {
         delete m_active.dequeue();
     }
 
@@ -252,7 +252,7 @@ QString ImageDownloader::imageFilePath(const QString &subDirPath, const QString 
 //-----------------------------------------------------------------------------
 
 ImageCacheThreadWorker::ImageCacheThreadWorker(QObject *parent)
-    : QObject(parent), m_downloader(Q_NULLPTR)
+    : QObject(parent), m_downloader(nullptr)
 {
 }
 
