@@ -13,63 +13,16 @@
 #include "synccacheevents.h"
 
 #include <QtCore/QAbstractListModel>
-#include <QtCore/QObject>
 #include <QtCore/QVector>
 #include <QtCore/QList>
 #include <QtCore/QHash>
 #include <QtCore/QSet>
 #include <QtCore/QPair>
-#include <QtCore/QByteArray>
-#include <QtCore/QString>
-#include <QtCore/QUrl>
-#include <QtNetwork/QNetworkRequest>
 #include <QtQml/QQmlParserStatus>
 
-class AccountAuthenticator;
 class QTimer;
 class MGConfItem;
 class QDBusInterface;
-
-class NextcloudEventCache : public SyncCache::EventCache
-{
-    Q_OBJECT
-
-public:
-    explicit NextcloudEventCache(QObject *parent = nullptr);
-
-    void openDatabase(const QString &) override;
-    void populateEventImage(int idempToken, int accountId, const QString &eventId, const QNetworkRequest &) override;
-
-    enum PendingRequestType {
-        PopulateEventImageType
-    };
-
-    struct PendingRequest {
-        PendingRequestType type;
-        int idempToken;
-        int accountId;
-        QString eventId;
-    };
-
-private Q_SLOTS:
-    void performRequests();
-    void signOnResponse(int accountId, const QString &serviceName, const QString &serverUrl, const QString &webdavPath, const QString &username, const QString &password, const QString &accessToken, bool ignoreSslErrors);
-    void signOnError(int accountId, const QString &serviceName);
-
-private:
-    QList<PendingRequest> m_pendingRequests;
-    QList<int> m_pendingAccountRequests;
-    QHash<int, int> m_signOnFailCount;
-    QHash<int, QPair<QString, QString> > m_accountIdCredentials;
-    QHash<int, QString> m_accountIdAccessTokens;
-    AccountAuthenticator *m_auth = nullptr;
-
-    void signIn(int accountId);
-    void performRequest(const PendingRequest &request);
-    QNetworkRequest templateRequest(int accountId) const;
-};
-Q_DECLARE_METATYPE(NextcloudEventCache::PendingRequest)
-Q_DECLARE_TYPEINFO(NextcloudEventCache::PendingRequest, Q_MOVABLE_TYPE);
 
 class NextcloudEventsModel : public QAbstractListModel, public QQmlParserStatus
 {
@@ -155,50 +108,6 @@ private:
     MGConfItem *m_notifCapabilityConf = nullptr;
     QDBusInterface *m_buteoInterface = nullptr;
     QString m_buteoProfileId;
-};
-
-class NextcloudEventImageDownloader : public QObject, public QQmlParserStatus
-{
-    Q_OBJECT
-    Q_INTERFACES(QQmlParserStatus)
-    Q_PROPERTY(SyncCache::EventCache* eventCache READ eventCache WRITE setEventCache NOTIFY eventCacheChanged)
-    Q_PROPERTY(int accountId READ accountId WRITE setAccountId NOTIFY accountIdChanged)
-    Q_PROPERTY(QString eventId READ eventId WRITE setEventId NOTIFY eventIdChanged)
-    Q_PROPERTY(QUrl imagePath READ imagePath NOTIFY imagePathChanged)
-
-public:
-    explicit NextcloudEventImageDownloader(QObject *parent = nullptr);
-
-    // QQmlParserStatus
-    void classBegin() override;
-    void componentComplete() override;
-
-    SyncCache::EventCache *eventCache() const;
-    void setEventCache(SyncCache::EventCache *cache);
-
-    int accountId() const;
-    void setAccountId(int id);
-
-    QString eventId() const;
-    void setEventId(const QString &eventId);
-
-    QUrl imagePath() const;
-
-Q_SIGNALS:
-    void eventCacheChanged();
-    void accountIdChanged();
-    void eventIdChanged();
-    void imagePathChanged();
-
-private:
-    void loadImage();
-
-    bool m_deferLoad;
-    SyncCache::EventCache *m_eventCache;
-    int m_accountId;
-    QString m_eventId;
-    QUrl m_imagePath;
-    int m_idempToken;
 };
 
 #endif // NEXTCLOUD_EVENTSVIEW_EVENTMODEL_H

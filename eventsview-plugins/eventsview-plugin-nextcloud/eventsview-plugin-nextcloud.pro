@@ -26,10 +26,14 @@ import.path = $$TARGETPATH
 target.path = $$TARGETPATH
 
 HEADERS += \
-    eventmodel.h
+    eventmodel.h \
+    eventcache.h \
+    eventimagedownloader.h
 
 SOURCES += \
     eventmodel.cpp \
+    eventcache.cpp \
+    eventimagedownloader.cpp \
     plugin.cpp
 
 OTHER_FILES += $$import.files $$qml.files

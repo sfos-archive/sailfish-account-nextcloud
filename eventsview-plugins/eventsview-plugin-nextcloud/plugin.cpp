@@ -15,6 +15,8 @@
 #include <QTranslator>
 #include <QLocale>
 
+#include "eventcache.h"
+#include "eventimagedownloader.h"
 #include "eventmodel.h"
 
 // using custom translator so it gets properly removed from qApp when engine is deleted
