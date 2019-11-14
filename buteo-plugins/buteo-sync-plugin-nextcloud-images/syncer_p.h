@@ -12,7 +12,7 @@
 
 #include "webdavsyncer_p.h"
 
-#include "imagecache.h"
+#include "synccacheimages.h"
 
 #include <QList>
 #include <QHash>

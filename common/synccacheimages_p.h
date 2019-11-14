@@ -7,10 +7,10 @@
 **
 ****************************************************************************************/
 
-#ifndef NEXTCLOUD_IMAGECACHE_P_H
-#define NEXTCLOUD_IMAGECACHE_P_H
+#ifndef NEXTCLOUD_SYNCCACHEIMAGES_P_H
+#define NEXTCLOUD_SYNCCACHEIMAGES_P_H
 
-#include "imagecache.h"
+#include "synccacheimages.h"
 #include "synccachedatabase_p.h"
 
 #include <QtCore/QObject>
@@ -195,14 +195,14 @@ class ImageDatabasePrivate : public DatabasePrivate
 public:
     ImageDatabasePrivate(ImageDatabase *parent);
 
-    int currentSchemaVersion() const Q_DECL_OVERRIDE;
-    QVector<const char *> createStatements() const Q_DECL_OVERRIDE;
-    QVector<UpgradeOperation> upgradeVersions() const Q_DECL_OVERRIDE;
+    int currentSchemaVersion() const override;
+    QVector<const char *> createStatements() const override;
+    QVector<UpgradeOperation> upgradeVersions() const override;
 
-    void preTransactionCommit() Q_DECL_OVERRIDE;
-    void transactionCommittedPreUnlock() Q_DECL_OVERRIDE;
-    void transactionCommittedPostUnlock() Q_DECL_OVERRIDE;
-    void transactionRolledBackPreUnlocked() Q_DECL_OVERRIDE;
+    void preTransactionCommit() override;
+    void transactionCommittedPreUnlock() override;
+    void transactionCommittedPostUnlock() override;
+    void transactionRolledBackPreUnlocked() override;
 
 private:
     friend class SyncCache::ImageDatabase;
@@ -227,4 +227,4 @@ private:
 
 } // namespace SyncCache
 
-#endif // NEXTCLOUD_IMAGECACHE_P_H
+#endif // NEXTCLOUD_SYNCCACHEIMAGES_P_H

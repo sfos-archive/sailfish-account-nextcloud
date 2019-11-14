@@ -10,7 +10,7 @@ CONFIG += plugin link_pkgconfig c++11
 PKGCONFIG += libsignon-qt5 accounts-qt5 libsailfishkeyprovider
 
 include($$PWD/../../common/auth.pri)
-include($$PWD/../../common/imagecache.pri)
+include($$PWD/../../common/synccacheimages.pri)
 
 include ($$PWD/translations.pri)
 

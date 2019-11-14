@@ -7,8 +7,8 @@
 **
 ****************************************************************************************/
 
-#ifndef NEXTCLOUD_IMAGECACHE_H
-#define NEXTCLOUD_IMAGECACHE_H
+#ifndef NEXTCLOUD_SYNCCACHEIMAGES_H
+#define NEXTCLOUD_SYNCCACHEIMAGES_H
 
 #include "synccachedatabase.h"
 
@@ -187,4 +187,4 @@ Q_DECLARE_METATYPE(SyncCache::Photo)
 Q_DECLARE_METATYPE(QVector<SyncCache::Photo>)
 Q_DECLARE_TYPEINFO(SyncCache::Photo, Q_MOVABLE_TYPE);
 
-#endif // NEXTCLOUD_IMAGECACHE_H
+#endif // NEXTCLOUD_SYNCCACHEIMAGES_H

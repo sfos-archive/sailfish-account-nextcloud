@@ -7,8 +7,8 @@
 **
 ****************************************************************************************/
 
-#include "imagecache.h"
-#include "imagecache_p.h"
+#include "synccacheimages.h"
+#include "synccacheimages_p.h"
 
 #include <QtCore/QFile>
 #include <QtCore/QDir>

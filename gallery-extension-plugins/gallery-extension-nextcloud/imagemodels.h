@@ -10,7 +10,7 @@
 #ifndef NEXTCLOUD_GALLERY_IMAGEMODELS_H
 #define NEXTCLOUD_GALLERY_IMAGEMODELS_H
 
-#include "imagecache.h"
+#include "synccacheimages.h"
 
 #include <QtCore/QAbstractListModel>
 #include <QtCore/QObject>
