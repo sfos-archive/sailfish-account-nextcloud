@@ -8,207 +8,23 @@
 ****************************************************************************************/
 
 #include "imagemodels.h"
-#include "accountauthenticator_p.h"
 
 #include <QtCore/QDebug>
 #include <QtQml/QQmlInfo>
 
-#define MAX_RETRY_SIGNON 3
-
-NextcloudImageCache::NextcloudImageCache(QObject *parent)
-    : SyncCache::ImageCache(parent)
-{
-    openDatabase(QStringLiteral("nextcloud"));
-}
-
-void NextcloudImageCache::openDatabase(const QString &)
-{
-    QObject *contextObject = new QObject(this);
-    SyncCache::ImageCache::openDatabase(QStringLiteral("nextcloud"));
-    connect(this, &NextcloudImageCache::openDatabaseFinished,
-            contextObject, [this, contextObject] {
-        contextObject->deleteLater();
-    });
-    connect(this, &NextcloudImageCache::openDatabaseFailed,
-            contextObject, [this, contextObject] (const QString &errorMessage) {
-        contextObject->deleteLater();
-        qWarning() << "NextcloudImageCache: failed to open database:" << errorMessage;
-    });
-}
-
-void NextcloudImageCache::populateUserThumbnail(int idempToken, int accountId, const QString &userId, const QNetworkRequest &)
-{
-    PendingRequest req;
-    req.idempToken = idempToken;
-    req.accountId = accountId;
-    req.userId = userId;
-    req.type = PopulateUserThumbnailType;
-    performRequest(req);
-}
-
-void NextcloudImageCache::populateAlbumThumbnail(int idempToken, int accountId, const QString &userId, const QString &albumId, const QNetworkRequest &)
-{
-    PendingRequest req;
-    req.idempToken = idempToken;
-    req.accountId = accountId;
-    req.userId = userId;
-    req.albumId = albumId;
-    req.type = PopulateAlbumThumbnailType;
-    performRequest(req);
-}
-
-void NextcloudImageCache::populatePhotoThumbnail(int idempToken, int accountId, const QString &userId, const QString &albumId, const QString &photoId, const QNetworkRequest &)
-{
-    PendingRequest req;
-    req.idempToken = idempToken;
-    req.accountId = accountId;
-    req.userId = userId;
-    req.albumId = albumId;
-    req.photoId = photoId;
-    req.type = PopulatePhotoThumbnailType;
-    performRequest(req);
-}
-
-void NextcloudImageCache::populatePhotoImage(int idempToken, int accountId, const QString &userId, const QString &albumId, const QString &photoId, const QNetworkRequest &)
-{
-    PendingRequest req;
-    req.idempToken = idempToken;
-    req.accountId = accountId;
-    req.userId = userId;
-    req.albumId = albumId;
-    req.photoId = photoId;
-    req.type = PopulatePhotoImageType;
-    performRequest(req);
-}
-
-void NextcloudImageCache::performRequest(const NextcloudImageCache::PendingRequest &request)
-{
-    m_pendingRequests.append(request);
-    performRequests();
-}
-
-void NextcloudImageCache::performRequests()
-{
-    QList<NextcloudImageCache::PendingRequest>::iterator it = m_pendingRequests.begin();
-    while (it != m_pendingRequests.end()) {
-        NextcloudImageCache::PendingRequest req = *it;
-        if (m_accountIdAccessTokens.contains(req.accountId)
-                || m_accountIdCredentials.contains(req.accountId)) {
-            switch (req.type) {
-                case PopulateUserThumbnailType:
-                        SyncCache::ImageCache::populateUserThumbnail(
-                                req.idempToken, req.accountId, req.userId,
-                                templateRequest(req.accountId, true));
-                        break;
-                case PopulateAlbumThumbnailType:
-                        SyncCache::ImageCache::populateAlbumThumbnail(
-                                req.idempToken, req.accountId, req.userId, req.albumId,
-                                templateRequest(req.accountId, true));
-                        break;
-                case PopulatePhotoThumbnailType:
-                        SyncCache::ImageCache::populatePhotoThumbnail(
-                                req.idempToken, req.accountId, req.userId, req.albumId, req.photoId,
-                                templateRequest(req.accountId, true));
-                        break;
-                case PopulatePhotoImageType:
-                        SyncCache::ImageCache::populatePhotoImage(
-                                req.idempToken, req.accountId, req.userId, req.albumId, req.photoId,
-                                templateRequest(req.accountId));
-                        break;
-            }
-            it = m_pendingRequests.erase(it);
-        } else {
-            if (!m_pendingAccountRequests.contains(req.accountId)) {
-                // trigger an account flow to get the credentials.
-                if (m_signOnFailCount[req.accountId] < MAX_RETRY_SIGNON) {
-                    m_pendingAccountRequests.append(req.accountId);
-                    signIn(req.accountId);
-                } else {
-                    qWarning() << "NextcloudImageCache refusing to perform sign-on request for failing account:" << req.accountId;
-                }
-            } else {
-                // nothing, waiting for asynchronous account flow to finish.
-            }
-            ++it;
-        }
-    }
-}
-
-QNetworkRequest NextcloudImageCache::templateRequest(int accountId, bool requiresBasicAuth) const
-{
-    QUrl templateUrl(QStringLiteral("https://localhost:8080/"));
-    if (m_accountIdCredentials.contains(accountId)) {
-        templateUrl.setUserName(m_accountIdCredentials.value(accountId).first);
-        templateUrl.setPassword(m_accountIdCredentials.value(accountId).second);
-    }
-    QNetworkRequest templateRequest(templateUrl);
-    if (m_accountIdAccessTokens.contains(accountId)) {
-        templateRequest.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
-                                     QString(QLatin1String("Bearer ")).toUtf8() + m_accountIdAccessTokens.value(accountId).toUtf8());
-    } else if (requiresBasicAuth) {
-        const QByteArray credentials((m_accountIdCredentials.value(accountId).first + ':' + m_accountIdCredentials.value(accountId).second).toUtf8());
-        templateRequest.setRawHeader("Authorization", QByteArray("Basic ") + credentials.toBase64());
-    }
-    return templateRequest;
-}
-
-void NextcloudImageCache::signIn(int accountId)
-{
-    if (!m_auth) {
-        m_auth = new AccountAuthenticator(this);
-        connect(m_auth, &AccountAuthenticator::signInCompleted,
-                this, &NextcloudImageCache::signOnResponse);
-        connect(m_auth, &AccountAuthenticator::signInError,
-                this, &NextcloudImageCache::signOnError);
-    }
-    m_auth->signIn(accountId, QStringLiteral("nextcloud-images"));
-}
-
-void NextcloudImageCache::signOnResponse(int accountId, const QString &serviceName,
-                                         const QString &serverUrl, const QString &webdavPath,
-                                         const QString &username, const QString &password,
-                                         const QString &accessToken, bool ignoreSslErrors)
-{
-    Q_UNUSED(serviceName)
-    Q_UNUSED(serverUrl)
-    Q_UNUSED(webdavPath)
-    Q_UNUSED(ignoreSslErrors)
-
-    // we need both username+password, OR accessToken.
-    if (!accessToken.isEmpty()) {
-        m_accountIdAccessTokens.insert(accountId, accessToken);
-    } else {
-        m_accountIdCredentials.insert(accountId, qMakePair<QString, QString>(username, password));
-    }
-
-    m_pendingAccountRequests.removeAll(accountId);
-    QMetaObject::invokeMethod(this, "performRequests", Qt::QueuedConnection);
-}
-
-void NextcloudImageCache::signOnError(int accountId, const QString &serviceName)
-{
-    qWarning() << "NextcloudImageCache: sign-on failed for account:" << accountId
-               << "service:" << serviceName;
-    m_pendingAccountRequests.removeAll(accountId);
-    m_signOnFailCount[accountId] += 1;
-    QMetaObject::invokeMethod(this, "performRequests", Qt::QueuedConnection);
-}
-
-//-----------------------------------------------------------------------------
-
-NextcloudUsersModel::NextcloudUsersModel(QObject *parent)
+NextcloudUserModel::NextcloudUserModel(QObject *parent)
     : QAbstractListModel(parent)
 {
     qRegisterMetaType<SyncCache::User>();
     qRegisterMetaType<QVector<SyncCache::User> >();
 }
 
-void NextcloudUsersModel::classBegin()
+void NextcloudUserModel::classBegin()
 {
     m_deferLoad = true;
 }
 
-void NextcloudUsersModel::componentComplete()
+void NextcloudUserModel::componentComplete()
 {
     m_deferLoad = false;
     if (m_imageCache) {
@@ -216,14 +32,14 @@ void NextcloudUsersModel::componentComplete()
     }
 }
 
-QModelIndex NextcloudUsersModel::index(int row, int column, const QModelIndex &parent) const
+QModelIndex NextcloudUserModel::index(int row, int column, const QModelIndex &parent) const
 {
     return !parent.isValid() && column == 0 && row >= 0 && row < m_data.size()
             ? createIndex(row, column)
             : QModelIndex();
 }
 
-QVariant NextcloudUsersModel::data(const QModelIndex &index, int role) const
+QVariant NextcloudUserModel::data(const QModelIndex &index, int role) const
 {
     const int row = index.row();
     if (!index.isValid() || row < 0 || row >= m_data.size()) {
@@ -242,12 +58,12 @@ QVariant NextcloudUsersModel::data(const QModelIndex &index, int role) const
     }
 }
 
-int NextcloudUsersModel::rowCount(const QModelIndex &) const
+int NextcloudUserModel::rowCount(const QModelIndex &) const
 {
     return m_data.size();
 }
 
-QHash<int, QByteArray> NextcloudUsersModel::roleNames() const
+QHash<int, QByteArray> NextcloudUserModel::roleNames() const
 {
     static QHash<int, QByteArray> retn {
         { AccountIdRole,        "accountId" },
@@ -259,12 +75,12 @@ QHash<int, QByteArray> NextcloudUsersModel::roleNames() const
     return retn;
 }
 
-SyncCache::ImageCache* NextcloudUsersModel::imageCache() const
+SyncCache::ImageCache *NextcloudUserModel::imageCache() const
 {
     return m_imageCache;
 }
 
-void NextcloudUsersModel::setImageCache(SyncCache::ImageCache *cache)
+void NextcloudUserModel::setImageCache(SyncCache::ImageCache *cache)
 {
     if (m_imageCache == cache) {
         return;
@@ -321,7 +137,7 @@ void NextcloudUsersModel::setImageCache(SyncCache::ImageCache *cache)
     });
 }
 
-QVariantMap NextcloudUsersModel::at(int row) const
+QVariantMap NextcloudUserModel::at(int row) const
 {
     QVariantMap retn;
     if (row < 0 || row >= rowCount()) {
@@ -337,7 +153,7 @@ QVariantMap NextcloudUsersModel::at(int row) const
     return retn;
 }
 
-void NextcloudUsersModel::loadData()
+void NextcloudUserModel::loadData()
 {
     if (!m_imageCache) {
         return;
@@ -365,26 +181,26 @@ void NextcloudUsersModel::loadData()
     connect(m_imageCache, &SyncCache::ImageCache::requestUsersFailed,
             contextObject, [this, contextObject] (const QString &errorMessage) {
         contextObject->deleteLater();
-        qWarning() << "NextcloudUsersModel::loadData: failed:" << errorMessage;
+        qWarning() << "NextcloudUserModel::loadData: failed:" << errorMessage;
     });
     m_imageCache->requestUsers();
 }
 
 //-----------------------------------------------------------------------------
 
-NextcloudAlbumsModel::NextcloudAlbumsModel(QObject *parent)
+NextcloudAlbumModel::NextcloudAlbumModel(QObject *parent)
     : QAbstractListModel(parent)
 {
     qRegisterMetaType<SyncCache::Album>();
     qRegisterMetaType<QVector<SyncCache::Album> >();
 }
 
-void NextcloudAlbumsModel::classBegin()
+void NextcloudAlbumModel::classBegin()
 {
     m_deferLoad = true;
 }
 
-void NextcloudAlbumsModel::componentComplete()
+void NextcloudAlbumModel::componentComplete()
 {
     m_deferLoad = false;
     if (m_imageCache) {
@@ -392,14 +208,14 @@ void NextcloudAlbumsModel::componentComplete()
     }
 }
 
-QModelIndex NextcloudAlbumsModel::index(int row, int column, const QModelIndex &parent) const
+QModelIndex NextcloudAlbumModel::index(int row, int column, const QModelIndex &parent) const
 {
     return !parent.isValid() && column == 0 && row >= 0 && row < m_data.size()
             ? createIndex(row, column)
             : QModelIndex();
 }
 
-QVariant NextcloudAlbumsModel::data(const QModelIndex &index, int role) const
+QVariant NextcloudAlbumModel::data(const QModelIndex &index, int role) const
 {
     const int row = index.row();
     if (!index.isValid() || row < 0 || row >= m_data.size()) {
@@ -423,12 +239,12 @@ QVariant NextcloudAlbumsModel::data(const QModelIndex &index, int role) const
     }
 }
 
-int NextcloudAlbumsModel::rowCount(const QModelIndex &) const
+int NextcloudAlbumModel::rowCount(const QModelIndex &) const
 {
     return m_data.size();
 }
 
-QHash<int, QByteArray> NextcloudAlbumsModel::roleNames() const
+QHash<int, QByteArray> NextcloudAlbumModel::roleNames() const
 {
     static QHash<int, QByteArray> retn {
         { AccountIdRole,        "accountId" },
@@ -445,12 +261,12 @@ QHash<int, QByteArray> NextcloudAlbumsModel::roleNames() const
     return retn;
 }
 
-SyncCache::ImageCache* NextcloudAlbumsModel::imageCache() const
+SyncCache::ImageCache *NextcloudAlbumModel::imageCache() const
 {
     return m_imageCache;
 }
 
-void NextcloudAlbumsModel::setImageCache(SyncCache::ImageCache *cache)
+void NextcloudAlbumModel::setImageCache(SyncCache::ImageCache *cache)
 {
     if (m_imageCache == cache) {
         return;
@@ -511,12 +327,12 @@ void NextcloudAlbumsModel::setImageCache(SyncCache::ImageCache *cache)
     });
 }
 
-int NextcloudAlbumsModel::accountId() const
+int NextcloudAlbumModel::accountId() const
 {
     return m_accountId;
 }
 
-void NextcloudAlbumsModel::setAccountId(int id)
+void NextcloudAlbumModel::setAccountId(int id)
 {
     if (m_accountId == id) {
         return;
@@ -530,12 +346,12 @@ void NextcloudAlbumsModel::setAccountId(int id)
     }
 }
 
-QString NextcloudAlbumsModel::userId() const
+QString NextcloudAlbumModel::userId() const
 {
     return m_userId;
 }
 
-void NextcloudAlbumsModel::setUserId(const QString &id)
+void NextcloudAlbumModel::setUserId(const QString &id)
 {
     if (m_userId == id) {
         return;
@@ -549,7 +365,7 @@ void NextcloudAlbumsModel::setUserId(const QString &id)
     }
 }
 
-QVariantMap NextcloudAlbumsModel::at(int row) const
+QVariantMap NextcloudAlbumModel::at(int row) const
 {
     QVariantMap retn;
     if (row < 0 || row >= rowCount()) {
@@ -565,7 +381,7 @@ QVariantMap NextcloudAlbumsModel::at(int row) const
     return retn;
 }
 
-void NextcloudAlbumsModel::loadData()
+void NextcloudAlbumModel::loadData()
 {
     if (!m_imageCache) {
         return;
@@ -613,26 +429,26 @@ void NextcloudAlbumsModel::loadData()
             return;
         }
         contextObject->deleteLater();
-        qWarning() << "NextcloudAlbumsModel::loadData: failed:" << errorMessage;
+        qWarning() << "NextcloudAlbumModel::loadData: failed:" << errorMessage;
     });
     m_imageCache->requestAlbums(m_accountId, m_userId);
 }
 
 //-----------------------------------------------------------------------------
 
-NextcloudPhotosModel::NextcloudPhotosModel(QObject *parent)
+NextcloudPhotoModel::NextcloudPhotoModel(QObject *parent)
     : QAbstractListModel(parent)
 {
     qRegisterMetaType<SyncCache::Photo>();
     qRegisterMetaType<QVector<SyncCache::Photo> >();
 }
 
-void NextcloudPhotosModel::classBegin()
+void NextcloudPhotoModel::classBegin()
 {
     m_deferLoad = true;
 }
 
-void NextcloudPhotosModel::componentComplete()
+void NextcloudPhotoModel::componentComplete()
 {
     m_deferLoad = false;
     if (m_imageCache) {
@@ -640,14 +456,14 @@ void NextcloudPhotosModel::componentComplete()
     }
 }
 
-QModelIndex NextcloudPhotosModel::index(int row, int column, const QModelIndex &parent) const
+QModelIndex NextcloudPhotoModel::index(int row, int column, const QModelIndex &parent) const
 {
     return !parent.isValid() && column == 0 && row >= 0 && row < m_data.size()
             ? createIndex(row, column)
             : QModelIndex();
 }
 
-QVariant NextcloudPhotosModel::data(const QModelIndex &index, int role) const
+QVariant NextcloudPhotoModel::data(const QModelIndex &index, int role) const
 {
     const int row = index.row();
     if (!index.isValid() || row < 0 || row >= m_data.size()) {
@@ -680,12 +496,12 @@ QVariant NextcloudPhotosModel::data(const QModelIndex &index, int role) const
     }
 }
 
-int NextcloudPhotosModel::rowCount(const QModelIndex &) const
+int NextcloudPhotoModel::rowCount(const QModelIndex &) const
 {
     return m_data.size();
 }
 
-QHash<int, QByteArray> NextcloudPhotosModel::roleNames() const
+QHash<int, QByteArray> NextcloudPhotoModel::roleNames() const
 {
     static QHash<int, QByteArray> retn {
         { AccountIdRole,        "accountId" },
@@ -710,12 +526,12 @@ QHash<int, QByteArray> NextcloudPhotosModel::roleNames() const
     return retn;
 }
 
-SyncCache::ImageCache* NextcloudPhotosModel::imageCache() const
+SyncCache::ImageCache *NextcloudPhotoModel::imageCache() const
 {
     return m_imageCache;
 }
 
-void NextcloudPhotosModel::setImageCache(SyncCache::ImageCache *cache)
+void NextcloudPhotoModel::setImageCache(SyncCache::ImageCache *cache)
 {
     if (m_imageCache == cache) {
         return;
@@ -779,12 +595,12 @@ void NextcloudPhotosModel::setImageCache(SyncCache::ImageCache *cache)
     });
 }
 
-int NextcloudPhotosModel::accountId() const
+int NextcloudPhotoModel::accountId() const
 {
     return m_accountId;
 }
 
-void NextcloudPhotosModel::setAccountId(int id)
+void NextcloudPhotoModel::setAccountId(int id)
 {
     if (m_accountId == id) {
         return;
@@ -798,12 +614,12 @@ void NextcloudPhotosModel::setAccountId(int id)
     }
 }
 
-QString NextcloudPhotosModel::userId() const
+QString NextcloudPhotoModel::userId() const
 {
     return m_userId;
 }
 
-void NextcloudPhotosModel::setUserId(const QString &id)
+void NextcloudPhotoModel::setUserId(const QString &id)
 {
     if (m_userId == id) {
         return;
@@ -817,12 +633,12 @@ void NextcloudPhotosModel::setUserId(const QString &id)
     }
 }
 
-QString NextcloudPhotosModel::albumId() const
+QString NextcloudPhotoModel::albumId() const
 {
     return m_albumId;
 }
 
-void NextcloudPhotosModel::setAlbumId(const QString &id)
+void NextcloudPhotoModel::setAlbumId(const QString &id)
 {
     if (m_albumId == id) {
         return;
@@ -836,7 +652,7 @@ void NextcloudPhotosModel::setAlbumId(const QString &id)
     }
 }
 
-QVariantMap NextcloudPhotosModel::at(int row) const
+QVariantMap NextcloudPhotoModel::at(int row) const
 {
     QVariantMap retn;
     if (row < 0 || row >= rowCount()) {
@@ -852,7 +668,7 @@ QVariantMap NextcloudPhotosModel::at(int row) const
     return retn;
 }
 
-void NextcloudPhotosModel::loadData()
+void NextcloudPhotoModel::loadData()
 {
     if (!m_imageCache || m_accountId < 0) {
         return;
@@ -896,7 +712,7 @@ void NextcloudPhotosModel::loadData()
             return;
         }
         contextObject->deleteLater();
-        qWarning() << "NextcloudPhotosModel::loadData: failed:" << errorMessage;
+        qWarning() << "NextcloudPhotoModel::loadData: failed:" << errorMessage;
     });
     m_imageCache->requestPhotos(m_accountId, m_userId, m_albumId);
 }
@@ -908,7 +724,7 @@ NextcloudPhotoCounter::NextcloudPhotoCounter(QObject *parent)
 {
 }
 
-SyncCache::ImageCache* NextcloudPhotoCounter::imageCache() const
+SyncCache::ImageCache *NextcloudPhotoCounter::imageCache() const
 {
     return m_imageCache;
 }
@@ -948,224 +764,4 @@ void NextcloudPhotoCounter::setImageCache(SyncCache::ImageCache *cache)
 int NextcloudPhotoCounter::count()
 {
     return m_count;
-}
-
-//-----------------------------------------------------------------------------
-
-NextcloudImageDownloader::NextcloudImageDownloader(QObject *parent)
-    : QObject(parent)
-{
-}
-
-void NextcloudImageDownloader::classBegin()
-{
-    m_deferLoad = true;
-}
-
-void NextcloudImageDownloader::componentComplete()
-{
-    m_deferLoad = false;
-    if (m_imageCache) {
-        loadImage();
-    }
-}
-
-SyncCache::ImageCache* NextcloudImageDownloader::imageCache() const
-{
-    return m_imageCache;
-}
-
-void NextcloudImageDownloader::setImageCache(SyncCache::ImageCache *cache)
-{
-    if (m_imageCache == cache) {
-        return;
-    }
-
-    if (m_imageCache) {
-        disconnect(m_imageCache, 0, this, 0);
-    }
-
-    m_imageCache = cache;
-    emit imageCacheChanged();
-
-    if (!m_deferLoad) {
-        loadImage();
-    }
-}
-
-int NextcloudImageDownloader::accountId() const
-{
-    return m_accountId;
-}
-
-void NextcloudImageDownloader::setAccountId(int id)
-{
-    if (m_accountId == id) {
-        return;
-    }
-
-    m_accountId = id;
-    emit accountIdChanged();
-
-    if (!m_deferLoad) {
-        loadImage();
-    }
-}
-
-QString NextcloudImageDownloader::userId() const
-{
-    return m_userId;
-}
-
-void NextcloudImageDownloader::setUserId(const QString &id)
-{
-    if (m_userId == id) {
-        return;
-    }
-
-    m_userId = id;
-    emit userIdChanged();
-
-    if (!m_deferLoad) {
-        loadImage();
-    }
-}
-
-QString NextcloudImageDownloader::albumId() const
-{
-    return m_albumId;
-}
-
-void NextcloudImageDownloader::setAlbumId(const QString &id)
-{
-    if (m_albumId == id) {
-        return;
-    }
-
-    m_albumId = id;
-    emit albumIdChanged();
-
-    if (!m_deferLoad) {
-        loadImage();
-    }
-}
-
-QString NextcloudImageDownloader::photoId() const
-{
-    return m_photoId;
-}
-void NextcloudImageDownloader::setPhotoId(const QString &id)
-{
-    if (m_photoId == id) {
-        return;
-    }
-
-    m_photoId = id;
-    emit photoIdChanged();
-
-    if (!m_deferLoad) {
-        loadImage();
-    }
-}
-
-bool NextcloudImageDownloader::downloadThumbnail() const
-{
-    return m_downloadThumbnail;
-}
-
-void NextcloudImageDownloader::setDownloadThumbnail(bool v)
-{
-    if (m_downloadThumbnail != v) {
-        m_downloadThumbnail = v;
-        emit downloadThumbnailChanged();
-        if (!m_deferLoad) {
-            loadImage();
-        }
-    }
-}
-
-bool NextcloudImageDownloader::downloadImage() const
-{
-    return m_downloadImage;
-}
-
-void NextcloudImageDownloader::setDownloadImage(bool v)
-{
-    if (m_downloadImage != v) {
-        m_downloadImage = v;
-        emit downloadImageChanged();
-        if (!m_deferLoad) {
-            loadImage();
-        }
-    }
-}
-
-QUrl NextcloudImageDownloader::imagePath() const
-{
-    return m_imagePath;
-}
-
-void NextcloudImageDownloader::loadImage()
-{
-    if (!m_imageCache) {
-        qWarning() << "No image cache, cannot load image";
-        return;
-    }
-
-    if (m_downloadImage) {
-        m_idempToken = qHash(QStringLiteral("%1|%2|%3").arg(m_userId, m_albumId, m_photoId));
-
-        connect(m_imageCache, &SyncCache::ImageCache::populatePhotoImageFinished,
-                this, &NextcloudImageDownloader::populateFinished,
-                Qt::UniqueConnection);
-        connect(m_imageCache, &SyncCache::ImageCache::populatePhotoImageFailed,
-                this, &NextcloudImageDownloader::populateFailed,
-                Qt::UniqueConnection);
-
-        m_imageCache->populatePhotoImage(m_idempToken, m_accountId, m_userId, m_albumId, m_photoId, QNetworkRequest());
-
-    } else if (m_downloadThumbnail) {
-        m_idempToken = qHash(QStringLiteral("%1|%2|%3").arg(m_userId, m_albumId, m_photoId));
-        NextcloudImageCache *nextcloudImageCache = qobject_cast<NextcloudImageCache*>(m_imageCache);
-        const QNetworkRequest networkRequest = nextcloudImageCache
-                ? nextcloudImageCache->templateRequest(m_accountId, true)
-                : QNetworkRequest();
-
-        if (m_photoId.isEmpty()) {
-            connect(m_imageCache, &SyncCache::ImageCache::populateAlbumThumbnailFinished,
-                    this, &NextcloudImageDownloader::populateFinished,
-                    Qt::UniqueConnection);
-            connect(m_imageCache, &SyncCache::ImageCache::populateAlbumThumbnailFailed,
-                    this, &NextcloudImageDownloader::populateFailed,
-                    Qt::UniqueConnection);
-            m_imageCache->populateAlbumThumbnail(m_idempToken, m_accountId, m_userId, m_albumId, networkRequest);
-
-        } else {
-            connect(m_imageCache, &SyncCache::ImageCache::populatePhotoThumbnailFinished,
-                    this, &NextcloudImageDownloader::populateFinished,
-                    Qt::UniqueConnection);
-            connect(m_imageCache, &SyncCache::ImageCache::populatePhotoThumbnailFailed,
-                    this, &NextcloudImageDownloader::populateFailed,
-                    Qt::UniqueConnection);
-            m_imageCache->populatePhotoThumbnail(m_idempToken, m_accountId, m_userId, m_albumId, m_photoId, networkRequest);
-        }
-    }
-}
-
-void NextcloudImageDownloader::populateFinished(int idempToken, const QString &path)
-{
-    if (m_idempToken == idempToken) {
-        const QUrl imagePath = QUrl::fromLocalFile(path);
-        if (m_imagePath != imagePath) {
-            m_imagePath = imagePath;
-            emit imagePathChanged();
-        }
-    }
-}
-
-void NextcloudImageDownloader::populateFailed(int idempToken, const QString &errorMessage)
-{
-    if (m_idempToken == idempToken) {
-        qWarning() << "NextcloudImageDownloader::loadImage: failed:" << errorMessage;
-    }
 }

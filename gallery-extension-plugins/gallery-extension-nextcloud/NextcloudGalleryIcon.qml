@@ -59,13 +59,13 @@ MediaSourceIcon {
         }
     }
 
-    NextcloudPhotosModel {
+    NextcloudPhotoModel {
         id: allPhotosModel
 
         imageCache: NextcloudImageCache
     }
 
-    NextcloudUsersModel {
+    NextcloudUserModel {
         id: nextcloudUsers
 
         imageCache: NextcloudImageCache

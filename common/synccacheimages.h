@@ -7,8 +7,8 @@
 **
 ****************************************************************************************/
 
-#ifndef NEXTCLOUD_IMAGECACHE_H
-#define NEXTCLOUD_IMAGECACHE_H
+#ifndef NEXTCLOUD_SYNCCACHEIMAGES_H
+#define NEXTCLOUD_SYNCCACHEIMAGES_H
 
 #include "synccachedatabase.h"
 
@@ -80,7 +80,7 @@ class ImageDatabase : public Database
     Q_OBJECT
 
 public:
-    ImageDatabase(QObject *parent = Q_NULLPTR);
+    ImageDatabase(QObject *parent = nullptr);
 
     QVector<SyncCache::User> users(SyncCache::DatabaseError *error) const;
     QVector<SyncCache::Album> albums(int accountId, const QString &userId, SyncCache::DatabaseError *error) const;
@@ -116,7 +116,7 @@ class ImageCache : public QObject
     Q_OBJECT
 
 public:
-    ImageCache(QObject *parent = Q_NULLPTR);
+    ImageCache(QObject *parent = nullptr);
     ~ImageCache();
 
 public Q_SLOTS:
@@ -187,4 +187,4 @@ Q_DECLARE_METATYPE(SyncCache::Photo)
 Q_DECLARE_METATYPE(QVector<SyncCache::Photo>)
 Q_DECLARE_TYPEINFO(SyncCache::Photo, Q_MOVABLE_TYPE);
 
-#endif // NEXTCLOUD_IMAGECACHE_H
+#endif // NEXTCLOUD_SYNCCACHEIMAGES_H

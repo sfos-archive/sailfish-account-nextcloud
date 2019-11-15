@@ -7,10 +7,10 @@
 **
 ****************************************************************************************/
 
-#ifndef NEXTCLOUD_EVENTCACHE_P_H
-#define NEXTCLOUD_EVENTCACHE_P_H
+#ifndef NEXTCLOUD_SYNCCACHEEVENTS_P_H
+#define NEXTCLOUD_SYNCCACHEEVENTS_P_H
 
-#include "eventcache.h"
+#include "synccacheevents.h"
 #include "synccachedatabase_p.h"
 
 #include <QtCore/QObject>
@@ -33,7 +33,7 @@ class EventImageDownloadWatcher : public QObject
     Q_OBJECT
 
 public:
-    EventImageDownloadWatcher(int idempToken, const QUrl &imageUrl, QObject *parent = Q_NULLPTR);
+    EventImageDownloadWatcher(int idempToken, const QUrl &imageUrl, QObject *parent = nullptr);
     ~EventImageDownloadWatcher();
 
     int idempToken() const;
@@ -57,7 +57,7 @@ public:
             const QString &fileName = QString(),
             const QString &eventId = QString(),
             const QNetworkRequest &templateRequest = QNetworkRequest(QUrl()),
-            EventImageDownloadWatcher *watcher = Q_NULLPTR);
+            EventImageDownloadWatcher *watcher = nullptr);
     ~EventImageDownload();
 
     int m_idempToken = 0;
@@ -65,8 +65,8 @@ public:
     QString m_fileName;
     QString m_eventId;
     QNetworkRequest m_templateRequest;
-    QTimer *m_timeoutTimer = Q_NULLPTR;
-    QNetworkReply *m_reply = Q_NULLPTR;
+    QTimer *m_timeoutTimer = nullptr;
+    QNetworkReply *m_reply = nullptr;
     QPointer<SyncCache::EventImageDownloadWatcher> m_watcher;
 };
 
@@ -75,7 +75,7 @@ class EventImageDownloader : public QObject
     Q_OBJECT
 
 public:
-    EventImageDownloader(int maxActive = 4, QObject *parent = Q_NULLPTR);
+    EventImageDownloader(int maxActive = 4, QObject *parent = nullptr);
     ~EventImageDownloader();
 
     void setImageDirectory(const QString &path);
@@ -104,7 +104,7 @@ class EventCacheThreadWorker : public QObject
     Q_OBJECT
 
 public:
-    EventCacheThreadWorker(QObject *parent = Q_NULLPTR);
+    EventCacheThreadWorker(QObject *parent = nullptr);
     ~EventCacheThreadWorker();
 
 public Q_SLOTS:
@@ -167,14 +167,14 @@ class EventDatabasePrivate : public DatabasePrivate
 public:
     EventDatabasePrivate(EventDatabase *parent);
 
-    int currentSchemaVersion() const Q_DECL_OVERRIDE;
-    QVector<const char *> createStatements() const Q_DECL_OVERRIDE;
-    QVector<UpgradeOperation> upgradeVersions() const Q_DECL_OVERRIDE;
+    int currentSchemaVersion() const override;
+    QVector<const char *> createStatements() const override;
+    QVector<UpgradeOperation> upgradeVersions() const override;
 
-    void preTransactionCommit() Q_DECL_OVERRIDE;
-    void transactionCommittedPreUnlock() Q_DECL_OVERRIDE;
-    void transactionCommittedPostUnlock() Q_DECL_OVERRIDE;
-    void transactionRolledBackPreUnlocked() Q_DECL_OVERRIDE;
+    void preTransactionCommit() override;
+    void transactionCommittedPreUnlock() override;
+    void transactionCommittedPostUnlock() override;
+    void transactionRolledBackPreUnlocked() override;
 
 private:
     friend class SyncCache::EventDatabase;
@@ -191,4 +191,4 @@ private:
 
 } // namespace SyncCache
 
-#endif // NEXTCLOUD_EVENTCACHE_P_H
+#endif // NEXTCLOUD_SYNCCACHEEVENTS_P_H

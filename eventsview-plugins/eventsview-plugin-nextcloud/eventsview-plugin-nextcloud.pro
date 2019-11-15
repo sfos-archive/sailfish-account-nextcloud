@@ -10,7 +10,7 @@ CONFIG += plugin link_pkgconfig c++11
 PKGCONFIG += libsignon-qt5 accounts-qt5 libsailfishkeyprovider mlite5
 
 include($$PWD/../../common/auth.pri)
-include($$PWD/../../common/eventcache.pri)
+include($$PWD/../../common/synccacheevents.pri)
 
 include ($$PWD/translations.pri)
 
@@ -26,10 +26,14 @@ import.path = $$TARGETPATH
 target.path = $$TARGETPATH
 
 HEADERS += \
-    eventmodel.h
+    eventmodel.h \
+    eventcache.h \
+    eventimagedownloader.h
 
 SOURCES += \
     eventmodel.cpp \
+    eventcache.cpp \
+    eventimagedownloader.cpp \
     plugin.cpp
 
 OTHER_FILES += $$import.files $$qml.files

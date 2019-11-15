@@ -15,7 +15,7 @@
 #include <QList>
 #include <QByteArray>
 
-#include "imagecache.h"
+#include "synccacheimages.h"
 
 class Syncer;
 class ReplyParser

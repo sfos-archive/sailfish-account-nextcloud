@@ -7,10 +7,10 @@
 **
 ****************************************************************************************/
 
-#ifndef NEXTCLOUD_IMAGECACHE_P_H
-#define NEXTCLOUD_IMAGECACHE_P_H
+#ifndef NEXTCLOUD_SYNCCACHEIMAGES_P_H
+#define NEXTCLOUD_SYNCCACHEIMAGES_P_H
 
-#include "imagecache.h"
+#include "synccacheimages.h"
 #include "synccachedatabase_p.h"
 
 #include <QtCore/QObject>
@@ -33,7 +33,7 @@ class ImageDownloadWatcher : public QObject
     Q_OBJECT
 
 public:
-    ImageDownloadWatcher(int idempToken, const QUrl &imageUrl, QObject *parent = Q_NULLPTR);
+    ImageDownloadWatcher(int idempToken, const QUrl &imageUrl, QObject *parent = nullptr);
     ~ImageDownloadWatcher();
 
     int idempToken() const;
@@ -75,7 +75,7 @@ class ImageDownloader : public QObject
     Q_OBJECT
 
 public:
-    ImageDownloader(int maxActive = 4, QObject *parent = Q_NULLPTR);
+    ImageDownloader(int maxActive = 4, QObject *parent = nullptr);
     ~ImageDownloader();
 
     void setImageDirectory(const QString &path);
@@ -105,7 +105,7 @@ class ImageCacheThreadWorker : public QObject
     Q_OBJECT
 
 public:
-    ImageCacheThreadWorker(QObject *parent = Q_NULLPTR);
+    ImageCacheThreadWorker(QObject *parent = nullptr);
     ~ImageCacheThreadWorker();
 
 public Q_SLOTS:
@@ -195,14 +195,14 @@ class ImageDatabasePrivate : public DatabasePrivate
 public:
     ImageDatabasePrivate(ImageDatabase *parent);
 
-    int currentSchemaVersion() const Q_DECL_OVERRIDE;
-    QVector<const char *> createStatements() const Q_DECL_OVERRIDE;
-    QVector<UpgradeOperation> upgradeVersions() const Q_DECL_OVERRIDE;
+    int currentSchemaVersion() const override;
+    QVector<const char *> createStatements() const override;
+    QVector<UpgradeOperation> upgradeVersions() const override;
 
-    void preTransactionCommit() Q_DECL_OVERRIDE;
-    void transactionCommittedPreUnlock() Q_DECL_OVERRIDE;
-    void transactionCommittedPostUnlock() Q_DECL_OVERRIDE;
-    void transactionRolledBackPreUnlocked() Q_DECL_OVERRIDE;
+    void preTransactionCommit() override;
+    void transactionCommittedPreUnlock() override;
+    void transactionCommittedPostUnlock() override;
+    void transactionRolledBackPreUnlocked() override;
 
 private:
     friend class SyncCache::ImageDatabase;
@@ -227,4 +227,4 @@ private:
 
 } // namespace SyncCache
 
-#endif // NEXTCLOUD_IMAGECACHE_P_H
+#endif // NEXTCLOUD_SYNCCACHEIMAGES_P_H

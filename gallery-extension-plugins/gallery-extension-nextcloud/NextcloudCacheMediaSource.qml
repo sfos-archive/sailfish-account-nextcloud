@@ -36,11 +36,11 @@ MediaSource {
         imageCache: NextcloudImageCache
     }
 
-    property NextcloudUsersModel nextcloudUsers: NextcloudUsersModel {
+    property NextcloudUserModel nextcloudUsers: NextcloudUserModel {
         imageCache: NextcloudImageCache
     }
 
-    property NextcloudAlbumsModel nextcloudAlbums: NextcloudAlbumsModel {
+    property NextcloudAlbumModel nextcloudAlbums: NextcloudAlbumModel {
         imageCache: NextcloudImageCache
         accountId: nextcloudUsers.count > 0 ? nextcloudUsers.at(0).accountId : 0
         userId: nextcloudUsers.count > 0 ? nextcloudUsers.at(0).userId : ""

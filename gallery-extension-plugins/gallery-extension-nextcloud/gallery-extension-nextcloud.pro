@@ -10,7 +10,7 @@ CONFIG += plugin link_pkgconfig c++11
 PKGCONFIG += libsignon-qt5 accounts-qt5 libsailfishkeyprovider
 
 include($$PWD/../../common/auth.pri)
-include($$PWD/../../common/imagecache.pri)
+include($$PWD/../../common/synccacheimages.pri)
 
 include ($$PWD/translations.pri)
 
@@ -30,8 +30,17 @@ target.path = $$TARGETPATH
 qml.files = NextcloudCacheMediaSource.qml
 qml.path = /usr/share/jolla-gallery/mediasources/
 
-HEADERS += imagemodels.h
-SOURCES += imagemodels.cpp nextcloudplugin.cpp
-OTHER_FILES += *.qml
+HEADERS += \
+    imagemodels.h \
+    imagecache.h \
+    imagedownloader.h
+
+SOURCES += \
+    imagemodels.cpp \
+    imagecache.cpp \
+    imagedownloader.cpp \
+    nextcloudplugin.cpp
+
+OTHER_FILES += $$import.files $$qml.files
 
 INSTALLS += target import qml

@@ -12,7 +12,7 @@
 
 #include "webdavsyncer_p.h"
 
-#include "imagecache.h"
+#include "synccacheimages.h"
 
 #include <QList>
 #include <QHash>
@@ -28,14 +28,14 @@ public:
     Syncer(QObject *parent, Buteo::SyncProfile *profile);
    ~Syncer();
 
-    void purgeAccount(int accountId) Q_DECL_OVERRIDE;
+    void purgeAccount(int accountId) override;
 
 private Q_SLOTS:
     void handleConfigReply();
     void handleGalleryMetaDataReply();
 
 private:
-    void beginSync() Q_DECL_OVERRIDE;
+    void beginSync() override;
     void calculateAndApplyDelta(
             const QHash<QString, SyncCache::Album> &albums,
             const QHash<QString, SyncCache::Photo> &photos);
