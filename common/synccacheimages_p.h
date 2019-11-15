@@ -7,10 +7,10 @@
 **
 ****************************************************************************************/
 
-#ifndef NEXTCLOUD_IMAGECACHE_P_H
-#define NEXTCLOUD_IMAGECACHE_P_H
+#ifndef NEXTCLOUD_SYNCCACHEIMAGES_P_H
+#define NEXTCLOUD_SYNCCACHEIMAGES_P_H
 
-#include "imagecache.h"
+#include "synccacheimages.h"
 #include "synccachedatabase_p.h"
 
 #include <QtCore/QObject>
@@ -33,7 +33,7 @@ class ImageDownloadWatcher : public QObject
     Q_OBJECT
 
 public:
-    ImageDownloadWatcher(int idempToken, const QUrl &imageUrl, QObject *parent = Q_NULLPTR);
+    ImageDownloadWatcher(int idempToken, const QUrl &imageUrl, QObject *parent = nullptr);
     ~ImageDownloadWatcher();
 
     int idempToken() const;
@@ -55,18 +55,18 @@ public:
             int idempToken = 0,
             const QUrl &imageUrl = QUrl(),
             const QString &fileName = QString(),
-            const QString &albumPath = QString(),
+            const QString &subDirPath = QString(),
             const QNetworkRequest &templateRequest = QNetworkRequest(QUrl()),
-            ImageDownloadWatcher *watcher = Q_NULLPTR);
+            ImageDownloadWatcher *watcher = nullptr);
     ~ImageDownload();
 
     int m_idempToken = 0;
     QUrl m_imageUrl;
     QString m_fileName;
-    QString m_albumPath;
+    QString m_subDirPath;
     QNetworkRequest m_templateRequest;
-    QTimer *m_timeoutTimer = Q_NULLPTR;
-    QNetworkReply *m_reply = Q_NULLPTR;
+    QTimer *m_timeoutTimer = nullptr;
+    QNetworkReply *m_reply = nullptr;
     QPointer<SyncCache::ImageDownloadWatcher> m_watcher;
 };
 
@@ -75,16 +75,17 @@ class ImageDownloader : public QObject
     Q_OBJECT
 
 public:
-    ImageDownloader(int maxActive = 4, QObject *parent = Q_NULLPTR);
+    ImageDownloader(int maxActive = 4, QObject *parent = nullptr);
     ~ImageDownloader();
 
     void setImageDirectory(const QString &path);
-    ImageDownloadWatcher *downloadImage(
-            int idempToken,
+    ImageDownloadWatcher *downloadImage(int idempToken,
             const QUrl &imageUrl,
             const QString &fileName,
-            const QString &albumPath,
+            const QString &subDirPath,
             const QNetworkRequest &requestTemplate);
+
+    QString imageFilePath(const QString &subDirPath, const QString &fileName) const;
 
 private Q_SLOTS:
     void triggerDownload();
@@ -104,7 +105,7 @@ class ImageCacheThreadWorker : public QObject
     Q_OBJECT
 
 public:
-    ImageCacheThreadWorker(QObject *parent = Q_NULLPTR);
+    ImageCacheThreadWorker(QObject *parent = nullptr);
     ~ImageCacheThreadWorker();
 
 public Q_SLOTS:
@@ -113,6 +114,7 @@ public Q_SLOTS:
     void requestUsers();
     void requestAlbums(int accountId, const QString &userId);
     void requestPhotos(int accountId, const QString &userId, const QString &albumId);
+    void requestPhotoCount();
 
     void populateUserThumbnail(int idempToken, int accountId, const QString &userId, const QNetworkRequest &requestTemplate);
     void populateAlbumThumbnail(int idempToken, int accountId, const QString &userId, const QString &albumId, const QNetworkRequest &requestTemplate);
@@ -131,6 +133,9 @@ Q_SIGNALS:
 
     void requestPhotosFailed(int accountId, const QString &userId, const QString &albumId, const QString &errorMessage);
     void requestPhotosFinished(int accountId, const QString &userId, const QString &albumId, const QVector<SyncCache::Photo> &photos);
+
+    void requestPhotoCountFailed(const QString &errorMessage);
+    void requestPhotoCountFinished(int photoCount);
 
     void populateUserThumbnailFailed(int idempToken, const QString &errorMessage);
     void populateUserThumbnailFinished(int idempToken, const QString &path);
@@ -153,6 +158,8 @@ Q_SIGNALS:
     void photosDeleted(const QVector<SyncCache::Photo> &photos);
 
 private:
+    void photoThumbnailDownloadFinished(int idempToken, const SyncCache::Photo &photo, const QUrl &filePath);
+
     ImageDatabase m_db;
     ImageDownloader *m_downloader;
 };
@@ -171,6 +178,7 @@ Q_SIGNALS:
     void requestUsers();
     void requestAlbums(int accountId, const QString &userId);
     void requestPhotos(int accountId, const QString &userId, const QString &albumId);
+    void requestPhotoCount();
 
     bool populateUserThumbnail(int idempToken, int accountId, const QString &userId, const QNetworkRequest &requestTemplate);
     bool populateAlbumThumbnail(int idempToken, int accountId, const QString &userId, const QString &albumId, const QNetworkRequest &requestTemplate);
@@ -187,14 +195,14 @@ class ImageDatabasePrivate : public DatabasePrivate
 public:
     ImageDatabasePrivate(ImageDatabase *parent);
 
-    int currentSchemaVersion() const Q_DECL_OVERRIDE;
-    QVector<const char *> createStatements() const Q_DECL_OVERRIDE;
-    QVector<UpgradeOperation> upgradeVersions() const Q_DECL_OVERRIDE;
+    int currentSchemaVersion() const override;
+    QVector<const char *> createStatements() const override;
+    QVector<UpgradeOperation> upgradeVersions() const override;
 
-    void preTransactionCommit() Q_DECL_OVERRIDE;
-    void transactionCommittedPreUnlock() Q_DECL_OVERRIDE;
-    void transactionCommittedPostUnlock() Q_DECL_OVERRIDE;
-    void transactionRolledBackPreUnlocked() Q_DECL_OVERRIDE;
+    void preTransactionCommit() override;
+    void transactionCommittedPreUnlock() override;
+    void transactionCommittedPostUnlock() override;
+    void transactionRolledBackPreUnlocked() override;
 
 private:
     friend class SyncCache::ImageDatabase;
@@ -219,4 +227,4 @@ private:
 
 } // namespace SyncCache
 
-#endif // NEXTCLOUD_IMAGECACHE_P_H
+#endif // NEXTCLOUD_SYNCCACHEIMAGES_P_H

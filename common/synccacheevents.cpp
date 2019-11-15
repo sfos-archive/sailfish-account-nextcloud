@@ -7,8 +7,8 @@
 **
 ****************************************************************************************/
 
-#include "eventcache.h"
-#include "eventcache_p.h"
+#include "synccacheevents.h"
+#include "synccacheevents_p.h"
 
 #include <QtCore/QThread>
 #include <QtCore/QFile>
@@ -103,7 +103,7 @@ EventImageDownloadWatcher *EventImageDownloader::downloadImage(int idempToken, c
 
 void EventImageDownloader::triggerDownload()
 {
-    while (m_active.size() && (m_active.head() == Q_NULLPTR || !m_active.head()->m_timeoutTimer->isActive())) {
+    while (m_active.size() && (m_active.head() == nullptr || !m_active.head()->m_timeoutTimer->isActive())) {
         delete m_active.dequeue();
     }
 
@@ -190,7 +190,7 @@ void EventImageDownloader::eraseActiveDownload(EventImageDownload *download)
 //-----------------------------------------------------------------------------
 
 EventCacheThreadWorker::EventCacheThreadWorker(QObject *parent)
-    : QObject(parent), m_downloader(Q_NULLPTR)
+    : QObject(parent), m_downloader(nullptr)
 {
 }
 

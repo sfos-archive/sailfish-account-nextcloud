@@ -12,7 +12,7 @@
 #include "networkrequestgenerator_p.h"
 #include "networkreplyparser_p.h"
 
-#include "eventcache.h"
+#include "synccacheevents.h"
 
 #include <QtCore/QDateTime>
 #include <QtCore/QUrl>

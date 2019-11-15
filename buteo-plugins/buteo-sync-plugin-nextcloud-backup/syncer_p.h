@@ -26,10 +26,10 @@ public:
     Syncer(QObject *parent, Buteo::SyncProfile *profile);
    ~Syncer();
 
-    void purgeAccount(int accountId) Q_DECL_OVERRIDE;
+    void purgeAccount(int accountId) override;
 
 private:
-    void beginSync() Q_DECL_OVERRIDE;
+    void beginSync() override;
 
     bool performDirCreationRequest(const QStringList &remotePathParts, int remotePathPartsIndex);
     void handleDirCreationReply();

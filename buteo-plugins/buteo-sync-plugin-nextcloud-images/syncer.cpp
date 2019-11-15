@@ -159,14 +159,18 @@ void Syncer::calculateAndApplyDelta(
     if (error.errorCode == SyncCache::DatabaseError::NoError) {
         SyncCache::User currentUser = db.user(m_accountId, NEXTCLOUD_USERID, &error);
         if (error.errorCode != SyncCache::DatabaseError::NoError) {
-            LOG_WARNING("calculateAndApplyDelta: failed to read user:" << error.errorCode << error.errorMessage);
+            LOG_WARNING("calculateAndApplyDelta: failed to read user:"
+                        << currentUser.userId
+                        << error.errorCode << error.errorMessage);
         } else if (currentUser.userId.isEmpty()) {
             // need to store the default user.
             currentUser.accountId = m_accountId;
             currentUser.userId = NEXTCLOUD_USERID;
             db.storeUser(currentUser, &error);
             if (error.errorCode != SyncCache::DatabaseError::NoError) {
-                LOG_WARNING("calculateAndApplyDelta: failed to store user:" << error.errorCode << error.errorMessage);
+                LOG_WARNING("calculateAndApplyDelta: failed to store user:"
+                            << currentUser.userId
+                            << error.errorCode << error.errorMessage);
             }
         }
     }
@@ -177,7 +181,9 @@ void Syncer::calculateAndApplyDelta(
             if (!serverAlbums.contains(album.albumId)) {
                 db.deleteAlbum(album, &error);
                 if (error.errorCode != SyncCache::DatabaseError::NoError) {
-                    LOG_WARNING("calculateAndApplyDelta: failed to delete album:" << error.errorCode << error.errorMessage);
+                    LOG_WARNING("calculateAndApplyDelta: failed to delete album:"
+                                << album.albumId
+                                << error.errorCode << error.errorMessage);
                     break;
                 }
                 currentAlbums.remove(album.albumId);
@@ -189,13 +195,18 @@ void Syncer::calculateAndApplyDelta(
     // add new albums, update modified albums.
     if (error.errorCode == SyncCache::DatabaseError::NoError) {
         Q_FOREACH (const SyncCache::Album &album, serverAlbums) {
-            if (currentAlbums.contains(album.albumId)) {
-                if (currentAlbums[album.albumId].photoCount != album.photoCount) {
-                    SyncCache::Album currAlbum = currentAlbums[album.albumId];
+            auto it = currentAlbums.find(album.albumId);
+            if (it != currentAlbums.end()) {
+                SyncCache::Album currAlbum = *it;
+                if (currAlbum.photoCount != album.photoCount
+                        || currAlbum.thumbnailUrl != album.thumbnailUrl) {
                     currAlbum.photoCount = album.photoCount;
+                    currAlbum.thumbnailUrl = album.thumbnailUrl;
                     db.storeAlbum(currAlbum, &error);
                     if (error.errorCode != SyncCache::DatabaseError::NoError) {
-                        LOG_WARNING("calculateAndApplyDelta: failed to store album update:" << error.errorCode << error.errorMessage);
+                        LOG_WARNING("calculateAndApplyDelta: failed to update album:"
+                                    << currAlbum.albumId
+                                    << error.errorCode << error.errorMessage);
                         break;
                     }
                     ++modifiedAlbums;
@@ -204,7 +215,9 @@ void Syncer::calculateAndApplyDelta(
                 currentAlbums.insert(album.albumId, album);
                 db.storeAlbum(album, &error);
                 if (error.errorCode != SyncCache::DatabaseError::NoError) {
-                    LOG_WARNING("calculateAndApplyDelta: failed to store album addition:" << error.errorCode << error.errorMessage);
+                    LOG_WARNING("calculateAndApplyDelta: failed to add album:"
+                                << album.albumId
+                                << error.errorCode << error.errorMessage);
                     break;
                 }
                 ++addedAlbums;
@@ -230,9 +243,10 @@ void Syncer::calculateAndApplyDelta(
     // add new photos, updated modified photos.
     if (error.errorCode == SyncCache::DatabaseError::NoError) {
         Q_FOREACH (const SyncCache::Photo &photo, serverPhotos) {
-            if (currentPhotos.contains(photo.photoId)) {
+            auto it = currentPhotos.find(photo.photoId);
+            if (it != currentPhotos.end()) {
                 bool changed = false;
-                SyncCache::Photo currPhoto = currentPhotos[photo.photoId];
+                SyncCache::Photo currPhoto = *it;
                 if (currPhoto.updatedTimestamp != photo.updatedTimestamp
                         || currPhoto.imageUrl != photo.imageUrl) {
                     // the image has changed, we need to delete the old image file.
@@ -241,6 +255,7 @@ void Syncer::calculateAndApplyDelta(
                     currPhoto.imagePath = QUrl();
                     currPhoto.imageUrl = photo.imageUrl;
                     currPhoto.updatedTimestamp = photo.updatedTimestamp;
+                    currPhoto.fileSize = photo.fileSize;
                     changed = true;
                 }
                 if (currPhoto.albumId != photo.albumId) {
@@ -251,7 +266,10 @@ void Syncer::calculateAndApplyDelta(
                 if (changed) {
                     db.storePhoto(currPhoto, &error);
                     if (error.errorCode != SyncCache::DatabaseError::NoError) {
-                        LOG_WARNING("calculateAndApplyDelta: failed to store photo update:" << error.errorCode << error.errorMessage);
+                        LOG_WARNING("calculateAndApplyDelta: failed to update photo:"
+                                    << currPhoto.photoId
+                                    << "in album" << photo.albumId << photo.albumPath
+                                    << error.errorCode << error.errorMessage);
                         break;
                     }
                     ++modifiedPhotos;
@@ -260,7 +278,10 @@ void Syncer::calculateAndApplyDelta(
                 currentPhotos.insert(photo.photoId, photo);
                 db.storePhoto(photo, &error);
                 if (error.errorCode != SyncCache::DatabaseError::NoError) {
-                    LOG_WARNING("calculateAndApplyDelta: failed to store photo addition:" << error.errorCode << error.errorMessage);
+                    LOG_WARNING("calculateAndApplyDelta: failed to add photo:"
+                                << photo.photoId
+                                << "in album" << photo.albumId << photo.albumPath
+                                << error.errorCode << error.errorMessage);
                     break;
                 }
                 ++addedPhotos;

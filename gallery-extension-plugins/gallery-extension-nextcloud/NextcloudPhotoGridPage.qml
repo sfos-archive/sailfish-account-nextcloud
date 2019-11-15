@@ -10,8 +10,11 @@ Page {
     property int accountId
     property string userId
     property string albumId
+    property string albumName
 
-    property NextcloudPhotosModel photosModel: NextcloudPhotosModel {
+    NextcloudPhotoModel {
+        id: photosModel
+
         imageCache: NextcloudImageCache
         accountId: root.accountId
         userId: root.userId
@@ -20,45 +23,29 @@ Page {
 
     ImageGridView {
         id: imageGrid
-        anchors.fill: parent
 
+        anchors.fill: parent
         model: photosModel
+
+        header: PageHeader {
+            title: albumName.length > 0
+                   ? albumName
+                     //: Heading for Nextcloud photos
+                     //% "Nextcloud"
+                   : qsTrId("jolla_gallery_nextcloud-la-nextcloud")
+        }
+
         delegate: ThumbnailImage {
             id: delegateItem
 
-            property int accountId: model.accountId
-            property string userId: model.userId
-            property string albumId: model.albumId
-            property string photoId: model.photoId
-
             size: grid.cellSize
 
-            property NextcloudImageDownloader thumbDownloader: NextcloudImageDownloader {
-                imageCache: NextcloudImageCache
-                downloadThumbnail: true
-                accountId: delegateItem.accountId
-                userId: delegateItem.userId
-                albumId: delegateItem.albumId
-                photoId: delegateItem.photoId
-            }
-
-            Image {
-                id: placeholderItem
-                anchors.fill: parent
-                fillMode: Image.PreserveAspectFit
-                visible: delegateItem.source.toString().length === 0
-                source: "image://theme/icon-l-nextcloud"
-            }
-
-            MouseArea {
-                anchors.fill: parent
-                onClicked: {
-                    window.pageStack.push(Qt.resolvedUrl("NextcloudFullscreenPhotoPage.qml"),
-                                          {"accountId": delegateItem.accountId,
-                                           "userId": delegateItem.userId,
-                                           "albumId": delegateItem.albumId,
-                                           "photoId": delegateItem.photoId})
+            onClicked: {
+                var props = {
+                    "imageModel": photosModel,
+                    "currentIndex": model.index
                 }
+                pageStack.push(Qt.resolvedUrl("NextcloudFullscreenPhotoPage.qml"), props)
             }
 
             Component.onCompleted: {
@@ -70,6 +57,24 @@ Page {
                                     : model.imagePath.toString().length > 0
                                         ? model.imagePath
                                         : Qt.binding(function() { return thumbDownloader.imagePath })
+            }
+
+            NextcloudImageDownloader {
+                id: thumbDownloader
+
+                imageCache: NextcloudImageCache
+                downloadThumbnail: true
+                accountId: model.accountId
+                userId: model.userId
+                albumId: model.albumId
+                photoId: model.photoId
+            }
+
+            Image {
+                anchors.fill: parent
+                fillMode: Image.PreserveAspectFit
+                visible: delegateItem.status === Image.Null
+                source: "image://theme/icon-l-nextcloud"
             }
         }
     }

@@ -7,8 +7,8 @@
 **
 ****************************************************************************************/
 
-#include "imagecache.h"
-#include "imagecache_p.h"
+#include "synccacheimages.h"
+#include "synccacheimages_p.h"
 
 #include <QtCore/QFile>
 #include <QtCore/QDir>
@@ -21,9 +21,43 @@
 using namespace SyncCache;
 
 namespace {
-    QString constructAlbumIdentifier(int accountId, const QString &userId, const QString &albumId) {
-        return QStringLiteral("%1|%2|%3").arg(accountId).arg(userId, albumId);
+
+QString constructAlbumIdentifier(int accountId, const QString &userId, const QString &albumId) {
+    return QStringLiteral("%1|%2|%3").arg(accountId).arg(userId, albumId);
+}
+
+bool upgradeVersion1to2Fn(QSqlDatabase &database) {
+    QSqlQuery addFileSizeQuery(QStringLiteral("ALTER TABLE Photos ADD fileSize INTEGER;"), database);
+    if (addFileSizeQuery.lastError().isValid()) {
+        qWarning() << "Failed to add Photos fileSize column to images database schema for version 2:" << addFileSizeQuery.lastError().text();
+        return false;
     }
+    addFileSizeQuery.finish();
+
+    QSqlQuery addFileTypeQuery(QStringLiteral("ALTER TABLE Photos ADD fileType TEXT;"), database);
+    if (addFileTypeQuery.lastError().isValid()) {
+        qWarning() << "Failed to add Photos fileType column to images database schema for version 2:" << addFileTypeQuery.lastError().text();
+        return false;
+    }
+    addFileTypeQuery.finish();
+
+    QSqlQuery addUserThumbnailFileNameQuery(QStringLiteral("ALTER TABLE Users ADD thumbnailFileName TEXT;"), database);
+    if (addUserThumbnailFileNameQuery.lastError().isValid()) {
+        qWarning() << "Failed to add Users thumbnailFileName column to images database schema for version 2:" << addUserThumbnailFileNameQuery.lastError().text();
+        return false;
+    }
+    addUserThumbnailFileNameQuery.finish();
+
+    QSqlQuery addAlbumThumbnailFileNameQuery(QStringLiteral("ALTER TABLE Albums ADD thumbnailFileName TEXT;"), database);
+    if (addAlbumThumbnailFileNameQuery.lastError().isValid()) {
+        qWarning() << "Failed to add Albums thumbnailFileName column to images database schema for version 2:" << addAlbumThumbnailFileNameQuery.lastError().text();
+        return false;
+    }
+    addAlbumThumbnailFileNameQuery.finish();
+
+    return true;
+}
+
 }
 
 ImageDatabasePrivate::ImageDatabasePrivate(ImageDatabase *parent)
@@ -33,7 +67,7 @@ ImageDatabasePrivate::ImageDatabasePrivate(ImageDatabase *parent)
 
 int ImageDatabasePrivate::currentSchemaVersion() const
 {
-    return 1;
+    return 2;
 }
 
 QVector<const char *> ImageDatabasePrivate::createStatements() const
@@ -44,6 +78,7 @@ QVector<const char *> ImageDatabasePrivate::createStatements() const
             "\n userId TEXT,"
             "\n thumbnailUrl TEXT,"
             "\n thumbnailPath TEXT,"
+            "\n thumbnailFileName TEXT,"
             "\n PRIMARY KEY (accountId, userId));";
 
     static const char *createAlbumsTable =
@@ -56,6 +91,7 @@ QVector<const char *> ImageDatabasePrivate::createStatements() const
             "\n thumbnailPath TEXT,"
             "\n parentAlbumId TEXT,"
             "\n albumName TEXT,"
+            "\n thumbnailFileName TEXT,"
             "\n PRIMARY KEY (accountId, userId, albumId),"
             "\n FOREIGN KEY (accountId, userId) REFERENCES Users (accountId, userId) ON DELETE CASCADE);";
 
@@ -76,6 +112,8 @@ QVector<const char *> ImageDatabasePrivate::createStatements() const
             "\n imagePath TEXT,"
             "\n imageWidth INTEGER,"
             "\n imageHeight INTEGER,"
+            "\n fileSize INTEGER,"
+            "\n fileType TEXT,"
             "\n PRIMARY KEY (accountId, userId, albumId, photoId),"
             "\n FOREIGN KEY (accountId, userId, albumId) REFERENCES Albums (accountId, userId, albumId) ON DELETE CASCADE);";
 
@@ -90,18 +128,14 @@ QVector<UpgradeOperation> ImageDatabasePrivate::upgradeVersions() const
         0 // NULL-terminated
     };
 
-    // example for future: upgrading the schema can be done with upgrade version elements as follows:
-    //static const char *anotherUpgradeStatement = "\n UPDATE Photos ... etc etc";
-    //static const char *upgradeVersion1to2[] = {
-    //     anotherUpgradeStatement,
-    //     "PRAGMA user_version=2",
-    //     0 // NULL-terminated
-    //};
-    //static bool twiddleSomeDataViaCpp(QSqlDatabase &database) { /* do queries on database... */ return true; }
+    static const char *upgradeVersion1to2[] = {
+         "PRAGMA user_version=2",
+         0 // NULL-terminated
+    };
 
     static QVector<UpgradeOperation> retn {
         { 0, upgradeVersion0to1 },
-    //  { twiddleSomeDataViaCpp, upgradeVersion1to2 },
+        { upgradeVersion1to2Fn, upgradeVersion1to2 },
     };
 
     return retn;
@@ -236,17 +270,19 @@ QVector<SyncCache::User> ImageDatabase::users(DatabaseError *error) const
 {
     SYNCCACHE_DB_D(const ImageDatabase);
 
-    const QString queryString = QStringLiteral("SELECT accountId, userId, thumbnailUrl, thumbnailPath FROM USERS"
+    const QString queryString = QStringLiteral("SELECT accountId, userId, thumbnailUrl, thumbnailPath, thumbnailFileName FROM USERS"
                                                " ORDER BY accountId ASC, userId ASC");
 
     const QList<QPair<QString, QVariant> > bindValues;
 
     auto resultHandler = [](DatabaseQuery &selectQuery) -> SyncCache::User {
+        int whichValue = 0;
         User currUser;
-        currUser.accountId = selectQuery.value(0).toInt();
-        currUser.userId = selectQuery.value(1).toString();
-        currUser.thumbnailUrl = QUrl(selectQuery.value(2).toString());
-        currUser.thumbnailPath = QUrl(selectQuery.value(3).toString());
+        currUser.accountId = selectQuery.value(whichValue++).toInt();
+        currUser.userId = selectQuery.value(whichValue++).toString();
+        currUser.thumbnailUrl = QUrl(selectQuery.value(whichValue++).toString());
+        currUser.thumbnailPath = QUrl(selectQuery.value(whichValue++).toString());
+        currUser.thumbnailFileName = selectQuery.value(whichValue++).toString();
         return currUser;
     };
 
@@ -263,7 +299,7 @@ QVector<SyncCache::Album> ImageDatabase::albums(int accountId, const QString &us
 {
     SYNCCACHE_DB_D(const ImageDatabase);
 
-    const QString queryString = QStringLiteral("SELECT albumId, photoCount, thumbnailUrl, thumbnailPath, parentAlbumId, albumName FROM ALBUMS"
+    const QString queryString = QStringLiteral("SELECT albumId, photoCount, thumbnailUrl, thumbnailPath, parentAlbumId, albumName, thumbnailFileName FROM ALBUMS"
                                                " WHERE accountId = :accountId AND userId = :userId"
                                                " ORDER BY accountId ASC, userId ASC, albumId ASC");
 
@@ -283,6 +319,7 @@ QVector<SyncCache::Album> ImageDatabase::albums(int accountId, const QString &us
         currAlbum.thumbnailPath = QUrl(selectQuery.value(whichValue++).toString());
         currAlbum.parentAlbumId = selectQuery.value(whichValue++).toString();
         currAlbum.albumName = selectQuery.value(whichValue++).toString();
+        currAlbum.thumbnailFileName = selectQuery.value(whichValue++).toString();
         return currAlbum;
     };
 
@@ -299,35 +336,36 @@ QVector<SyncCache::Photo> ImageDatabase::photos(int accountId, const QString &us
 {
     SYNCCACHE_DB_D(const ImageDatabase);
 
-    const QString queryString = albumId.isEmpty()
-                              ? QStringLiteral("SELECT albumId, photoId, createdTimestamp, updatedTimestamp, fileName, albumPath, description,"
-                                                     " thumbnailUrl, thumbnailPath, imageUrl, imagePath, imageWidth, imageHeight FROM Photos"
-                                               " WHERE accountId = :accountId AND userId = :userId"
-                                               " ORDER BY accountId ASC, userId ASC, albumId ASC, createdTimestamp DESC")
-                              : QStringLiteral("SELECT photoId, createdTimestamp, updatedTimestamp, fileName, albumPath, description,"
-                                                     " thumbnailUrl, thumbnailPath, imageUrl, imagePath, imageWidth, imageHeight FROM Photos"
-                                               " WHERE accountId = :accountId AND userId = :userId AND albumId = :albumId"
-                                               " ORDER BY accountId ASC, userId ASC, albumId ASC, createdTimestamp DESC");
-
-    const QList<QPair<QString, QVariant> > bindValuesA {
-        qMakePair<QString, QVariant>(QStringLiteral(":accountId"), accountId),
-        qMakePair<QString, QVariant>(QStringLiteral(":userId"), userId)
-    };
-    const QList<QPair<QString, QVariant> > bindValuesB {
-        qMakePair<QString, QVariant>(QStringLiteral(":accountId"), accountId),
-        qMakePair<QString, QVariant>(QStringLiteral(":userId"), userId),
-        qMakePair<QString, QVariant>(QStringLiteral(":albumId"), albumId)
-    };
+    QString queryString = QStringLiteral("SELECT albumId, photoId, createdTimestamp, updatedTimestamp, fileName, albumPath, description,"
+                                         " thumbnailUrl, thumbnailPath, imageUrl, imagePath, imageWidth, imageHeight, fileSize, fileType FROM Photos");
+    QStringList conditions;
+    QList<QPair<QString, QVariant> > bindValues;
+    if (accountId > 0) {
+        conditions << QStringLiteral("accountId = :accountId");
+        bindValues << qMakePair<QString, QVariant>(QStringLiteral(":accountId"), accountId);
+    }
+    if (!userId.isEmpty()) {
+        conditions << QStringLiteral("userId = :userId");
+        bindValues << qMakePair<QString, QVariant>(QStringLiteral(":userId"), userId);
+    }
+    if (!albumId.isEmpty()) {
+        conditions << QStringLiteral("albumId = :albumId");
+        bindValues << qMakePair<QString, QVariant>(QStringLiteral(":albumId"), albumId);
+    }
+    if (!conditions.isEmpty()) {
+        queryString += QStringLiteral(" WHERE ") + conditions.join(QStringLiteral(" AND "));
+    }
+    queryString += QStringLiteral(" ORDER BY accountId ASC, userId ASC, albumId ASC, createdTimestamp DESC");
 
     auto resultHandler = [accountId, userId, albumId](DatabaseQuery &selectQuery) -> SyncCache::Photo {
         int whichValue = 0;
         Photo currPhoto;
         currPhoto.accountId = accountId;
         currPhoto.userId = userId;
-        currPhoto.albumId = albumId.isEmpty() ? selectQuery.value(whichValue++).toString() : albumId;
+        currPhoto.albumId = selectQuery.value(whichValue++).toString();
         currPhoto.photoId = selectQuery.value(whichValue++).toString();
-        currPhoto.createdTimestamp = selectQuery.value(whichValue++).toString();
-        currPhoto.updatedTimestamp = selectQuery.value(whichValue++).toString();
+        currPhoto.createdTimestamp = QDateTime::fromString(selectQuery.value(whichValue++).toString(), Qt::ISODate);
+        currPhoto.updatedTimestamp = QDateTime::fromString(selectQuery.value(whichValue++).toString(), Qt::ISODate);
         currPhoto.fileName = selectQuery.value(whichValue++).toString();
         currPhoto.albumPath = selectQuery.value(whichValue++).toString();
         currPhoto.description = selectQuery.value(whichValue++).toString();
@@ -335,13 +373,17 @@ QVector<SyncCache::Photo> ImageDatabase::photos(int accountId, const QString &us
         currPhoto.thumbnailPath = QUrl(selectQuery.value(whichValue++).toString());
         currPhoto.imageUrl = QUrl(selectQuery.value(whichValue++).toString());
         currPhoto.imagePath = QUrl(selectQuery.value(whichValue++).toString());
+        currPhoto.imageWidth = selectQuery.value(whichValue++).toInt();
+        currPhoto.imageHeight = selectQuery.value(whichValue++).toInt();
+        currPhoto.fileSize = selectQuery.value(whichValue++).toInt();
+        currPhoto.fileType = selectQuery.value(whichValue++).toString();
         return currPhoto;
     };
 
     return DatabaseImpl::fetchMultiple<SyncCache::Photo>(
             d,
             queryString,
-            albumId.isEmpty() ? bindValuesA : bindValuesB,
+            bindValues,
             resultHandler,
             QStringLiteral("photos"),
             error);
@@ -351,7 +393,7 @@ User ImageDatabase::user(int accountId, const QString &userId, DatabaseError *er
 {
     SYNCCACHE_DB_D(const ImageDatabase);
 
-    const QString queryString = QStringLiteral("SELECT thumbnailUrl, thumbnailPath FROM USERS"
+    const QString queryString = QStringLiteral("SELECT thumbnailUrl, thumbnailPath, thumbnailFileName FROM USERS"
                                                " WHERE accountId = :accountId AND userId = :userId");
 
     const QList<QPair<QString, QVariant> > bindValues {
@@ -360,11 +402,13 @@ User ImageDatabase::user(int accountId, const QString &userId, DatabaseError *er
     };
 
     auto resultHandler = [accountId, userId](DatabaseQuery &selectQuery) -> SyncCache::User {
+        int whichValue = 0;
         User currUser;
         currUser.accountId = accountId;
         currUser.userId = userId;
-        currUser.thumbnailUrl = QUrl(selectQuery.value(0).toString());
-        currUser.thumbnailPath = QUrl(selectQuery.value(1).toString());
+        currUser.thumbnailUrl = QUrl(selectQuery.value(whichValue++).toString());
+        currUser.thumbnailPath = QUrl(selectQuery.value(whichValue++).toString());
+        currUser.thumbnailFileName = selectQuery.value(whichValue++).toString();
         return currUser;
     };
 
@@ -381,7 +425,7 @@ Album ImageDatabase::album(int accountId, const QString &userId, const QString &
 {
     SYNCCACHE_DB_D(const ImageDatabase);
 
-    const QString queryString = QStringLiteral("SELECT photoCount, thumbnailUrl, thumbnailPath, parentAlbumId, albumName FROM ALBUMS"
+    const QString queryString = QStringLiteral("SELECT photoCount, thumbnailUrl, thumbnailPath, parentAlbumId, albumName, thumbnailFileName FROM ALBUMS"
                                                " WHERE accountId = :accountId AND userId = :userId AND albumId = :albumId");
 
     const QList<QPair<QString, QVariant> > bindValues {
@@ -401,6 +445,7 @@ Album ImageDatabase::album(int accountId, const QString &userId, const QString &
         currAlbum.thumbnailPath = QUrl(selectQuery.value(whichValue++).toString());
         currAlbum.parentAlbumId = selectQuery.value(whichValue++).toString();
         currAlbum.albumName = selectQuery.value(whichValue++).toString();
+        currAlbum.thumbnailFileName = selectQuery.value(whichValue++).toString();
         return currAlbum;
     };
 
@@ -418,7 +463,7 @@ Photo ImageDatabase::photo(int accountId, const QString &userId, const QString &
     SYNCCACHE_DB_D(const ImageDatabase);
 
     const QString queryString = QStringLiteral("SELECT createdTimestamp, updatedTimestamp, fileName, albumPath, description,"
-                                               " thumbnailUrl, thumbnailPath, imageUrl, imagePath, imageWidth, imageHeight FROM Photos"
+                                               " thumbnailUrl, thumbnailPath, imageUrl, imagePath, imageWidth, imageHeight, fileSize, fileType FROM Photos"
                                                " WHERE accountId = :accountId AND userId = :userId AND albumId = :albumId AND photoId = :photoId");
 
     const QList<QPair<QString, QVariant> > bindValues {
@@ -435,8 +480,8 @@ Photo ImageDatabase::photo(int accountId, const QString &userId, const QString &
         currPhoto.userId = userId;
         currPhoto.albumId = albumId;
         currPhoto.photoId = photoId;
-        currPhoto.createdTimestamp = selectQuery.value(whichValue++).toString();
-        currPhoto.updatedTimestamp = selectQuery.value(whichValue++).toString();
+        currPhoto.createdTimestamp = QDateTime::fromString(selectQuery.value(whichValue++).toString(), Qt::ISODate);
+        currPhoto.updatedTimestamp = QDateTime::fromString(selectQuery.value(whichValue++).toString(), Qt::ISODate);
         currPhoto.fileName = selectQuery.value(whichValue++).toString();
         currPhoto.albumPath = selectQuery.value(whichValue++).toString();
         currPhoto.description = selectQuery.value(whichValue++).toString();
@@ -444,6 +489,10 @@ Photo ImageDatabase::photo(int accountId, const QString &userId, const QString &
         currPhoto.thumbnailPath = QUrl(selectQuery.value(whichValue++).toString());
         currPhoto.imageUrl = QUrl(selectQuery.value(whichValue++).toString());
         currPhoto.imagePath = QUrl(selectQuery.value(whichValue++).toString());
+        currPhoto.imageWidth = selectQuery.value(whichValue++).toInt();
+        currPhoto.imageHeight = selectQuery.value(whichValue++).toInt();
+        currPhoto.fileSize = selectQuery.value(whichValue++).toInt();
+        currPhoto.fileType = selectQuery.value(whichValue++).toString();
         return currPhoto;
     };
 
@@ -453,6 +502,29 @@ Photo ImageDatabase::photo(int accountId, const QString &userId, const QString &
             bindValues,
             resultHandler,
             QStringLiteral("photo"),
+            error);
+}
+
+SyncCache::PhotoCounter ImageDatabase::photoCount(DatabaseError *error) const
+{
+    SYNCCACHE_DB_D(const ImageDatabase);
+
+    const QString queryString = QStringLiteral("SELECT COUNT(*) FROM Photos");
+
+    const QList<QPair<QString, QVariant> > bindValues;
+
+    auto resultHandler = [](DatabaseQuery &selectQuery) -> SyncCache::PhotoCounter {
+        PhotoCounter counter;
+        counter.count = selectQuery.value(0).toInt();
+        return counter;
+    };
+
+    return DatabaseImpl::fetch<SyncCache::PhotoCounter>(
+            d,
+            queryString,
+            bindValues,
+            resultHandler,
+            QStringLiteral("photoCount"),
             error);
 }
 
@@ -469,9 +541,9 @@ void ImageDatabase::storeUser(const User &user, DatabaseError *error)
         return;
     }
 
-    const QString insertString = QStringLiteral("INSERT INTO Users (accountId, userId, thumbnailUrl, thumbnailPath)"
-                                                " VALUES(:accountId, :userId, :thumbnailUrl, :thumbnailPath)");
-    const QString updateString = QStringLiteral("UPDATE Users SET thumbnailUrl = :thumbnailUrl, thumbnailPath = :thumbnailPath"
+    const QString insertString = QStringLiteral("INSERT INTO Users (accountId, userId, thumbnailUrl, thumbnailPath, thumbnailFileName)"
+                                                " VALUES(:accountId, :userId, :thumbnailUrl, :thumbnailPath, :thumbnailFileName)");
+    const QString updateString = QStringLiteral("UPDATE Users SET thumbnailUrl = :thumbnailUrl, thumbnailPath = :thumbnailPath, thumbnailFileName = :thumbnailFileName"
                                                 " WHERE accountId = :accountId AND userId = :userId");
 
     const bool insert = existingUser.userId.isEmpty();
@@ -481,7 +553,8 @@ void ImageDatabase::storeUser(const User &user, DatabaseError *error)
         qMakePair<QString, QVariant>(QStringLiteral(":accountId"), user.accountId),
         qMakePair<QString, QVariant>(QStringLiteral(":userId"), user.userId),
         qMakePair<QString, QVariant>(QStringLiteral(":thumbnailUrl"), user.thumbnailUrl),
-        qMakePair<QString, QVariant>(QStringLiteral(":thumbnailPath"), user.thumbnailPath)
+        qMakePair<QString, QVariant>(QStringLiteral(":thumbnailPath"), user.thumbnailPath),
+        qMakePair<QString, QVariant>(QStringLiteral(":thumbnailFileName"), user.thumbnailFileName)
     };
 
     auto storeResultHandler = [d, user]() -> void {
@@ -510,10 +583,10 @@ void ImageDatabase::storeAlbum(const Album &album, DatabaseError *error)
         return;
     }
 
-    const QString insertString = QStringLiteral("INSERT INTO Albums (accountId, userId, albumId, photoCount, thumbnailUrl, thumbnailPath, parentAlbumId, albumName)"
-                                                " VALUES(:accountId, :userId, :albumId, :photoCount, :thumbnailUrl, :thumbnailPath, :parentAlbumId, :albumName)");
+    const QString insertString = QStringLiteral("INSERT INTO Albums (accountId, userId, albumId, photoCount, thumbnailUrl, thumbnailPath, parentAlbumId, albumName, thumbnailFileName)"
+                                                " VALUES(:accountId, :userId, :albumId, :photoCount, :thumbnailUrl, :thumbnailPath, :parentAlbumId, :albumName, :thumbnailFileName)");
     const QString updateString = QStringLiteral("UPDATE Albums SET photoCount = :photoCount, thumbnailUrl = :thumbnailUrl, thumbnailPath = :thumbnailPath, "
-                                                                  "parentAlbumId = :parentAlbumId, albumName = :albumName"
+                                                "parentAlbumId = :parentAlbumId, albumName = :albumName, thumbnailFileName = :thumbnailFileName"
                                                 " WHERE accountId = :accountId AND userId = :userId AND albumId = :albumId");
 
     const bool insert = existingAlbum.albumId.isEmpty();
@@ -527,7 +600,8 @@ void ImageDatabase::storeAlbum(const Album &album, DatabaseError *error)
         qMakePair<QString, QVariant>(QStringLiteral(":thumbnailUrl"), album.thumbnailUrl),
         qMakePair<QString, QVariant>(QStringLiteral(":thumbnailPath"), album.thumbnailPath),
         qMakePair<QString, QVariant>(QStringLiteral(":parentAlbumId"), album.parentAlbumId),
-        qMakePair<QString, QVariant>(QStringLiteral(":albumName"), album.albumName)
+        qMakePair<QString, QVariant>(QStringLiteral(":albumName"), album.albumName),
+        qMakePair<QString, QVariant>(QStringLiteral(":thumbnailFileName"), album.thumbnailFileName)
     };
 
     auto storeResultHandler = [d, album]() -> void {
@@ -558,13 +632,14 @@ void ImageDatabase::storePhoto(const Photo &photo, DatabaseError *error)
 
     const QString insertString = QStringLiteral("INSERT INTO Photos (accountId, userId, albumId, photoId, createdTimestamp, updatedTimestamp, "
                                                                     "fileName, albumPath, description, thumbnailUrl, thumbnailPath, "
-                                                                    "imageUrl, imagePath, imageWidth, imageHeight)"
+                                                                    "imageUrl, imagePath, imageWidth, imageHeight, fileSize, fileType)"
                                                 " VALUES(:accountId, :userId, :albumId, :photoId, :createdTimestamp, :updatedTimestamp, "
-                                                        ":fileName, :albumPath, :description, :thumbnailUrl, :thumbnailPath, :imageUrl, :imagePath, :imageWidth, :imageHeight)");
+                                                        ":fileName, :albumPath, :description, :thumbnailUrl, :thumbnailPath, :imageUrl, :imagePath, :imageWidth, :imageHeight, :fileSize, :fileType)");
     const QString updateString = QStringLiteral("UPDATE Photos SET createdTimestamp = :createdTimestamp, updatedTimestamp = :updatedTimestamp, "
                                                                   "fileName = :fileName, albumPath = :albumPath, description = :description, "
                                                                   "thumbnailUrl = :thumbnailUrl, thumbnailPath = :thumbnailPath, "
-                                                                  "imageUrl = :imageUrl, imagePath = :imagePath, imageWidth = :imageWidth, imageHeight = :imageHeight"
+                                                                  "imageUrl = :imageUrl, imagePath = :imagePath, imageWidth = :imageWidth, imageHeight = :imageHeight,"
+                                                                  "fileSize = :fileSize, fileType = :fileType"
                                                 " WHERE accountId = :accountId AND userId = :userId AND albumId = :albumId AND photoId = :photoId");
 
     const bool insert = existingPhoto.photoId.isEmpty();
@@ -575,8 +650,8 @@ void ImageDatabase::storePhoto(const Photo &photo, DatabaseError *error)
         qMakePair<QString, QVariant>(QStringLiteral(":userId"), photo.userId),
         qMakePair<QString, QVariant>(QStringLiteral(":albumId"), photo.albumId),
         qMakePair<QString, QVariant>(QStringLiteral(":photoId"), photo.photoId),
-        qMakePair<QString, QVariant>(QStringLiteral(":createdTimestamp"), photo.createdTimestamp),
-        qMakePair<QString, QVariant>(QStringLiteral(":updatedTimestamp"), photo.updatedTimestamp),
+        qMakePair<QString, QVariant>(QStringLiteral(":createdTimestamp"), photo.createdTimestamp.toString(Qt::ISODate)),
+        qMakePair<QString, QVariant>(QStringLiteral(":updatedTimestamp"), photo.updatedTimestamp.toString(Qt::ISODate)),
         qMakePair<QString, QVariant>(QStringLiteral(":fileName"), photo.fileName),
         qMakePair<QString, QVariant>(QStringLiteral(":albumPath"), photo.albumPath),
         qMakePair<QString, QVariant>(QStringLiteral(":description"), photo.description),
@@ -585,7 +660,9 @@ void ImageDatabase::storePhoto(const Photo &photo, DatabaseError *error)
         qMakePair<QString, QVariant>(QStringLiteral(":imageUrl"), photo.imageUrl),
         qMakePair<QString, QVariant>(QStringLiteral(":imagePath"), photo.imagePath),
         qMakePair<QString, QVariant>(QStringLiteral(":imageWidth"), photo.imageWidth),
-        qMakePair<QString, QVariant>(QStringLiteral(":imageHeight"), photo.imageHeight)
+        qMakePair<QString, QVariant>(QStringLiteral(":imageHeight"), photo.imageHeight),
+        qMakePair<QString, QVariant>(QStringLiteral(":fileSize"), photo.fileSize),
+        qMakePair<QString, QVariant>(QStringLiteral(":fileType"), photo.fileType)
     };
 
     auto storeResultHandler = [d, photo, existingPhoto, insert]() -> void {

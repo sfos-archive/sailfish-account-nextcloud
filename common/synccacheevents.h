@@ -7,8 +7,8 @@
 **
 ****************************************************************************************/
 
-#ifndef NEXTCLOUD_EVENTCACHE_H
-#define NEXTCLOUD_EVENTCACHE_H
+#ifndef NEXTCLOUD_SYNCCACHEEVENTS_H
+#define NEXTCLOUD_SYNCCACHEEVENTS_H
 
 #include "synccachedatabase.h"
 
@@ -42,7 +42,7 @@ class EventDatabase : public Database
     Q_OBJECT
 
 public:
-    EventDatabase(QObject *parent = Q_NULLPTR);
+    EventDatabase(QObject *parent = nullptr);
 
     QVector<SyncCache::Event> events(int accountId, SyncCache::DatabaseError *error, bool includeLocallyDeleted = true) const;
     SyncCache::Event event(int accountId, const QString &eventId, SyncCache::DatabaseError *error) const;
@@ -62,7 +62,7 @@ class EventCache : public QObject
     Q_OBJECT
 
 public:
-    EventCache(QObject *parent = Q_NULLPTR);
+    EventCache(QObject *parent = nullptr);
     ~EventCache();
 
 public Q_SLOTS:
@@ -105,4 +105,4 @@ Q_DECLARE_METATYPE(SyncCache::Event)
 Q_DECLARE_METATYPE(QVector<SyncCache::Event>)
 Q_DECLARE_TYPEINFO(SyncCache::Event, Q_MOVABLE_TYPE);
 
-#endif // NEXTCLOUD_EVENTCACHE_H
+#endif // NEXTCLOUD_SYNCCACHEEVENTS_H

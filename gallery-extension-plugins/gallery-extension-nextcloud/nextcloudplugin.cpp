@@ -6,9 +6,11 @@
 #include <QTranslator>
 #include <QLocale>
 
+#include "imagecache.h"
+#include "imagedownloader.h"
 #include "imagemodels.h"
 
-static QObject *imagecache_api_factory(QQmlEngine *, QJSEngine *)
+static QObject *synccacheimages_api_factory(QQmlEngine *, QJSEngine *)
 {
     return new NextcloudImageCache;
 }
@@ -51,10 +53,11 @@ public:
     {
         Q_ASSERT(QLatin1String(uri) == QLatin1String("com.jolla.gallery.nextcloud"));
 
-        qmlRegisterSingletonType<NextcloudImageCache>(uri, 1, 0, "NextcloudImageCache", imagecache_api_factory);
-        qmlRegisterType<NextcloudUsersModel> (uri, 1, 0, "NextcloudUsersModel");
-        qmlRegisterType<NextcloudAlbumsModel>(uri, 1, 0, "NextcloudAlbumsModel");
-        qmlRegisterType<NextcloudPhotosModel>(uri, 1, 0, "NextcloudPhotosModel");
+        qmlRegisterSingletonType<NextcloudImageCache>(uri, 1, 0, "NextcloudImageCache", synccacheimages_api_factory);
+        qmlRegisterType<NextcloudUserModel> (uri, 1, 0, "NextcloudUserModel");
+        qmlRegisterType<NextcloudAlbumModel>(uri, 1, 0, "NextcloudAlbumModel");
+        qmlRegisterType<NextcloudPhotoModel>(uri, 1, 0, "NextcloudPhotoModel");
+        qmlRegisterType<NextcloudPhotoCounter>(uri, 1, 0, "NextcloudPhotoCounter");
         qmlRegisterType<NextcloudImageDownloader>(uri, 1, 0, "NextcloudImageDownloader");
     }
 };

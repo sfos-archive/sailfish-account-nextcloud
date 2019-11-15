@@ -20,18 +20,32 @@ BackgroundItem {
     property string albumId
     property string albumName
     property string albumThumbnailPath
-
     property int photoCount
 
     height: Theme.itemSizeExtraLarge
 
-    Image {
+    HighlightImage {
         id: image
+
         anchors.left: parent.left
         width: Theme.itemSizeExtraLarge
         height: width
-        source: albumThumbnailPath.toString().length ? albumThumbnailPath : "image://theme/icon-l-nextcloud"
-        fillMode: albumThumbnailPath.toString().length ? Image.PreserveAspectCrop : Image.PreserveAspectFit
+        source: albumThumbnailPath.length ? albumThumbnailPath : "image://theme/icon-l-nextcloud"
+        fillMode: albumThumbnailPath.length ? Image.PreserveAspectCrop : Image.PreserveAspectFit
+        clip: true
+        highlighted: albumThumbnailPath.length === 0 && root.highlighted
+        opacity: albumThumbnailPath.length && root.highlighted ? Theme.opacityHigh : 1
+    }
+
+    NextcloudImageDownloader {
+        id: imageDownloader
+
+        accountId: root.accountId
+        userId: root.userId
+        albumId: root.albumId
+
+        imageCache: NextcloudImageCache
+        downloadThumbnail: true
     }
 
     Column {
@@ -48,10 +62,8 @@ BackgroundItem {
         Label {
             id: titleLabel
             width: parent.width
+            height: text.length > 0 ? implicitHeight : 0
             text: albumName
-            font.family: Theme.fontFamilyHeading
-            font.pixelSize: Theme.fontSizeMedium
-            color: highlighted ? Theme.highlightColor : Theme.primaryColor
             truncationMode: TruncationMode.Fade
         }
 
@@ -62,7 +74,6 @@ BackgroundItem {
             //: Photos count for Nextcloud album
             //% "%n photos"
             text: qsTrId("jolla_gallery_nextcloud-album_photo_count", photoCount)
-            font.family: Theme.fontFamilyHeading
             font.pixelSize: Theme.fontSizeSmall
             color: highlighted ? Theme.secondaryHighlightColor : Theme.secondaryColor
             truncationMode: TruncationMode.Fade

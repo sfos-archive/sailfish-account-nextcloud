@@ -1,7 +1,7 @@
 QT -= gui
 
 include($$PWD/../../common/webdav.pri)
-include($$PWD/../../common/imagecache.pri)
+include($$PWD/../../common/synccacheimages.pri)
 
 INCLUDEPATH += $$PWD
 

@@ -16,31 +16,38 @@ Page {
     id: root
     allowedOrientations: window.allowedOrientations
 
+    property alias model: view.model
+    property string title
+
     SilicaListView {
         id: view
         anchors.fill: parent
-        header: PageHeader {}
-        model: NextcloudUsersModel {
-            id: nextcloudUsers
-            imageCache: NextcloudImageCache
-        }
+        header: PageHeader { title: root.title }
 
         delegate: BackgroundItem {
             id: delegateItem
 
             property int accountId: model.accountId
             property string userId: model.userId
-            property int userCount: nextcloudUsers.count
+            property int userCount: view.model.count
 
             width: parent.width
             height: Math.max(thumbnail.height, titleLabel.height, countLabel.height)
 
-            NextcloudPhotosModel {
+            NextcloudPhotoModel {
                 id: photosModel
                 imageCache: NextcloudImageCache
                 accountId: delegateItem.accountId
                 userId: delegateItem.userId
                 // TODO: getThumbnailForRow()
+            }
+
+            NextcloudAlbumModel {
+                id: nextcloudAlbums
+
+                imageCache: NextcloudImageCache
+                accountId: delegateItem.accountId
+                userId: delegateItem.userId
             }
 
             Label {
@@ -79,9 +86,13 @@ Page {
             }
 
             onClicked: {
-                window.pageStack.push(Qt.resolvedUrl("NextcloudAlbumsPage.qml"),
-                                      {"accountId": delegateItem.accountId,
-                                       "userId": delegateItem.userId})
+                var props = {
+                    "accountId": delegateItem.accountId,
+                    "userId": delegateItem.userId,
+                    "model": nextcloudAlbums,
+                    "title": root.title
+                }
+                pageStack.animatorPush(Qt.resolvedUrl("NextcloudAlbumsPage.qml"), props)
             }
         }
     }

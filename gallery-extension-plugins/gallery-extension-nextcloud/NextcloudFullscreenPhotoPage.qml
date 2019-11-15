@@ -7,28 +7,108 @@
 **
 ****************************************************************************************/
 
-import QtQuick 2.0
+import QtQuick 2.6
 import Sailfish.Silica 1.0
+import Sailfish.Silica.private 1.0 as SilicaPrivate
 import Sailfish.Gallery 1.0
 import com.jolla.gallery 1.0
 import com.jolla.gallery.nextcloud 1.0
 
-Page {
-    id: fullscreenPage
+FullscreenContentPage {
+    id: root
 
-    property alias accountId: imageDownloader.accountId
-    property alias userId: imageDownloader.userId
-    property alias albumId: imageDownloader.albumId
-    property alias photoId: imageDownloader.photoId
+    property var imageModel
+    property alias currentIndex: slideshowView.currentIndex
 
-    property NextcloudImageDownloader imgDownloader: NextcloudImageDownloader {
-        id: imageDownloader
-        imageCache: NextcloudImageCache
-        downloadImage: true
+    allowedOrientations: Orientation.All
+
+    // Update the Cover via window.activeObject property
+    Binding {
+        target: window
+        property: "activeObject"
+        property bool active: root.status === PageStatus.Active
+        value: { "url": active ? slideshowView.currentItem.source : "", "mimeType": active ? slideshowView.currentItem.mimeType : "" }
     }
 
-    ImageViewer {
+    SlideshowView {
+        id: slideshowView
+
         anchors.fill: parent
-        source: imageDownloader.imagePath
+        itemWidth: width
+        itemHeight: height
+
+        model: root.imageModel
+
+        delegate: ImageViewer {
+            id: delegateItem
+
+            readonly property string mimeType: model.fileType
+
+            width: slideshowView.width
+            height: slideshowView.height
+
+            source: imageDownloader.imagePath
+            active: PathView.isCurrentItem
+            viewMoving: slideshowView.moving
+
+            onZoomedChanged: overlay.active = !zoomed
+            onClicked: {
+                if (zoomed) {
+                    zoomOut()
+                } else {
+                    overlay.active = !overlay.active
+                }
+            }
+
+            NextcloudImageDownloader {
+                id: imageDownloader
+
+                accountId: model.accountId
+                userId: model.userId
+                albumId: model.albumId
+                photoId: model.photoId
+
+                imageCache: NextcloudImageCache
+                downloadImage: delegateItem.active
+            }
+        }
+    }
+
+    GalleryOverlay {
+        id: overlay
+
+        anchors.fill: parent
+
+        // Currently, images are only downloaded and never uploaded, so
+        // don't allow editing or deleting.
+        deletingAllowed: false
+        editingAllowed: false
+
+        source: slideshowView.currentItem ? slideshowView.currentItem.source : ""
+        isImage: true
+        duration: 1
+        error: slideshowView.currentItem && slideshowView.currentItem.error
+    }
+
+    IconButton {
+        id: detailsButton
+        x: Theme.horizontalPageMargin
+        y: Theme.paddingLarge
+        icon.source: "image://theme/icon-m-about"
+        onClicked: {
+            var props = {
+                "modelData": imageModel.at(root.currentIndex),
+                "imageMetaData": slideshowView.currentItem.imageMetaData
+            }
+            pageStack.animatorPush("NextcloudImageDetailsPage.qml", props)
+        }
+    }
+
+    SilicaPrivate.DismissButton {}
+
+    BusyIndicator {
+        anchors.centerIn: parent
+        size: BusyIndicatorSize.Large
+        running: slideshowView.currentItem && slideshowView.currentItem.source.toString().length === 0
     }
 }

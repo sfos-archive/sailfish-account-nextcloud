@@ -6,11 +6,11 @@ HEADERS += \
     $$PWD/processmutex_p.h \
     $$PWD/synccachedatabase.h \
     $$PWD/synccachedatabase_p.h \
-    $$PWD/eventcache.h \
-    $$PWD/eventcache_p.h
+    $$PWD/synccacheevents.h \
+    $$PWD/synccacheevents_p.h
 
 SOURCES += \
     $$PWD/processmutex.cpp \
     $$PWD/synccachedatabase.cpp \
-    $$PWD/eventcache.cpp \
+    $$PWD/synccacheevents.cpp \
     $$PWD/eventdatabase.cpp

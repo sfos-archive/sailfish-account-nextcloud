@@ -7,8 +7,8 @@
 **
 ****************************************************************************************/
 
-#include "eventcache.h"
-#include "eventcache_p.h"
+#include "synccacheevents.h"
+#include "synccacheevents_p.h"
 
 #include <QtCore/QFile>
 #include <QtCore/QDir>

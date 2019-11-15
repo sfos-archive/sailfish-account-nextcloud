@@ -246,7 +246,7 @@ void NextcloudApi::finishTransfer(QNetworkReply::NetworkError error, int httpCod
             return;
         }
 
-        qWarning() << "NextcloudApi::replyError: " << error << "httpCode:" << httpCode << "data:" << data;
+        qWarning() << Q_FUNC_INFO << error << "httpCode:" << httpCode << "data:" << data;
         emit transferError();
     } else {
         // Everything ok
