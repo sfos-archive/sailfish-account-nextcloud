@@ -16,6 +16,7 @@
 
 class AccountAuthenticator;
 class WebDavRequestGenerator;
+class NetworkRequestGenerator;
 namespace Buteo { class SyncProfile; }
 
 class WebDavSyncer : public QObject
@@ -49,6 +50,7 @@ protected:
 
     Buteo::SyncProfile *m_syncProfile = nullptr;
     AccountAuthenticator *m_auth = nullptr;
+    NetworkRequestGenerator *m_requestGenerator = nullptr;
     QNetworkAccessManager m_qnam;
     bool m_syncAborted = false;
     bool m_syncError = false;

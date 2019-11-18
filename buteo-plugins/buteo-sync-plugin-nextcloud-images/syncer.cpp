@@ -33,20 +33,14 @@ Syncer::Syncer(QObject *parent, Buteo::SyncProfile *syncProfile)
 Syncer::~Syncer()
 {
     delete m_replyParser;
-    delete m_requestGenerator;
 }
 
 void Syncer::beginSync()
 {
-    delete m_requestGenerator;
-    m_requestGenerator = m_accessToken.isEmpty()
-                       ? new JsonRequestGenerator(&m_qnam, m_username, m_password)
-                       : new JsonRequestGenerator(&m_qnam, m_accessToken);
-
     delete m_replyParser;
     m_replyParser = new ReplyParser(this, m_accountId, NEXTCLOUD_USERID, m_serverUrl, m_webdavPath);
 
-    QNetworkReply *reply = m_requestGenerator->galleryConfig(m_serverUrl);
+    QNetworkReply *reply = m_requestGenerator->galleryConfig(NetworkRequestGenerator::JsonContentType);
     if (reply) {
         connect(reply, &QNetworkReply::finished,
                 this, &Syncer::handleConfigReply);
@@ -69,7 +63,7 @@ void Syncer::handleConfigReply()
         return;
     }
 
-    QNetworkReply *listReply = m_requestGenerator->galleryList(m_serverUrl);
+    QNetworkReply *listReply = m_requestGenerator->galleryList(NetworkRequestGenerator::JsonContentType);
     if (listReply) {
         connect(listReply, &QNetworkReply::finished,
                 this, &Syncer::handleGalleryMetaDataReply);

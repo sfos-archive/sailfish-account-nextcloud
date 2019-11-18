@@ -40,7 +40,6 @@ private:
             const QHash<QString, SyncCache::Album> &albums,
             const QHash<QString, SyncCache::Photo> &photos);
 
-    JsonRequestGenerator *m_requestGenerator = nullptr;
     ReplyParser *m_replyParser = nullptr;
 };
 
