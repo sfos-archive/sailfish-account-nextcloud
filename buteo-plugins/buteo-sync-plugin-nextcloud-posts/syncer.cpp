@@ -30,7 +30,6 @@
 
 namespace {
     const int HTTP_UNAUTHORIZED_ACCESS = 401;
-    const QString NEXTCLOUD_USERID = QStringLiteral("nextcloud");
 
     const QString NotificationsEndpointsKey = QStringLiteral("ocs-endpoints");
 }
@@ -297,8 +296,6 @@ void Syncer::handleNotificationDeleteAllReply()
 
 void Syncer::purgeAccount(int accountId)
 {
-    Q_UNUSED(accountId);
-
     SyncCache::EventDatabase db;
     SyncCache::DatabaseError error;
     db.openDatabase(

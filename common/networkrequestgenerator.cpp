@@ -119,6 +119,15 @@ QUrl NetworkRequestGenerator::networkRequestUrl(const QString &path, const QUrlQ
     return ret;
 }
 
+QNetworkReply *NetworkRequestGenerator::userInfo(const QByteArray &acceptContentType)
+{
+    QNetworkRequest request = networkRequest(networkRequestUrl("/ocs/v2.php/cloud/user"));
+    if (!acceptContentType.isEmpty()) {
+        request.setRawHeader("Accept", acceptContentType);
+    }
+    return sendRequest(request, "GET");
+}
+
 QNetworkReply *NetworkRequestGenerator::capabilities(const QByteArray &acceptContentType)
 {
     QNetworkRequest request = networkRequest(networkRequestUrl("/ocs/v2.php/cloud/capabilities"));

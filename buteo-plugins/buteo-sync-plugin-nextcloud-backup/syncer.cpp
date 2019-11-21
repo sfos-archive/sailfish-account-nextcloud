@@ -28,7 +28,6 @@
 namespace {
     const int HTTP_UNAUTHORIZED_ACCESS = 401;
     const int HTTP_METHOD_NOT_ALLOWED = 405;
-    const QString NEXTCLOUD_USERID = QStringLiteral("nextcloud");
 
     const QString DefaultLocalPath = QStringLiteral("/home/nemo/.local/share/system/privileged/Backups");
     const QString DefaultDirListLocalPath = DefaultLocalPath + "/directoryListing.txt";

@@ -26,17 +26,7 @@ public:
         QVector<SyncCache::Photo> photos;
     };
 
-    ReplyParser(Syncer *parent, int accountId, const QString &userId, const QUrl &serverUrl, const QString &webdavPath);
-    ~ReplyParser();
-
-    GalleryMetadata parseGalleryMetadata(const QByteArray &galleryListResponse);
-
-private:
-    Syncer *q;
-    int m_accountId;
-    QString m_userId;
-    QUrl m_serverUrl;
-    QString m_webdavPath;
+    static GalleryMetadata parseGalleryMetadata(Syncer *imageSyncer, const QByteArray &galleryListResponse);
 };
 
 Q_DECLARE_METATYPE(ReplyParser::GalleryMetadata)

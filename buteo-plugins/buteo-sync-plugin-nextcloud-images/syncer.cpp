@@ -10,20 +10,19 @@
 #include "syncer_p.h"
 
 #include "networkrequestgenerator_p.h"
+#include "networkreplyparser_p.h"
 #include "replyparser_p.h"
 
 #include <QtCore/QUrl>
 #include <QtCore/QUrlQuery>
 #include <QtCore/QFile>
+#include <QtCore/QDir>
 #include <QtCore/QByteArray>
 #include <QtCore/QStandardPaths>
 
 // buteo
 #include <SyncProfile.h>
 #include <LogMacros.h>
-
-static const int HTTP_UNAUTHORIZED_ACCESS = 401;
-static const QString NEXTCLOUD_USERID = QStringLiteral("nextcloud");
 
 Syncer::Syncer(QObject *parent, Buteo::SyncProfile *syncProfile)
     : WebDavSyncer(parent, syncProfile, QStringLiteral("nextcloud-images"))
@@ -32,21 +31,73 @@ Syncer::Syncer(QObject *parent, Buteo::SyncProfile *syncProfile)
 
 Syncer::~Syncer()
 {
-    delete m_replyParser;
 }
 
 void Syncer::beginSync()
 {
-    delete m_replyParser;
-    m_replyParser = new ReplyParser(this, m_accountId, NEXTCLOUD_USERID, m_serverUrl, m_webdavPath);
+    QNetworkReply *reply = m_requestGenerator->userInfo(NetworkRequestGenerator::JsonContentType);
+    if (reply) {
+        connect(reply, &QNetworkReply::finished,
+                this, &Syncer::handleUserInfoReply);
+    } else {
+        finishWithError(QStringLiteral("Failed to start user info request"));
+    }
+}
 
+void Syncer::handleUserInfoReply()
+{
+    QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
+    reply->deleteLater();
+    const int httpCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+
+    if (reply->error() != QNetworkReply::NoError) {
+        finishWithHttpError("User info request failed", httpCode);
+        return;
+    }
+
+    NetworkReplyParser::User user = JsonReplyParser::parseUserResponse(reply->readAll());
+    if (user.userId.isEmpty()) {
+        finishWithError("No user id found in server response");
+        return;
+    }
+
+    // Store the user.
+    SyncCache::ImageDatabase db;
+    SyncCache::DatabaseError error;
+    db.openDatabase(
+            QStringLiteral("%1/system/privileged/Images/nextcloud.db").arg(QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)),
+            &error);
+    if (error.errorCode != SyncCache::DatabaseError::NoError) {
+        LOG_WARNING("Failed to open database to store user for account:" << m_accountId
+                    << ":" << error.errorMessage);
+        return;
+    }
+    SyncCache::User currentUser;
+    currentUser.accountId = m_accountId;
+    currentUser.userId = user.userId;
+    currentUser.displayName = user.displayName;
+    db.storeUser(currentUser, &error);
+    if (error.errorCode != SyncCache::DatabaseError::NoError) {
+        LOG_WARNING("Failed to store user:" << currentUser.userId
+                    << error.errorCode << error.errorMessage);
+    }
+
+    m_userId = user.userId;
+
+    if (!performConfigRequest()) {
+        finishWithError(QStringLiteral("Failed to start gallery config request"));
+    }
+}
+
+bool Syncer::performConfigRequest()
+{
     QNetworkReply *reply = m_requestGenerator->galleryConfig(NetworkRequestGenerator::JsonContentType);
     if (reply) {
         connect(reply, &QNetworkReply::finished,
                 this, &Syncer::handleConfigReply);
-    } else {
-        finishWithError(QStringLiteral("Gallery config request failed"));
+        return true;
     }
+    return false;
 }
 
 void Syncer::handleConfigReply()
@@ -86,7 +137,7 @@ void Syncer::handleGalleryMetaDataReply()
         return;
     }
 
-    const ReplyParser::GalleryMetadata metadata = m_replyParser->parseGalleryMetadata(replyData);
+    const ReplyParser::GalleryMetadata metadata = ReplyParser::parseGalleryMetadata(this, replyData);
 
     QHash<QString, SyncCache::Album> albums;
     for (const SyncCache::Album &album : metadata.albums) {
@@ -98,12 +149,13 @@ void Syncer::handleGalleryMetaDataReply()
         photos.insert(photo.photoId, photo);
     }
 
-    calculateAndApplyDelta(albums, photos);
+    calculateAndApplyDelta(albums, photos, metadata.photos.count() > 0 ? metadata.photos.first().photoId : QString());
 }
 
 void Syncer::calculateAndApplyDelta(
         const QHash<QString, SyncCache::Album> &serverAlbums,
-        const QHash<QString, SyncCache::Photo> &serverPhotos)
+        const QHash<QString, SyncCache::Photo> &serverPhotos,
+        const QString &firstPhotoId)
 {
     LOG_DEBUG("calculateAndApplyDelta: entry");
     SyncCache::ImageDatabase db;
@@ -127,13 +179,13 @@ void Syncer::calculateAndApplyDelta(
     // read all albums and photos
     QHash<QString, SyncCache::Album> currentAlbums;
     QHash<QString, SyncCache::Photo> currentPhotos;
-    const QVector<SyncCache::Album> albums = db.albums(m_accountId, NEXTCLOUD_USERID, &error);
+    const QVector<SyncCache::Album> albums = db.albums(m_accountId, m_userId, &error);
     if (error.errorCode != SyncCache::DatabaseError::NoError) {
         LOG_WARNING("calculateAndApplyDelta: failed to read albums:" << error.errorCode << error.errorMessage);
     } else {
         Q_FOREACH (const SyncCache::Album &album, albums) {
             currentAlbums.insert(album.albumId, album);
-            const QVector<SyncCache::Photo> photos = db.photos(m_accountId, NEXTCLOUD_USERID, album.albumId, &error);
+            const QVector<SyncCache::Photo> photos = db.photos(m_accountId, m_userId, album.albumId, &error);
             if (error.errorCode == SyncCache::DatabaseError::NoError) {
                 Q_FOREACH (const SyncCache::Photo &photo, photos) {
                     currentPhotos.insert(photo.photoId, photo);
@@ -148,26 +200,6 @@ void Syncer::calculateAndApplyDelta(
     // determine and apply delta.
     int addedAlbums = 0, modifiedAlbums = 0, removedAlbums = 0;
     int addedPhotos = 0, modifiedPhotos = 0, removedPhotos = 0;
-
-    // create the default user if none exists.
-    if (error.errorCode == SyncCache::DatabaseError::NoError) {
-        SyncCache::User currentUser = db.user(m_accountId, NEXTCLOUD_USERID, &error);
-        if (error.errorCode != SyncCache::DatabaseError::NoError) {
-            LOG_WARNING("calculateAndApplyDelta: failed to read user:"
-                        << currentUser.userId
-                        << error.errorCode << error.errorMessage);
-        } else if (currentUser.userId.isEmpty()) {
-            // need to store the default user.
-            currentUser.accountId = m_accountId;
-            currentUser.userId = NEXTCLOUD_USERID;
-            db.storeUser(currentUser, &error);
-            if (error.errorCode != SyncCache::DatabaseError::NoError) {
-                LOG_WARNING("calculateAndApplyDelta: failed to store user:"
-                            << currentUser.userId
-                            << error.errorCode << error.errorMessage);
-            }
-        }
-    }
 
     // remove deleted albums.
     if (error.errorCode == SyncCache::DatabaseError::NoError) {
@@ -283,6 +315,28 @@ void Syncer::calculateAndApplyDelta(
         }
     }
 
+    // Set the user thumbnail using the first photo
+    if (!firstPhotoId.isEmpty()) {
+        SyncCache::Photo firstPhoto = serverPhotos.value(firstPhotoId);
+        if (firstPhoto.accountId > 0) {
+            SyncCache::User currentUser = db.user(m_accountId, m_userId, &error);{
+            if (error.errorCode != SyncCache::DatabaseError::NoError) {
+                LOG_WARNING("Failed to find user:" << m_userId << "for account:" << m_accountId
+                            << error.errorCode << error.errorMessage);
+            } else if (currentUser.thumbnailUrl.isEmpty()
+                       || currentUser.thumbnailUrl != firstPhoto.thumbnailUrl)
+                currentUser.thumbnailUrl = firstPhoto.thumbnailUrl;
+                currentUser.thumbnailPath = firstPhoto.thumbnailPath;
+                currentUser.thumbnailFileName = firstPhoto.fileName;
+                db.storeUser(currentUser, &error);
+                if (error.errorCode != SyncCache::DatabaseError::NoError) {
+                    LOG_WARNING("Failed to store user:" << currentUser.userId
+                                << error.errorCode << error.errorMessage);
+                }
+            }
+        }
+    }
+
     if (error.errorCode != SyncCache::DatabaseError::NoError) {
         db.rollbackTransaction(&error);
         emit syncFailed();
@@ -312,16 +366,30 @@ void Syncer::purgeAccount(int accountId)
     if (error.errorCode != SyncCache::DatabaseError::NoError) {
         LOG_WARNING("Failed to open database in order to purge Nextcloud images for account:" << accountId
                     << ":" << error.errorMessage);
-        return;
+    } else {
+        SyncCache::User user = db.user(accountId, QString(), &error);
+        if (error.errorCode == SyncCache::DatabaseError::NoError) {
+            if (user.userId.isEmpty()) {
+                LOG_WARNING("Failed to find Nextcloud user ID for account:" << accountId
+                            << ":" << error.errorMessage);
+            } else {
+                db.deleteUser(user, &error);
+                if (error.errorCode != SyncCache::DatabaseError::NoError) {
+                    LOG_WARNING("Failed to purge Nextcloud images for account:" << accountId
+                                << ":" << error.errorMessage);
+                }
+            }
+        } else {
+            LOG_WARNING("Failed to find Nextcloud user for account:" << accountId
+                        << ":" << error.errorMessage);
+        }
     }
 
-    SyncCache::User user;
-    user.accountId = accountId;
-    user.userId = NEXTCLOUD_USERID;
-    db.deleteUser(user, &error);
-
-    if (error.errorCode != SyncCache::DatabaseError::NoError) {
-        LOG_WARNING("Failed to purge Nextcloud images for account:" << accountId
-                    << ":" << error.errorMessage);
+    QDir dir(SyncCache::ImageCache::imageCacheDir(accountId));
+    if (dir.exists() && !dir.removeRecursively()) {
+        LOG_WARNING("Failed to purge Nextcloud image cache for account:" << accountId
+                    << "in dir:" << dir.absolutePath());
     }
+
+    LOG_DEBUG("Purged Nextcloud images for account:" << accountId);
 }

@@ -149,25 +149,107 @@ QVariantMap JsonReplyParser::findCapability(const QString &capabilityName, const
         return QVariantMap();
     }
 
-    const QVariant variant = doc.toVariant();
-    if (variant.type() != QVariant::Map) {
-        qWarning() << "Cannot convert JSON to map!";
+    const QJsonObject ocs = doc.object().value(QLatin1String("ocs")).toObject();
+    int errorCode = 0;
+    QString errorMessage;
+    if (!ocsMetaStatusCodeSucceeded(ocs, &errorCode, &errorMessage)) {
+        qWarning() << "Capabilities response has non-success status code:" << errorCode << errorMessage;
         return QVariantMap();
     }
 
-    const QVariantMap ocs = variant.toMap().value(QStringLiteral("ocs")).toMap();
-    if (ocsMetaStatusCode(ocs) != 200) {
-        qWarning() << "Capabilities response has non-success status code:" << ocsMetaStatusCode(ocs);
+    const QJsonObject data = ocs.value(QLatin1String("data")).toObject();
+    if (data.isEmpty()) {
+        qWarning() << "No 'data' entry found in capabilities JSON response!";
         return QVariantMap();
     }
 
-    const QVariantMap capabilityMap = ocs.value(QStringLiteral("data")).toMap().value(QStringLiteral("capabilities")).toMap();
-    if (capabilityMap.isEmpty()) {
-        qWarning() << "No capabilities found in capability response!";
+    const QJsonObject capabilities = data.value(QLatin1String("capabilities")).toObject();
+    if (capabilities.isEmpty()) {
+        qWarning() << "No 'capabilities' entry found in capabilities JSON response!";
         return QVariantMap();
     }
 
-    return capabilityMap.value(capabilityName).toMap();
+    return capabilities.value(capabilityName).toObject().toVariantMap();
+}
+
+NetworkReplyParser::User JsonReplyParser::parseUserResponse(const QByteArray &userInfoResponse)
+{
+    /* Expected result:
+    {
+        "ocs": {
+            "meta": {
+                "status": "ok",
+                "statuscode": 200,
+                "message": "OK"
+            },
+            "data": {
+                "enabled": true,
+                "storageLocation": "\\/var\\/www\\/html\\/data\\/MyUserName",
+                "id": "MyUserName",
+                "lastLogin": 1574123564000,
+                "backend": "Database",
+                "subadmin": [
+                    "group 3"
+                ],
+                "quota": {
+                    "free": 109500956672,
+                    "used": 10233453,
+                    "total": 109511190125,
+                    "relative": 0.01,
+                    "quota": -3
+                },
+                "email": "me@myemail.com",
+                "phone": "",
+                "address": "",
+                "website": "",
+                "twitter": "",
+                "groups": [
+                    "group 1",
+                    "group 2",
+                    "group 3"
+                ],
+                "language": "en",
+                "locale": "",
+                "backendCapabilities": {
+                    "setDisplayName": true,
+                    "setPassword": true
+                },
+                "display-name": "My Display Name"
+            }
+        }
+    }
+    */
+
+    NetworkReplyParser::debugDumpData(QString::fromUtf8(userInfoResponse));
+
+    QJsonParseError err;
+    NetworkReplyParser::User user;
+
+    const QJsonDocument doc = QJsonDocument::fromJson(userInfoResponse, &err);
+    if (err.error != QJsonParseError::NoError) {
+        qWarning() << "JSON parsing failed:" << err.errorString();
+        return user;
+    }
+
+    const QJsonObject ocs = doc.object().value(QLatin1String("ocs")).toObject();
+    int errorCode = 0;
+    QString errorMessage;
+    if (!ocsMetaStatusCodeSucceeded(ocs, &errorCode, &errorMessage)) {
+        qWarning() << "user metadata response has non-success status code:" << errorCode << errorMessage;
+        return user;
+    }
+
+    const QJsonObject data = ocs.value(QLatin1String("data")).toObject();
+    user.userId = data.value(QLatin1String("id")).toString();
+    user.displayName = data.value(QLatin1String("display-name")).toString();
+
+    // There's an API inconsistency where ocs/v2.php/cloud/user has a "display-name" key while
+    // ocs/v2.php/cloud/users/<userid> has "displayname". Check for both just in case.
+    if (user.displayName.isEmpty()) {
+        user.displayName = data.value(QLatin1String("displayname")).toString();
+    }
+
+    return user;
 }
 
 QList<NetworkReplyParser::Notification> JsonReplyParser::parseNotificationResponse(const QByteArray &replyData)
@@ -259,7 +341,7 @@ QList<NetworkReplyParser::Notification> JsonReplyParser::parseNotificationRespon
 
         notif.notificationId = QString::number(notifObject.value(QLatin1String("notification_id")).toDouble());
         notif.app = notifObject.value(QLatin1String("app")).toString();
-        notif.userName = notifObject.value(QLatin1String("user")).toString();
+        notif.userId = notifObject.value(QLatin1String("user")).toString();
         notif.dateTime = QDateTime::fromString(notifObject.value(QLatin1String("datetime")).toString(), Qt::ISODate);
         notif.icon = notifObject.value(QLatin1String("icon")).toString();
         notif.link = notifObject.value(QLatin1String("link")).toString();

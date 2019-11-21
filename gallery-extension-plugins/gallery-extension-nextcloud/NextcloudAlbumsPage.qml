@@ -12,18 +12,17 @@ import Sailfish.Silica 1.0
 import com.jolla.gallery.nextcloud 1.0
 
 Page {
-    id: albums
+    id: root
 
     property alias model: view.model
-    property string title
-    property int accountId
-    property string userId
 
     SilicaListView {
         id: view
 
         anchors.fill: parent
-        header: PageHeader { title: albums.title }
+        header: PageHeader {
+            title: view.model.userDisplayName || view.model.userId
+        }
         cacheBuffer: Screen.height
 
         delegate: NextcloudAlbumDelegate {

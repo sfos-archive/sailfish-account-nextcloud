@@ -19,17 +19,28 @@ MediaSourceIcon {
 
     // shuffle thumbnails with timer similar to that of gallery photos but without aligning exactly
     timerEnabled: allPhotosModel.count > 1
-    timerInterval: (!slideShow.currentItem || slideShow.currentItem.status === Image.Null)
-                   ? 200
-                   : Math.floor(Math.random() * 8000) + 6000
+    timerInterval: Math.floor(Math.random() * 8000) + 6000
 
-    onTimerTriggered: {
+    onTimerTriggered: _showNextValidPhoto()
+
+    function _showNextValidPhoto() {
         var startIndex = (slideShow.currentIndex + 1) % allPhotosModel.count
+        var restarted = false
+
+        // Loop until a downloaded thumbnail is found.
         for (var i = startIndex; i < allPhotosModel.count; ++i) {
             var data = allPhotosModel.at(i)
             if (data.thumbnailPath.toString().length > 0) {
                 slideShow.currentIndex = i
                 break
+            }
+            if (restarted && i === startIndex) {
+                // There are no downloaded thumbnails yet
+                root._showPlaceholder = true
+                break
+            } else if (i === allPhotosModel.count - 1) {
+                restarted = true
+                i = -1
             }
         }
     }
@@ -37,12 +48,13 @@ MediaSourceIcon {
     ListView {
         id: slideShow
 
+        anchors.fill: parent
         interactive: false
-        currentIndex: 0
+        currentIndex: -1
         clip: true
         orientation: ListView.Horizontal
         cacheBuffer: width * 2
-        anchors.fill: parent
+        highlightMoveDuration: 0    // jump immediately to initial image instead of animating
 
         model: allPhotosModel
 
@@ -63,6 +75,13 @@ MediaSourceIcon {
         id: allPhotosModel
 
         imageCache: NextcloudImageCache
+
+        onCountChanged: {
+            if (slideShow.currentIndex < 0) {
+                _showNextValidPhoto()
+                slideShow.highlightMoveDuration = -1    // restore animation for cycling to next image
+            }
+        }
     }
 
     NextcloudUserModel {
@@ -71,23 +90,13 @@ MediaSourceIcon {
         imageCache: NextcloudImageCache
     }
 
-    Timer {
-        id: loadingTimer
-        running: true
-        interval: 1000
-        onTriggered: {
-            if (nextcloudUsers.count === 0) {
-                root._showPlaceholder = true
-            }
-        }
-    }
-
     Image {
         anchors.fill: parent
         source: "image://theme/graphic-service-nextcloud"
         fillMode: Image.PreserveAspectCrop
         clip: true
-        visible: (_showPlaceholder && nextcloudUsers.count === 0)
-                 || (slideShow.currentItem && (slideShow.currentItem.status === Image.Null || slideShow.currentItem.status === Image.Error))
+        visible: _showPlaceholder
+                 || (slideShow.currentItem
+                     && (slideShow.currentItem.status === Image.Null || slideShow.currentItem.status === Image.Error))
     }
 }

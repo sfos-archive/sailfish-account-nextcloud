@@ -32,6 +32,7 @@ struct DatabaseError {
         TransactionLockError,
         PrepareQueryError,
         QueryError,
+        InvalidArgumentError,
         UnknownError = 1024
     };
     ErrorCode errorCode = NoError;

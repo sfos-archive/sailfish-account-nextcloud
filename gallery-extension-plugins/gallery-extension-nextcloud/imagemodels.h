@@ -42,6 +42,7 @@ public:
     enum Roles {
         AccountIdRole = Qt::UserRole + 1,
         UserIdRole,
+        DisplayNameRole,
         ThumbnailUrlRole,
         ThumbnailPathRole
     };
@@ -71,6 +72,7 @@ class NextcloudAlbumModel : public QAbstractListModel, public QQmlParserStatus
     Q_PROPERTY(SyncCache::ImageCache* imageCache READ imageCache WRITE setImageCache NOTIFY imageCacheChanged)
     Q_PROPERTY(int accountId READ accountId WRITE setAccountId NOTIFY accountIdChanged)
     Q_PROPERTY(QString userId READ userId WRITE setUserId NOTIFY userIdChanged)
+    Q_PROPERTY(QString userDisplayName READ userDisplayName NOTIFY userDisplayNameChanged)
     Q_PROPERTY(int count READ rowCount NOTIFY rowCountChanged)
 
 public:
@@ -108,12 +110,15 @@ public:
     QString userId() const;
     void setUserId(const QString &id);
 
+    QString userDisplayName() const;
+
     Q_INVOKABLE QVariantMap at(int row) const;
 
 Q_SIGNALS:
     void imageCacheChanged();
     void accountIdChanged();
     void userIdChanged();
+    void userDisplayNameChanged();
     void rowCountChanged();
 
 private:
@@ -123,6 +128,7 @@ private:
     SyncCache::ImageCache *m_imageCache = nullptr;
     int m_accountId = 0;
     QString m_userId;
+    QString m_userDisplayName;
     QVector<SyncCache::Album> m_data;
 };
 

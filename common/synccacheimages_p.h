@@ -51,11 +51,10 @@ private:
 class ImageDownload
 {
 public:
-    ImageDownload(
-            int idempToken = 0,
+    ImageDownload(int idempToken = 0,
             const QUrl &imageUrl = QUrl(),
             const QString &fileName = QString(),
-            const QString &subDirPath = QString(),
+            const QString &fileDirPath = QString(),
             const QNetworkRequest &templateRequest = QNetworkRequest(QUrl()),
             ImageDownloadWatcher *watcher = nullptr);
     ~ImageDownload();
@@ -63,7 +62,7 @@ public:
     int m_idempToken = 0;
     QUrl m_imageUrl;
     QString m_fileName;
-    QString m_subDirPath;
+    QString m_fileDirPath;
     QNetworkRequest m_templateRequest;
     QTimer *m_timeoutTimer = nullptr;
     QNetworkReply *m_reply = nullptr;
@@ -78,14 +77,16 @@ public:
     ImageDownloader(int maxActive = 4, QObject *parent = nullptr);
     ~ImageDownloader();
 
-    void setImageDirectory(const QString &path);
     ImageDownloadWatcher *downloadImage(int idempToken,
             const QUrl &imageUrl,
             const QString &fileName,
-            const QString &subDirPath,
+            const QString &fileDirPath,
             const QNetworkRequest &requestTemplate);
 
-    QString imageFilePath(const QString &subDirPath, const QString &fileName) const;
+    QString userImageDownloadDir(int accountId, const QString &userId, bool thumbnail) const;
+    QString albumImageDownloadDir(int accountId, const QString &albumName, bool thumbnail) const;
+
+    static QString imageDownloadDir(int accountId);
 
 private Q_SLOTS:
     void triggerDownload();
@@ -97,7 +98,6 @@ private:
     QQueue<ImageDownload*> m_pending;
     QQueue<ImageDownload*> m_active;
     int m_maxActive;
-    QString m_imageDirectory;
 };
 
 class ImageCacheThreadWorker : public QObject
@@ -111,6 +111,7 @@ public:
 public Q_SLOTS:
     void openDatabase(const QString &accountType);
 
+    void requestUser(int accountId, const QString &userId);
     void requestUsers();
     void requestAlbums(int accountId, const QString &userId);
     void requestPhotos(int accountId, const QString &userId, const QString &albumId);
@@ -124,6 +125,9 @@ public Q_SLOTS:
 Q_SIGNALS:
     void openDatabaseFailed(const QString &errorMessage);
     void openDatabaseFinished();
+
+    void requestUserFailed(int accountId, const QString &userId, const QString &errorMessage);
+    void requestUserFinished(int accountId, const QString &userId, const SyncCache::User &user);
 
     void requestUsersFailed(const QString &errorMessage);
     void requestUsersFinished(const QVector<SyncCache::User> &users);
@@ -175,6 +179,7 @@ public:
 Q_SIGNALS:
     void openDatabase(const QString &accountType);
 
+    void requestUser(int accountId, const QString &userId);
     void requestUsers();
     void requestAlbums(int accountId, const QString &userId);
     void requestPhotos(int accountId, const QString &userId, const QString &albumId);

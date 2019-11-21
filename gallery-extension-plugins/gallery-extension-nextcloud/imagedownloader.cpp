@@ -166,49 +166,88 @@ QUrl NextcloudImageDownloader::imagePath() const
     return m_imagePath;
 }
 
+NextcloudImageDownloader::Status NextcloudImageDownloader::status() const
+{
+    return m_status;
+}
+
+void NextcloudImageDownloader::setStatus(Status status)
+{
+    if (status != m_status) {
+        m_status = status;
+        emit statusChanged();
+    }
+}
+
 void NextcloudImageDownloader::loadImage()
 {
     if (!m_imageCache) {
-        qWarning() << "No image cache, cannot load image";
+        qmlInfo(this) << "imageCache not set, cannot load image";
         return;
     }
 
-    if (m_downloadImage) {
-        m_idempToken = qHash(QStringLiteral("%1|%2|%3").arg(m_userId, m_albumId, m_photoId));
+    if (m_userId.isEmpty()) {
+        qmlInfo(this) << "userId not set, cannot load image";
+        return;
+    }
 
-        connect(m_imageCache, &SyncCache::ImageCache::populatePhotoImageFinished,
-                this, &NextcloudImageDownloader::populateFinished,
-                Qt::UniqueConnection);
-        connect(m_imageCache, &SyncCache::ImageCache::populatePhotoImageFailed,
-                this, &NextcloudImageDownloader::populateFailed,
-                Qt::UniqueConnection);
+    setStatus(Downloading);
 
-        m_imageCache->populatePhotoImage(m_idempToken, m_accountId, m_userId, m_albumId, m_photoId, QNetworkRequest());
+    NextcloudImageCache *nextcloudImageCache = qobject_cast<NextcloudImageCache*>(m_imageCache);
+    const QNetworkRequest networkRequest = nextcloudImageCache
+            ? nextcloudImageCache->templateRequest(m_accountId, true)
+            : QNetworkRequest();
 
-    } else if (m_downloadThumbnail) {
-        m_idempToken = qHash(QStringLiteral("%1|%2|%3").arg(m_userId, m_albumId, m_photoId));
-        NextcloudImageCache *nextcloudImageCache = qobject_cast<NextcloudImageCache*>(m_imageCache);
-        const QNetworkRequest networkRequest = nextcloudImageCache
-                ? nextcloudImageCache->templateRequest(m_accountId, true)
-                : QNetworkRequest();
+    if (!m_albumId.isEmpty()) {
+        m_idempToken = qHash(QStringLiteral("%1|%2|%3").arg(m_accountId).arg(m_albumId).arg(m_photoId));
 
-        if (m_photoId.isEmpty()) {
-            connect(m_imageCache, &SyncCache::ImageCache::populateAlbumThumbnailFinished,
+        if (m_downloadImage) {
+            // Download photo image
+            connect(m_imageCache, &SyncCache::ImageCache::populatePhotoImageFinished,
                     this, &NextcloudImageDownloader::populateFinished,
                     Qt::UniqueConnection);
-            connect(m_imageCache, &SyncCache::ImageCache::populateAlbumThumbnailFailed,
+            connect(m_imageCache, &SyncCache::ImageCache::populatePhotoImageFailed,
                     this, &NextcloudImageDownloader::populateFailed,
                     Qt::UniqueConnection);
-            m_imageCache->populateAlbumThumbnail(m_idempToken, m_accountId, m_userId, m_albumId, networkRequest);
+            m_imageCache->populatePhotoImage(m_idempToken, m_accountId, m_userId, m_albumId, m_photoId, QNetworkRequest());
 
-        } else {
-            connect(m_imageCache, &SyncCache::ImageCache::populatePhotoThumbnailFinished,
+        } else if (m_downloadThumbnail) {
+            if (m_photoId.isEmpty()) {
+                // Download album thumbnail
+                connect(m_imageCache, &SyncCache::ImageCache::populateAlbumThumbnailFinished,
+                        this, &NextcloudImageDownloader::populateFinished,
+                        Qt::UniqueConnection);
+                connect(m_imageCache, &SyncCache::ImageCache::populateAlbumThumbnailFailed,
+                        this, &NextcloudImageDownloader::populateFailed,
+                        Qt::UniqueConnection);
+                m_imageCache->populateAlbumThumbnail(m_idempToken, m_accountId, m_userId, m_albumId, networkRequest);
+
+            } else {
+                // Download photo thumbnail
+                connect(m_imageCache, &SyncCache::ImageCache::populatePhotoThumbnailFinished,
+                        this, &NextcloudImageDownloader::populateFinished,
+                        Qt::UniqueConnection);
+                connect(m_imageCache, &SyncCache::ImageCache::populatePhotoThumbnailFailed,
+                        this, &NextcloudImageDownloader::populateFailed,
+                        Qt::UniqueConnection);
+                m_imageCache->populatePhotoThumbnail(m_idempToken, m_accountId, m_userId, m_albumId, m_photoId, networkRequest);
+            }
+        }
+    } else {
+        m_idempToken = qHash(QStringLiteral("%1|%2").arg(m_accountId).arg(m_userId));
+
+        if (m_downloadImage) {
+            qmlInfo(this) << "downloadImage option is not supported for user images, set downloadThumbnail instead";
+
+        } else if (m_downloadThumbnail) {
+            // Download user thumbnail
+            connect(m_imageCache, &SyncCache::ImageCache::populateUserThumbnailFinished,
                     this, &NextcloudImageDownloader::populateFinished,
                     Qt::UniqueConnection);
-            connect(m_imageCache, &SyncCache::ImageCache::populatePhotoThumbnailFailed,
+            connect(m_imageCache, &SyncCache::ImageCache::populateUserThumbnailFailed,
                     this, &NextcloudImageDownloader::populateFailed,
                     Qt::UniqueConnection);
-            m_imageCache->populatePhotoThumbnail(m_idempToken, m_accountId, m_userId, m_albumId, m_photoId, networkRequest);
+            m_imageCache->populateUserThumbnail(m_idempToken, m_accountId, m_userId, networkRequest);
         }
     }
 }
@@ -221,12 +260,14 @@ void NextcloudImageDownloader::populateFinished(int idempToken, const QString &p
             m_imagePath = imagePath;
             emit imagePathChanged();
         }
+        setStatus(Ready);
     }
 }
 
 void NextcloudImageDownloader::populateFailed(int idempToken, const QString &errorMessage)
 {
     if (m_idempToken == idempToken) {
-        qWarning() << "NextcloudImageDownloader failed to load image:" << errorMessage;
+        qmlInfo(this) << "NextcloudImageDownloader failed to load image:" << errorMessage;
+        setStatus(Error);
     }
 }

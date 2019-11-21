@@ -19,6 +19,13 @@ class QXmlStreamReader;
 class NetworkReplyParser
 {
 public:
+    class User
+    {
+    public:
+        QString userId;
+        QString displayName;
+    };
+
     class Resource
     {
     public:
@@ -33,7 +40,7 @@ public:
     public:
         QString notificationId;
         QString app;
-        QString userName;
+        QString userId;
         QDateTime dateTime;
         QString icon;
         QString link;
@@ -69,6 +76,7 @@ class JsonReplyParser
 {
 public:
     static QVariantMap findCapability(const QString &capabilityName, const QByteArray &capabilityResponse);
+    static NetworkReplyParser::User parseUserResponse(const QByteArray &userInfoResponse);
     static QList<NetworkReplyParser::Notification> parseNotificationResponse(const QByteArray &replyData);
 };
 

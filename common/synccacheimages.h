@@ -30,6 +30,7 @@ struct User {
 
     int accountId = 0;
     QString userId;
+    QString displayName;
     QUrl thumbnailUrl;
     QUrl thumbnailPath;
     QString thumbnailFileName;
@@ -119,9 +120,12 @@ public:
     ImageCache(QObject *parent = nullptr);
     ~ImageCache();
 
+    static QString imageCacheDir(int accountId);
+
 public Q_SLOTS:
     virtual void openDatabase(const QString &accountType); // e.g. "nextcloud"
 
+    virtual void requestUser(int accountId, const QString &userId);
     virtual void requestUsers();
     virtual void requestAlbums(int accountId, const QString &userId);
     virtual void requestPhotos(int accountId, const QString &userId, const QString &albumId);
@@ -135,6 +139,9 @@ public Q_SLOTS:
 Q_SIGNALS:
     void openDatabaseFailed(const QString &errorMessage);
     void openDatabaseFinished();
+
+    void requestUserFailed(int accountId, const QString &userId, const QString &errorMessage);
+    void requestUserFinished(int accountId, const QString &userId, const SyncCache::User &user);
 
     void requestUsersFailed(const QString &errorMessage);
     void requestUsersFinished(const QVector<SyncCache::User> &users);

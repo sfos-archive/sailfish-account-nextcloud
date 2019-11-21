@@ -21,6 +21,7 @@ public:
     NetworkRequestGenerator(QNetworkAccessManager *networkAccessManager, const QString &serverUrl, const QString &username, const QString &password);
     NetworkRequestGenerator(QNetworkAccessManager *networkAccessManager, const QString &serverUrl, const QString &accessToken);
 
+    QNetworkReply *userInfo(const QByteArray &acceptContentType);
     QNetworkReply *capabilities(const QByteArray &acceptContentType);
 
     QNetworkReply *galleryConfig(const QByteArray &acceptContentType);

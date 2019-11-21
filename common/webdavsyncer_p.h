@@ -31,6 +31,10 @@ public:
     virtual void abortSync();
     virtual void purgeAccount(int accountId) = 0;
 
+    int accountId() const { return m_accountId; }
+    QString serverUrl() const { return m_serverUrl; }
+    QString webDavPath() const { return m_webdavPath; }
+
 Q_SIGNALS:
     void syncSucceeded();
     void syncFailed();

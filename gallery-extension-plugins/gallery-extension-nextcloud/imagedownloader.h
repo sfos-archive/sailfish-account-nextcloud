@@ -27,8 +27,17 @@ class NextcloudImageDownloader : public QObject, public QQmlParserStatus
     Q_PROPERTY(bool downloadThumbnail READ downloadThumbnail WRITE setDownloadThumbnail NOTIFY downloadThumbnailChanged)
     Q_PROPERTY(bool downloadImage READ downloadImage WRITE setDownloadImage NOTIFY downloadImageChanged)
     Q_PROPERTY(QUrl imagePath READ imagePath NOTIFY imagePathChanged)
+    Q_PROPERTY(Status status READ status NOTIFY statusChanged)
 
 public:
+    enum Status {
+        Null,
+        Ready,
+        Downloading,
+        Error
+    };
+    Q_ENUM(Status)
+
     explicit NextcloudImageDownloader(QObject *parent = nullptr);
 
     // QQmlParserStatus
@@ -57,6 +66,7 @@ public:
     void setDownloadImage(bool v);
 
     QUrl imagePath() const;
+    Status status() const;
 
 Q_SIGNALS:
     void imageCacheChanged();
@@ -67,15 +77,18 @@ Q_SIGNALS:
     void downloadThumbnailChanged();
     void downloadImageChanged();
     void imagePathChanged();
+    void statusChanged();
 
 private:
     void loadImage();
+    void setStatus(Status status);
     void populateFinished(int idempToken, const QString &path);
     void populateFailed(int idempToken, const QString &errorMessage);
 
     bool m_deferLoad = false;
     SyncCache::ImageCache *m_imageCache = nullptr;
     int m_accountId = 0;
+    Status m_status = Null;
     QString m_userId;
     QString m_albumId;
     QString m_photoId;

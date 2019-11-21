@@ -22,7 +22,7 @@ BackgroundItem {
     property string albumThumbnailPath
     property int photoCount
 
-    height: Theme.itemSizeExtraLarge
+    height: image.height
 
     HighlightImage {
         id: image

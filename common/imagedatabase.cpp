@@ -22,11 +22,13 @@ using namespace SyncCache;
 
 namespace {
 
-QString constructAlbumIdentifier(int accountId, const QString &userId, const QString &albumId) {
+QString constructAlbumIdentifier(int accountId, const QString &userId, const QString &albumId)
+{
     return QStringLiteral("%1|%2|%3").arg(accountId).arg(userId, albumId);
 }
 
-bool upgradeVersion1to2Fn(QSqlDatabase &database) {
+bool upgradeVersion1to2Fn(QSqlDatabase &database)
+{
     QSqlQuery addFileSizeQuery(QStringLiteral("ALTER TABLE Photos ADD fileSize INTEGER;"), database);
     if (addFileSizeQuery.lastError().isValid()) {
         qWarning() << "Failed to add Photos fileSize column to images database schema for version 2:" << addFileSizeQuery.lastError().text();
@@ -58,6 +60,18 @@ bool upgradeVersion1to2Fn(QSqlDatabase &database) {
     return true;
 }
 
+bool upgradeVersion2to3Fn(QSqlDatabase &database)
+{
+    QSqlQuery addUserDisplayNameQuery(QStringLiteral("ALTER TABLE Users ADD displayName TEXT;"), database);
+    if (addUserDisplayNameQuery.lastError().isValid()) {
+        qWarning() << "Failed to add Users displayName column to images database schema for version 2:" << addUserDisplayNameQuery.lastError().text();
+        return false;
+    }
+    addUserDisplayNameQuery.finish();
+
+    return true;
+}
+
 }
 
 ImageDatabasePrivate::ImageDatabasePrivate(ImageDatabase *parent)
@@ -67,7 +81,7 @@ ImageDatabasePrivate::ImageDatabasePrivate(ImageDatabase *parent)
 
 int ImageDatabasePrivate::currentSchemaVersion() const
 {
-    return 2;
+    return 3;
 }
 
 QVector<const char *> ImageDatabasePrivate::createStatements() const
@@ -76,6 +90,7 @@ QVector<const char *> ImageDatabasePrivate::createStatements() const
             "\n CREATE TABLE Users ("
             "\n accountId INTEGER,"
             "\n userId TEXT,"
+            "\n displayName TEXT,"
             "\n thumbnailUrl TEXT,"
             "\n thumbnailPath TEXT,"
             "\n thumbnailFileName TEXT,"
@@ -133,9 +148,15 @@ QVector<UpgradeOperation> ImageDatabasePrivate::upgradeVersions() const
          0 // NULL-terminated
     };
 
+    static const char *upgradeVersion2to3[] = {
+         "PRAGMA user_version=3",
+         0 // NULL-terminated
+    };
+
     static QVector<UpgradeOperation> retn {
         { 0, upgradeVersion0to1 },
         { upgradeVersion1to2Fn, upgradeVersion1to2 },
+        { upgradeVersion2to3Fn, upgradeVersion2to3 },
     };
 
     return retn;
@@ -270,7 +291,7 @@ QVector<SyncCache::User> ImageDatabase::users(DatabaseError *error) const
 {
     SYNCCACHE_DB_D(const ImageDatabase);
 
-    const QString queryString = QStringLiteral("SELECT accountId, userId, thumbnailUrl, thumbnailPath, thumbnailFileName FROM USERS"
+    const QString queryString = QStringLiteral("SELECT accountId, userId, displayName, thumbnailUrl, thumbnailPath, thumbnailFileName FROM USERS"
                                                " ORDER BY accountId ASC, userId ASC");
 
     const QList<QPair<QString, QVariant> > bindValues;
@@ -280,6 +301,7 @@ QVector<SyncCache::User> ImageDatabase::users(DatabaseError *error) const
         User currUser;
         currUser.accountId = selectQuery.value(whichValue++).toInt();
         currUser.userId = selectQuery.value(whichValue++).toString();
+        currUser.displayName = selectQuery.value(whichValue++).toString();
         currUser.thumbnailUrl = QUrl(selectQuery.value(whichValue++).toString());
         currUser.thumbnailPath = QUrl(selectQuery.value(whichValue++).toString());
         currUser.thumbnailFileName = selectQuery.value(whichValue++).toString();
@@ -298,6 +320,17 @@ QVector<SyncCache::User> ImageDatabase::users(DatabaseError *error) const
 QVector<SyncCache::Album> ImageDatabase::albums(int accountId, const QString &userId, DatabaseError *error) const
 {
     SYNCCACHE_DB_D(const ImageDatabase);
+
+    if (accountId <= 0) {
+        setDatabaseError(error, DatabaseError::InvalidArgumentError,
+                         QStringLiteral("Cannot fetch albums, invalid accountId: %1").arg(accountId));
+        return QVector<SyncCache::Album>();
+    }
+    if (userId.isEmpty()) {
+        setDatabaseError(error, DatabaseError::InvalidArgumentError,
+                         QStringLiteral("Cannot fetch albums, userId is empty"));
+        return QVector<SyncCache::Album>();
+    }
 
     const QString queryString = QStringLiteral("SELECT albumId, photoCount, thumbnailUrl, thumbnailPath, parentAlbumId, albumName, thumbnailFileName FROM ALBUMS"
                                                " WHERE accountId = :accountId AND userId = :userId"
@@ -393,19 +426,29 @@ User ImageDatabase::user(int accountId, const QString &userId, DatabaseError *er
 {
     SYNCCACHE_DB_D(const ImageDatabase);
 
-    const QString queryString = QStringLiteral("SELECT thumbnailUrl, thumbnailPath, thumbnailFileName FROM USERS"
-                                               " WHERE accountId = :accountId AND userId = :userId");
+    if (accountId <= 0) {
+        setDatabaseError(error, DatabaseError::InvalidArgumentError,
+                         QStringLiteral("Cannot fetch user, invalid accountId: %1").arg(accountId));
+        return User();
+    }
 
-    const QList<QPair<QString, QVariant> > bindValues {
-        qMakePair<QString, QVariant>(QStringLiteral(":accountId"), accountId),
-        qMakePair<QString, QVariant>(QStringLiteral(":userId"), userId)
+    QList<QPair<QString, QVariant> > bindValues {
+        qMakePair<QString, QVariant>(QStringLiteral(":accountId"), accountId)
     };
 
-    auto resultHandler = [accountId, userId](DatabaseQuery &selectQuery) -> SyncCache::User {
+    QString queryString = QStringLiteral("SELECT userId, displayName, thumbnailUrl, thumbnailPath, thumbnailFileName FROM USERS"
+                                         " WHERE accountId = :accountId");
+    if (!userId.isEmpty()) {
+        queryString += QStringLiteral(" AND userId = :userId");
+        bindValues.append(qMakePair<QString, QVariant>(QStringLiteral(":userId"), userId));
+    }
+
+    auto resultHandler = [accountId](DatabaseQuery &selectQuery) -> SyncCache::User {
         int whichValue = 0;
         User currUser;
         currUser.accountId = accountId;
-        currUser.userId = userId;
+        currUser.userId = selectQuery.value(whichValue++).toString();
+        currUser.displayName = selectQuery.value(whichValue++).toString();
         currUser.thumbnailUrl = QUrl(selectQuery.value(whichValue++).toString());
         currUser.thumbnailPath = QUrl(selectQuery.value(whichValue++).toString());
         currUser.thumbnailFileName = selectQuery.value(whichValue++).toString();
@@ -424,6 +467,22 @@ User ImageDatabase::user(int accountId, const QString &userId, DatabaseError *er
 Album ImageDatabase::album(int accountId, const QString &userId, const QString &albumId, DatabaseError *error) const
 {
     SYNCCACHE_DB_D(const ImageDatabase);
+
+    if (accountId <= 0) {
+        setDatabaseError(error, DatabaseError::InvalidArgumentError,
+                         QStringLiteral("Cannot fetch album, invalid accountId: %1").arg(accountId));
+        return Album();
+    }
+    if (userId.isEmpty()) {
+        setDatabaseError(error, DatabaseError::InvalidArgumentError,
+                         QStringLiteral("Cannot fetch album, userId is empty"));
+        return Album();
+    }
+    if (albumId.isEmpty()) {
+        setDatabaseError(error, DatabaseError::InvalidArgumentError,
+                         QStringLiteral("Cannot fetch album, albumId is empty"));
+        return Album();
+    }
 
     const QString queryString = QStringLiteral("SELECT photoCount, thumbnailUrl, thumbnailPath, parentAlbumId, albumName, thumbnailFileName FROM ALBUMS"
                                                " WHERE accountId = :accountId AND userId = :userId AND albumId = :albumId");
@@ -461,6 +520,27 @@ Album ImageDatabase::album(int accountId, const QString &userId, const QString &
 Photo ImageDatabase::photo(int accountId, const QString &userId, const QString &albumId, const QString &photoId, DatabaseError *error) const
 {
     SYNCCACHE_DB_D(const ImageDatabase);
+
+    if (accountId <= 0) {
+        setDatabaseError(error, DatabaseError::InvalidArgumentError,
+                         QStringLiteral("Cannot fetch photo, invalid accountId: %1").arg(accountId));
+        return Photo();
+    }
+    if (userId.isEmpty()) {
+        setDatabaseError(error, DatabaseError::InvalidArgumentError,
+                         QStringLiteral("Cannot fetch photo, userId is empty"));
+        return Photo();
+    }
+    if (albumId.isEmpty()) {
+        setDatabaseError(error, DatabaseError::InvalidArgumentError,
+                         QStringLiteral("Cannot fetch photo, albumId is empty"));
+        return Photo();
+    }
+    if (photoId.isEmpty()) {
+        setDatabaseError(error, DatabaseError::InvalidArgumentError,
+                         QStringLiteral("Cannot fetch photo, photoId is empty"));
+        return Photo();
+    }
 
     const QString queryString = QStringLiteral("SELECT createdTimestamp, updatedTimestamp, fileName, albumPath, description,"
                                                " thumbnailUrl, thumbnailPath, imageUrl, imagePath, imageWidth, imageHeight, fileSize, fileType FROM Photos"
@@ -532,6 +612,17 @@ void ImageDatabase::storeUser(const User &user, DatabaseError *error)
 {
     SYNCCACHE_DB_D(ImageDatabase);
 
+    if (user.accountId <= 0) {
+        setDatabaseError(error, DatabaseError::InvalidArgumentError,
+                         QStringLiteral("Cannot store user, invalid accountId: %1").arg(user.accountId));
+        return;
+    }
+    if (user.userId.isEmpty()) {
+        setDatabaseError(error, DatabaseError::InvalidArgumentError,
+                         QStringLiteral("Cannot store user, userId is empty"));
+        return;
+    }
+
     DatabaseError err;
     const User existingUser = this->user(user.accountId, user.userId, &err);
     if (err.errorCode != DatabaseError::NoError) {
@@ -541,9 +632,9 @@ void ImageDatabase::storeUser(const User &user, DatabaseError *error)
         return;
     }
 
-    const QString insertString = QStringLiteral("INSERT INTO Users (accountId, userId, thumbnailUrl, thumbnailPath, thumbnailFileName)"
-                                                " VALUES(:accountId, :userId, :thumbnailUrl, :thumbnailPath, :thumbnailFileName)");
-    const QString updateString = QStringLiteral("UPDATE Users SET thumbnailUrl = :thumbnailUrl, thumbnailPath = :thumbnailPath, thumbnailFileName = :thumbnailFileName"
+    const QString insertString = QStringLiteral("INSERT INTO Users (accountId, userId, displayName, thumbnailUrl, thumbnailPath, thumbnailFileName)"
+                                                " VALUES(:accountId, :userId, :displayName, :thumbnailUrl, :thumbnailPath, :thumbnailFileName)");
+    const QString updateString = QStringLiteral("UPDATE Users SET displayName = :displayName, thumbnailUrl = :thumbnailUrl, thumbnailPath = :thumbnailPath, thumbnailFileName = :thumbnailFileName"
                                                 " WHERE accountId = :accountId AND userId = :userId");
 
     const bool insert = existingUser.userId.isEmpty();
@@ -552,6 +643,7 @@ void ImageDatabase::storeUser(const User &user, DatabaseError *error)
     const QList<QPair<QString, QVariant> > bindValues {
         qMakePair<QString, QVariant>(QStringLiteral(":accountId"), user.accountId),
         qMakePair<QString, QVariant>(QStringLiteral(":userId"), user.userId),
+        qMakePair<QString, QVariant>(QStringLiteral(":displayName"), user.displayName),
         qMakePair<QString, QVariant>(QStringLiteral(":thumbnailUrl"), user.thumbnailUrl),
         qMakePair<QString, QVariant>(QStringLiteral(":thumbnailPath"), user.thumbnailPath),
         qMakePair<QString, QVariant>(QStringLiteral(":thumbnailFileName"), user.thumbnailFileName)
@@ -573,6 +665,22 @@ void ImageDatabase::storeUser(const User &user, DatabaseError *error)
 void ImageDatabase::storeAlbum(const Album &album, DatabaseError *error)
 {
     SYNCCACHE_DB_D(ImageDatabase);
+
+    if (album.accountId <= 0) {
+        setDatabaseError(error, DatabaseError::InvalidArgumentError,
+                         QStringLiteral("Cannot store album, invalid accountId: %1").arg(album.accountId));
+        return;
+    }
+    if (album.userId.isEmpty()) {
+        setDatabaseError(error, DatabaseError::InvalidArgumentError,
+                         QStringLiteral("Cannot store album, userId is empty"));
+        return;
+    }
+    if (album.albumId.isEmpty()) {
+        setDatabaseError(error, DatabaseError::InvalidArgumentError,
+                         QStringLiteral("Cannot store album, albumId is empty"));
+        return;
+    }
 
     DatabaseError err;
     const Album existingAlbum = this->album(album.accountId, album.userId, album.albumId, &err);
@@ -620,6 +728,27 @@ void ImageDatabase::storeAlbum(const Album &album, DatabaseError *error)
 void ImageDatabase::storePhoto(const Photo &photo, DatabaseError *error)
 {
     SYNCCACHE_DB_D(ImageDatabase);
+
+    if (photo.accountId <= 0) {
+        setDatabaseError(error, DatabaseError::InvalidArgumentError,
+                         QStringLiteral("Cannot store photo, invalid accountId: %1").arg(photo.accountId));
+        return;
+    }
+    if (photo.userId.isEmpty()) {
+        setDatabaseError(error, DatabaseError::InvalidArgumentError,
+                         QStringLiteral("Cannot store photo, userId is empty"));
+        return;
+    }
+    if (photo.albumId.isEmpty()) {
+        setDatabaseError(error, DatabaseError::InvalidArgumentError,
+                         QStringLiteral("Cannot store photo, albumId is empty"));
+        return;
+    }
+    if (photo.photoId.isEmpty()) {
+        setDatabaseError(error, DatabaseError::InvalidArgumentError,
+                         QStringLiteral("Cannot store photo, photoId is empty"));
+        return;
+    }
 
     DatabaseError err;
     const Photo existingPhoto = this->photo(photo.accountId, photo.userId, photo.albumId, photo.photoId, &err);
@@ -692,6 +821,17 @@ void ImageDatabase::deleteUser(const User &user, DatabaseError *error)
 {
     SYNCCACHE_DB_D(ImageDatabase);
 
+    if (user.accountId <= 0) {
+        setDatabaseError(error, DatabaseError::InvalidArgumentError,
+                         QStringLiteral("Cannot delete user, invalid accountId: %1").arg(user.accountId));
+        return;
+    }
+    if (user.userId.isEmpty()) {
+        setDatabaseError(error, DatabaseError::InvalidArgumentError,
+                         QStringLiteral("Cannot delete user, userId is empty"));
+        return;
+    }
+
     DatabaseError err;
     const User existingUser = this->user(user.accountId, user.userId, &err);
     if (err.errorCode != DatabaseError::NoError) {
@@ -756,6 +896,22 @@ void ImageDatabase::deleteUser(const User &user, DatabaseError *error)
 void ImageDatabase::deleteAlbum(const Album &album, DatabaseError *error)
 {
     SYNCCACHE_DB_D(ImageDatabase);
+
+    if (album.accountId <= 0) {
+        setDatabaseError(error, DatabaseError::InvalidArgumentError,
+                         QStringLiteral("Cannot delete album, invalid accountId: %1").arg(album.accountId));
+        return;
+    }
+    if (album.userId.isEmpty()) {
+        setDatabaseError(error, DatabaseError::InvalidArgumentError,
+                         QStringLiteral("Cannot delete album, userId is empty"));
+        return;
+    }
+    if (album.albumId.isEmpty()) {
+        setDatabaseError(error, DatabaseError::InvalidArgumentError,
+                         QStringLiteral("Cannot delete album, albumId is empty"));
+        return;
+    }
 
     DatabaseError err;
     const Album existingAlbum = this->album(album.accountId, album.userId, album.albumId, &err);
@@ -824,6 +980,27 @@ void ImageDatabase::deleteAlbum(const Album &album, DatabaseError *error)
 void ImageDatabase::deletePhoto(const Photo &photo, DatabaseError *error)
 {
     SYNCCACHE_DB_D(ImageDatabase);
+
+    if (photo.accountId <= 0) {
+        setDatabaseError(error, DatabaseError::InvalidArgumentError,
+                         QStringLiteral("Cannot delete photo, invalid accountId: %1").arg(photo.accountId));
+        return;
+    }
+    if (photo.userId.isEmpty()) {
+        setDatabaseError(error, DatabaseError::InvalidArgumentError,
+                         QStringLiteral("Cannot delete photo, userId is empty"));
+        return;
+    }
+    if (photo.albumId.isEmpty()) {
+        setDatabaseError(error, DatabaseError::InvalidArgumentError,
+                         QStringLiteral("Cannot delete photo, albumId is empty"));
+        return;
+    }
+    if (photo.photoId.isEmpty()) {
+        setDatabaseError(error, DatabaseError::InvalidArgumentError,
+                         QStringLiteral("Cannot delete photo, photoId is empty"));
+        return;
+    }
 
     DatabaseError err;
     const Photo existingPhoto = this->photo(photo.accountId, photo.userId, photo.albumId, photo.photoId, &err);
