@@ -14,6 +14,9 @@
 #include <QXmlStreamReader>
 #include <QJsonDocument>
 #include <QJsonParseError>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QJsonValue>
 
 const QString XmlReplyParser::XmlElementTextKey = QStringLiteral("@text");
 
@@ -64,10 +67,21 @@ QVariantMap elementToVariantMap(QXmlStreamReader &reader)
     return element;
 }
 
-int ocsMetaStatusCode(const QVariantMap &ocsVariantMap)
+bool ocsMetaStatusCodeSucceeded(const QJsonObject &ocs, int *errorCode, QString *errorMessage)
 {
-    return ocsVariantMap.value(QStringLiteral("meta")).toMap()
-            .value(QStringLiteral("statuscode")).toInt();
+    const QJsonObject meta = ocs.value(QLatin1String("meta")).toObject();
+    const int code = meta.value(QLatin1String("statuscode")).toInt();
+    if (errorCode) {
+        *errorCode = code;
+    }
+    if (code != 200) {
+        const QString message = meta.value(QLatin1String("message")).toString();
+        if (errorMessage) {
+            *errorMessage = message;
+        }
+        return false;
+    }
+    return true;
 }
 
 }
@@ -225,41 +239,42 @@ QList<NetworkReplyParser::Notification> JsonReplyParser::parseNotificationRespon
         return notifs;
     }
 
-    const QVariant variant = doc.toVariant();
-    if (variant.type() != QVariant::Map) {
-        qWarning() << "Cannot convert JSON to map!";
+    const QJsonObject ocs = doc.object().value(QLatin1String("ocs")).toObject();
+    int errorCode = 0;
+    QString errorMessage;
+    if (!ocsMetaStatusCodeSucceeded(ocs, &errorCode, &errorMessage)) {
+        qWarning() << "Notifications response has non-success status code:" << errorCode << errorMessage;
         return notifs;
     }
 
-    const QVariantMap ocs = variant.toMap().value(QStringLiteral("ocs")).toMap();
-    if (ocsMetaStatusCode(ocs) != 200) {
-        qWarning() << "Notifications response has non-success status code:" << ocsMetaStatusCode(ocs);
+    const QJsonArray notificationArray = ocs.value(QLatin1String("data")).toArray();
+    if (notificationArray.isEmpty()) {
+        qWarning() << "No 'data' entry found in notifications JSON response!";
         return notifs;
     }
 
-    const QVariantList notificationList = ocs.value(QStringLiteral("data")).toList();
-    for (const QVariant &notifVariant : notificationList) {
-        const QVariantMap notifMap = notifVariant.toMap();
-
+    for (const QJsonValue &jsonValue : notificationArray) {
         NetworkReplyParser::Notification notif;
-        notif.notificationId = notifMap.value(QStringLiteral("notification_id")).toString();
-        notif.app = notifMap.value(QStringLiteral("app")).toString();
-        notif.userName = notifMap.value(QStringLiteral("user")).toString();
-        notif.dateTime = QDateTime::fromString(notifMap.value(QStringLiteral("datetime")).toString(), Qt::ISODate);
-        notif.icon = notifMap.value(QStringLiteral("icon")).toString();
-        notif.link = notifMap.value(QStringLiteral("link")).toString();
-        notif.actions = notifMap.value(QStringLiteral("actions")).toList();
+        const QJsonObject notifObject = jsonValue.toObject();
 
-        notif.objectType = notifMap.value(QStringLiteral("object_type")).toString();
-        notif.objectId = notifMap.value(QStringLiteral("object_id")).toString();
+        notif.notificationId = QString::number(notifObject.value(QLatin1String("notification_id")).toDouble());
+        notif.app = notifObject.value(QLatin1String("app")).toString();
+        notif.userName = notifObject.value(QLatin1String("user")).toString();
+        notif.dateTime = QDateTime::fromString(notifObject.value(QLatin1String("datetime")).toString(), Qt::ISODate);
+        notif.icon = notifObject.value(QLatin1String("icon")).toString();
+        notif.link = notifObject.value(QLatin1String("link")).toString();
+        notif.actions = notifObject.value(QLatin1String("actions")).toArray().toVariantList();
 
-        notif.subject = notifMap.value(QStringLiteral("subject")).toString();
-        notif.subjectRich = notifMap.value(QStringLiteral("subjectRich")).toString();
-        notif.subjectRichParameters = notifMap.value(QStringLiteral("subjectRichParameters"));
+        notif.objectType = notifObject.value(QLatin1String("object_type")).toString();
+        notif.objectId = notifObject.value(QLatin1String("object_id")).toString();
 
-        notif.message = notifMap.value(QStringLiteral("message")).toString();
-        notif.messageRich = notifMap.value(QStringLiteral("messageRich")).toString();
-        notif.messageRichParameters = notifMap.value(QStringLiteral("messageRichParameters"));
+        notif.subject = notifObject.value(QLatin1String("subject")).toString();
+        notif.subjectRich = notifObject.value(QLatin1String("subjectRich")).toString();
+        notif.subjectRichParameters = notifObject.value(QLatin1String("subjectRichParameters"));
+
+        notif.message = notifObject.value(QLatin1String("message")).toString();
+        notif.messageRich = notifObject.value(QLatin1String("messageRich")).toString();
+        notif.messageRichParameters = notifObject.value(QLatin1String("messageRichParameters"));
 
         notifs.append(notif);
     }
