@@ -16,23 +16,17 @@ import com.jolla.eventsview.nextcloud 1.0
 Item {
     id: root
 
-    // used by lipstick
-    property var downloader
-    property string providerName
-    property var subviewModel
-    property int animationDuration
-    property bool collapsed: true
+    property int accountId
+    property bool collapsed
     property bool showingInActiveView
-    property int eventsColumnMaxWidth
-    signal expanded(int itemPosY)
-    signal hasRemovableItemsChanged()
-    signal mainContentHeightChanged()
 
     property int _modelCount: listView.model.count
     property int _expansionThreshold: 5
     property int _expansionMaximum: 10
     property bool _manuallyExpanded
     property string _hostUrl
+
+    signal expanded(int itemPosY)
 
     visible: _modelCount > 0
     width: parent.width
@@ -46,9 +40,8 @@ Item {
 
     NotificationGroupHeader {
         id: headerItem
-        //: Nextcloud notifications and announcements
-        //% "Nextcloud"
-        name: qsTrId("eventsview_plugin_nextcloud-la-nextcloud_notifications")
+
+        name: account.displayName
         indicator.iconSource: "image://theme/graphic-service-nextcloud"
         totalItemCount: root._modelCount
         memberCount: totalItemCount
@@ -135,13 +128,7 @@ Item {
         id: eventModel
 
         eventCache: evCache
-        Component.onCompleted: {
-            // Use the first found account, which is the one most recently added.
-            var ids = accountManager.providerAccountIdentifiers(root.providerName)
-            if (ids.length > 0) {
-                accountId = ids[0]
-            }
-        }
+        accountId: root.accountId
     }
 
     BoundedModel {
@@ -173,10 +160,6 @@ Item {
                 eventId: model.eventId
             }
         }
-    }
-
-    AccountManager {
-        id: accountManager
     }
 
     Account {

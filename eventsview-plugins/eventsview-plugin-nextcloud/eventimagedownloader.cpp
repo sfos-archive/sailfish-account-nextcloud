@@ -107,7 +107,7 @@ void NextcloudEventImageDownloader::loadImage()
         return;
     }
 
-    m_idempToken = qHash(m_eventId);
+    m_idempToken = qHash(QStringLiteral("%1|%2").arg(m_accountId).arg(m_eventId));
     QObject *contextObject = new QObject(this);
     connect(m_eventCache, &SyncCache::EventCache::populateEventImageFinished,
             contextObject, [this, contextObject] (int idempToken, const QString &path) {
