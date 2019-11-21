@@ -52,7 +52,7 @@ Item {
         indicator.iconSource: "image://theme/graphic-service-nextcloud"
         totalItemCount: root._modelCount
         memberCount: totalItemCount
-        userRemovable: eventModel.supportedActions & NextcloudEventsModel.DeleteAllEvents
+        userRemovable: eventModel.supportedActions & NextcloudEventModel.DeleteAllEvents
 
         onRemoveRequested: {
             removeComponent.createObject(root, { "target": root })
@@ -131,7 +131,7 @@ Item {
         onTriggered: eventModel.refresh()
     }
 
-    NextcloudEventsModel {
+    NextcloudEventModel {
         id: eventModel
 
         eventCache: evCache
@@ -159,7 +159,7 @@ Item {
                          : "image://theme/graphic-service-nextcloud" // placeholder is not square: "image://theme/icon-l-nextcloud"
             timestamp: model.timestamp
             eventUrl: model.eventUrl
-            userRemovable: eventModel.supportedActions & NextcloudEventsModel.DeleteEvent
+            userRemovable: eventModel.supportedActions & NextcloudEventModel.DeleteEvent
 
             onRemoveRequested: {
                 removeComponent.createObject(delegateItem, { "target": delegateItem })

@@ -21,23 +21,23 @@
 // mlite5
 #include <MGConfItem>
 
-NextcloudEventsModel::NextcloudEventsModel(QObject *parent)
+NextcloudEventModel::NextcloudEventModel(QObject *parent)
     : QAbstractListModel(parent)
 {
     qRegisterMetaType<SyncCache::Event>();
     qRegisterMetaType<QVector<SyncCache::Event> >();
 }
 
-NextcloudEventsModel::~NextcloudEventsModel()
+NextcloudEventModel::~NextcloudEventModel()
 {
 }
 
-void NextcloudEventsModel::classBegin()
+void NextcloudEventModel::classBegin()
 {
     m_deferLoad = true;
 }
 
-void NextcloudEventsModel::componentComplete()
+void NextcloudEventModel::componentComplete()
 {
     m_deferLoad = false;
     if (m_eventCache) {
@@ -45,14 +45,14 @@ void NextcloudEventsModel::componentComplete()
     }
 }
 
-QModelIndex NextcloudEventsModel::index(int row, int column, const QModelIndex &parent) const
+QModelIndex NextcloudEventModel::index(int row, int column, const QModelIndex &parent) const
 {
     return !parent.isValid() && column == 0 && row >= 0 && row < m_data.size()
             ? createIndex(row, column)
             : QModelIndex();
 }
 
-QVariant NextcloudEventsModel::data(const QModelIndex &index, int role) const
+QVariant NextcloudEventModel::data(const QModelIndex &index, int role) const
 {
     const int row = index.row();
     if (!index.isValid() || row < 0 || row >= m_data.size()) {
@@ -76,12 +76,12 @@ QVariant NextcloudEventsModel::data(const QModelIndex &index, int role) const
     }
 }
 
-int NextcloudEventsModel::rowCount(const QModelIndex &) const
+int NextcloudEventModel::rowCount(const QModelIndex &) const
 {
     return m_data.size();
 }
 
-QHash<int, QByteArray> NextcloudEventsModel::roleNames() const
+QHash<int, QByteArray> NextcloudEventModel::roleNames() const
 {
     static QHash<int, QByteArray> retn {
         { AccountIdRole,        "accountId" },
@@ -98,12 +98,12 @@ QHash<int, QByteArray> NextcloudEventsModel::roleNames() const
     return retn;
 }
 
-SyncCache::EventCache *NextcloudEventsModel::eventCache() const
+SyncCache::EventCache *NextcloudEventModel::eventCache() const
 {
     return m_eventCache;
 }
 
-void NextcloudEventsModel::setEventCache(SyncCache::EventCache *cache)
+void NextcloudEventModel::setEventCache(SyncCache::EventCache *cache)
 {
     if (m_eventCache == cache) {
         return;
@@ -170,12 +170,12 @@ void NextcloudEventsModel::setEventCache(SyncCache::EventCache *cache)
     });
 }
 
-int NextcloudEventsModel::accountId() const
+int NextcloudEventModel::accountId() const
 {
     return m_accountId;
 }
 
-void NextcloudEventsModel::setAccountId(int id)
+void NextcloudEventModel::setAccountId(int id)
 {
     if (m_accountId == id) {
         return;
@@ -190,7 +190,7 @@ void NextcloudEventsModel::setAccountId(int id)
     }
 }
 
-QVariantMap NextcloudEventsModel::at(int row) const
+QVariantMap NextcloudEventModel::at(int row) const
 {
     QVariantMap retn;
     if (row < 0 || row >= rowCount()) {
@@ -206,7 +206,7 @@ QVariantMap NextcloudEventsModel::at(int row) const
     return retn;
 }
 
-void NextcloudEventsModel::loadData()
+void NextcloudEventModel::loadData()
 {
     if (!m_eventCache) {
         return;
@@ -219,7 +219,7 @@ void NextcloudEventsModel::loadData()
     if (!m_notifCapabilityConf) {
         m_notifCapabilityConf = new MGConfItem("/sailfish/sync/profiles/" + m_buteoProfileId + "/ocs-endpoints", this);
         connect(m_notifCapabilityConf, &MGConfItem::valueChanged,
-                this, &NextcloudEventsModel::updateSupportedActions);
+                this, &NextcloudEventModel::updateSupportedActions);
     }
     updateSupportedActions();
 
@@ -253,12 +253,12 @@ void NextcloudEventsModel::loadData()
             return;
         }
         contextObject->deleteLater();
-        qmlInfo(this) << "NextcloudEventsModel::loadData: failed:" << errorMessage;
+        qmlInfo(this) << "NextcloudEventModel::loadData: failed:" << errorMessage;
     });
     m_eventCache->requestEvents(m_accountId, false);
 }
 
-void NextcloudEventsModel::updateSupportedActions()
+void NextcloudEventModel::updateSupportedActions()
 {
     if (m_accountId <= 0 || !m_notifCapabilityConf) {
         return;
@@ -282,7 +282,7 @@ void NextcloudEventsModel::updateSupportedActions()
 
 // call this periodically to detect changes made to the database by another process.
 // this would go away if we had daemonized storage rather than direct-file database access...
-void NextcloudEventsModel::refresh()
+void NextcloudEventModel::refresh()
 {
     if (!m_eventCache) {
         return;
@@ -379,17 +379,17 @@ void NextcloudEventsModel::refresh()
             return;
         }
         contextObject->deleteLater();
-        qmlInfo(this) << "NextcloudEventsModel::refresh: failed:" << errorMessage;
+        qmlInfo(this) << "NextcloudEventModel::refresh: failed:" << errorMessage;
     });
     m_eventCache->requestEvents(m_accountId, false);
 }
 
-NextcloudEventsModel::Actions NextcloudEventsModel::supportedActions() const
+NextcloudEventModel::Actions NextcloudEventModel::supportedActions() const
 {
     return m_supportedActions;
 }
 
-void NextcloudEventsModel::deleteEventAt(int row)
+void NextcloudEventModel::deleteEventAt(int row)
 {
     if (row < 0 || row >= m_data.count()) {
         return;
@@ -403,7 +403,7 @@ void NextcloudEventsModel::deleteEventAt(int row)
     startNotificationDeleteTimer();
 }
 
-void NextcloudEventsModel::deleteAllEvents()
+void NextcloudEventModel::deleteAllEvents()
 {
     if (!m_supportedActions & DeleteAllEvents) {
         qmlInfo(this) << "Notification delete-all action is not supported!";
@@ -418,20 +418,20 @@ void NextcloudEventsModel::deleteAllEvents()
     }
 }
 
-void NextcloudEventsModel::startNotificationDeleteTimer()
+void NextcloudEventModel::startNotificationDeleteTimer()
 {
     // Batch notification deletions to avoid unnecessary sync requests.
     if (!m_notificationDeleteTimer) {
         m_notificationDeleteTimer = new QTimer(this);
         m_notificationDeleteTimer->setSingleShot(true);
         connect(m_notificationDeleteTimer, &QTimer::timeout,
-                this, &NextcloudEventsModel::notificationDeleteTimeout);
+                this, &NextcloudEventModel::notificationDeleteTimeout);
         m_notificationDeleteTimer->setInterval(10 * 1000);
     }
     m_notificationDeleteTimer->start();
 }
 
-void NextcloudEventsModel::notificationDeleteTimeout()
+void NextcloudEventModel::notificationDeleteTimeout()
 {
     if (m_notificationsToDelete.isEmpty()) {
         return;
