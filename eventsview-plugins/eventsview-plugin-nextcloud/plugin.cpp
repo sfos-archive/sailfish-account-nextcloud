@@ -58,7 +58,7 @@ public:
         Q_ASSERT(QLatin1String(uri) == QLatin1String("com.jolla.eventsview.nextcloud"));
 
         qmlRegisterType<NextcloudEventCache> (uri, 1, 0, "NextcloudEventCache");
-        qmlRegisterType<NextcloudEventsModel> (uri, 1, 0, "NextcloudEventsModel");
+        qmlRegisterType<NextcloudEventModel> (uri, 1, 0, "NextcloudEventModel");
         qmlRegisterType<NextcloudEventImageDownloader> (uri, 1, 0, "NextcloudEventImageDownloader");
     }
 };

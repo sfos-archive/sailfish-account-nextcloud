@@ -24,7 +24,7 @@ class QTimer;
 class MGConfItem;
 class QDBusInterface;
 
-class NextcloudEventsModel : public QAbstractListModel, public QQmlParserStatus
+class NextcloudEventModel : public QAbstractListModel, public QQmlParserStatus
 {
     Q_OBJECT
     Q_INTERFACES(QQmlParserStatus)
@@ -42,8 +42,8 @@ public:
     Q_DECLARE_FLAGS(Actions, Action)
     Q_FLAG(Actions)
 
-    explicit NextcloudEventsModel(QObject *parent = nullptr);
-    ~NextcloudEventsModel();
+    explicit NextcloudEventModel(QObject *parent = nullptr);
+    ~NextcloudEventModel();
 
     // QQmlParserStatus
     void classBegin() override;
@@ -98,7 +98,7 @@ private:
 
     bool m_deferLoad = false;
     int m_accountId = 0;
-    NextcloudEventsModel::Actions m_supportedActions = 0;
+    NextcloudEventModel::Actions m_supportedActions = 0;
     QVector<SyncCache::Event> m_data;
     SyncCache::EventCache *m_eventCache = nullptr;
 
