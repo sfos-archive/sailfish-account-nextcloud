@@ -394,7 +394,7 @@ void NextcloudEventModel::deleteEventAt(int row)
     if (row < 0 || row >= m_data.count()) {
         return;
     }
-    if (!m_supportedActions & DeleteEvent) {
+    if (!(m_supportedActions & DeleteEvent)) {
         qmlInfo(this) << "Notification delete action is not supported!";
         return;
     }
@@ -405,7 +405,7 @@ void NextcloudEventModel::deleteEventAt(int row)
 
 void NextcloudEventModel::deleteAllEvents()
 {
-    if (!m_supportedActions & DeleteAllEvents) {
+    if (!(m_supportedActions & DeleteAllEvents)) {
         qmlInfo(this) << "Notification delete-all action is not supported!";
         return;
     }

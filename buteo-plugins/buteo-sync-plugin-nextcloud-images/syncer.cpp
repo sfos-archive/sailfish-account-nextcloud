@@ -319,12 +319,12 @@ void Syncer::calculateAndApplyDelta(
     if (!firstPhotoId.isEmpty()) {
         SyncCache::Photo firstPhoto = serverPhotos.value(firstPhotoId);
         if (firstPhoto.accountId > 0) {
-            SyncCache::User currentUser = db.user(m_accountId, m_userId, &error);{
+            SyncCache::User currentUser = db.user(m_accountId, m_userId, &error);
             if (error.errorCode != SyncCache::DatabaseError::NoError) {
                 LOG_WARNING("Failed to find user:" << m_userId << "for account:" << m_accountId
                             << error.errorCode << error.errorMessage);
             } else if (currentUser.thumbnailUrl.isEmpty()
-                       || currentUser.thumbnailUrl != firstPhoto.thumbnailUrl)
+                       || currentUser.thumbnailUrl != firstPhoto.thumbnailUrl) {
                 currentUser.thumbnailUrl = firstPhoto.thumbnailUrl;
                 currentUser.thumbnailPath = firstPhoto.thumbnailPath;
                 currentUser.thumbnailFileName = firstPhoto.fileName;
