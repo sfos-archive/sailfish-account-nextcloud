@@ -52,7 +52,6 @@ private:
     bool loadConfig();
 
     QFile *m_downloadedFile = nullptr;
-    WebDavRequestGenerator *m_requestGenerator = nullptr;
     AccountSyncManager m_accountSyncManager;
     AccountSyncManager::BackupRestoreOptions m_backupRestoreOptions;
     QStringList m_backupFileNames;

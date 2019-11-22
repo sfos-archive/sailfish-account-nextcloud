@@ -30,18 +30,19 @@ public:
 
     void purgeAccount(int accountId) override;
 
-private Q_SLOTS:
+private:
+    void handleUserInfoReply();
+    bool performConfigRequest();
     void handleConfigReply();
     void handleGalleryMetaDataReply();
 
-private:
     void beginSync() override;
-    void calculateAndApplyDelta(
-            const QHash<QString, SyncCache::Album> &albums,
-            const QHash<QString, SyncCache::Photo> &photos);
+    void calculateAndApplyDelta(const QHash<QString, SyncCache::Album> &albums,
+                                const QHash<QString, SyncCache::Photo> &photos,
+                                const QString &firstPhotoId);
 
-    JsonRequestGenerator *m_requestGenerator = nullptr;
     ReplyParser *m_replyParser = nullptr;
+    QString m_userId;
 };
 
 #endif // NEXTCLOUD_IMAGES_SYNCER_P_H

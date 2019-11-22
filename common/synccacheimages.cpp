@@ -18,9 +18,13 @@
 using namespace SyncCache;
 
 namespace {
-    QString privilegedImagesDirPath() {
-        return QStringLiteral("%1/system/privileged/Images").arg(QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation));
-    }
+
+static const int ImageDownloadTimeout = 60 * 1000;
+
+QString privilegedImagesDirPath() {
+    return QStringLiteral("%1/system/privileged/Images").arg(QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation));
+}
+
 }
 
 //-----------------------------------------------------------------------------
@@ -33,6 +37,7 @@ User& User::operator=(const User &other)
 
     accountId = other.accountId;
     userId = other.userId;
+    displayName = other.displayName;
     thumbnailUrl = other.thumbnailUrl;
     thumbnailPath = other.thumbnailPath;
     thumbnailFileName = other.thumbnailFileName;
@@ -112,13 +117,13 @@ QUrl ImageDownloadWatcher::imageUrl() const
 ImageDownload::ImageDownload(int idempToken,
         const QUrl &imageUrl,
         const QString &fileName,
-        const QString &subDirPath,
+        const QString &fileDirPath,
         const QNetworkRequest &templateRequest,
         ImageDownloadWatcher *watcher)
     : m_idempToken(idempToken)
     , m_imageUrl(imageUrl)
     , m_fileName(fileName)
-    , m_subDirPath(subDirPath)
+    , m_fileDirPath(fileDirPath)
     , m_templateRequest(templateRequest)
     , m_watcher(watcher)
 {
@@ -138,7 +143,6 @@ ImageDownload::~ImageDownload()
 ImageDownloader::ImageDownloader(int maxActive, QObject *parent)
     : QObject(parent)
     , m_maxActive(maxActive > 0 && maxActive < 20 ? maxActive : 4)
-    , m_imageDirectory(QStringLiteral("Nextcloud"))
 {
 }
 
@@ -146,15 +150,14 @@ ImageDownloader::~ImageDownloader()
 {
 }
 
-void ImageDownloader::setImageDirectory(const QString &path)
-{
-    m_imageDirectory = path;
-}
-
-ImageDownloadWatcher *ImageDownloader::downloadImage(int idempToken, const QUrl &imageUrl, const QString &fileName, const QString &subDirPath, const QNetworkRequest &templateRequest)
+ImageDownloadWatcher *ImageDownloader::downloadImage(int idempToken,
+                                                     const QUrl &imageUrl,
+                                                     const QString &fileName,
+                                                     const QString &fileDirPath,
+                                                     const QNetworkRequest &templateRequest)
 {
     ImageDownloadWatcher *watcher = new ImageDownloadWatcher(idempToken, imageUrl, this);
-    ImageDownload *download = new ImageDownload(idempToken, imageUrl, fileName, subDirPath, templateRequest, watcher);
+    ImageDownload *download = new ImageDownload(idempToken, imageUrl, fileName, fileDirPath, templateRequest, watcher);
     m_pending.enqueue(download);
     QMetaObject::invokeMethod(this, "triggerDownload", Qt::QueuedConnection);
     return watcher; // caller takes ownership.
@@ -172,12 +175,13 @@ void ImageDownloader::triggerDownload()
 
         connect(download->m_timeoutTimer, &QTimer::timeout, this, [this, download] {
             if (download->m_watcher) {
-                emit download->m_watcher->downloadFailed(QStringLiteral("Image download timed out"));
+                emit download->m_watcher->downloadFailed(QStringLiteral("Image download timed out for %1")
+                                                         .arg(download->m_imageUrl.toString()));
             }
             eraseActiveDownload(download);
         });
 
-        download->m_timeoutTimer->setInterval(20 * 1000);
+        download->m_timeoutTimer->setInterval(ImageDownloadTimeout);
         download->m_timeoutTimer->setSingleShot(true);
         download->m_timeoutTimer->start();
 
@@ -186,6 +190,7 @@ void ImageDownloader::triggerDownload()
         imageUrl.setUserName(download->m_templateRequest.url().userName());
         imageUrl.setPassword(download->m_templateRequest.url().password());
         request.setUrl(imageUrl);
+
         QNetworkReply *reply = m_qnam.get(request);
         download->m_reply = reply;
         if (reply) {
@@ -202,21 +207,20 @@ void ImageDownloader::triggerDownload()
                             emit download->m_watcher->downloadFailed(QStringLiteral("Empty image data received, aborting"));
                         }
                     } else {
-                        const QString filepath = imageFilePath(download->m_subDirPath, download->m_fileName);
-                        QDir dir = QFileInfo(filepath).dir();
+                        QDir dir(download->m_fileDirPath);
                         if (!dir.exists()) {
                             dir.mkpath(QStringLiteral("."));
                         }
-                        QFile file(filepath);
+                        QFile file(dir.absoluteFilePath(download->m_fileName));
                         if (!file.open(QFile::WriteOnly)) {
                             if (download->m_watcher) {
                                 emit download->m_watcher->downloadFailed(QStringLiteral("Error opening image file %1 for writing: %2")
-                                                                                   .arg(filepath, file.errorString()));
+                                                                                   .arg(file.fileName(), file.errorString()));
                             }
                         } else {
                             file.write(replyData);
                             file.close();
-                            emit download->m_watcher->downloadFinished(filepath);
+                            emit download->m_watcher->downloadFinished(file.fileName());
                         }
                     }
                 }
@@ -243,10 +247,26 @@ void ImageDownloader::eraseActiveDownload(ImageDownload *download)
     QMetaObject::invokeMethod(this, "triggerDownload", Qt::QueuedConnection);
 }
 
-QString ImageDownloader::imageFilePath(const QString &subDirPath, const QString &fileName) const
+QString ImageDownloader::userImageDownloadDir(int accountId, const QString &userId, bool thumbnail) const
 {
-    return QStringLiteral("%1/%2/%3/%4")
-            .arg(privilegedImagesDirPath(), m_imageDirectory, subDirPath, fileName);
+    const QString path = thumbnail
+            ? imageDownloadDir(accountId) + "/users-thumbnails"
+            : imageDownloadDir(accountId) + "/users";
+    return userId.isEmpty() ? path : path + "/" + userId;
+}
+
+QString ImageDownloader::albumImageDownloadDir(int accountId, const QString &albumName, bool thumbnail) const
+{
+    const QString path = thumbnail
+            ? imageDownloadDir(accountId) + "/albums-thumbnails"
+            : imageDownloadDir(accountId) + "/albums";
+    return albumName.isEmpty() ? path : path + "/" + albumName;
+}
+
+QString ImageDownloader::imageDownloadDir(int accountId)
+{
+    return QStringLiteral("%1/nextcloud/account-%2")
+            .arg(privilegedImagesDirPath()).arg(accountId);
 }
 
 //-----------------------------------------------------------------------------
@@ -296,6 +316,17 @@ void ImageCacheThreadWorker::requestUsers()
     }
 }
 
+void ImageCacheThreadWorker::requestUser(int accountId, const QString &userId)
+{
+    DatabaseError error;
+    SyncCache::User user = m_db.user(accountId, userId, &error);
+    if (error.errorCode != DatabaseError::NoError) {
+        emit requestUserFailed(accountId, userId, error.errorMessage);
+    } else {
+        emit requestUserFinished(accountId, userId, user);
+    }
+}
+
 void ImageCacheThreadWorker::requestAlbums(int accountId, const QString &userId)
 {
     DatabaseError error;
@@ -334,7 +365,9 @@ void ImageCacheThreadWorker::populateUserThumbnail(int idempToken, int accountId
     DatabaseError error;
     User user = m_db.user(accountId, userId, &error);
     if (error.errorCode != DatabaseError::NoError) {
-        emit populateUserThumbnailFailed(idempToken, QStringLiteral("Error occurred while reading user info from db: %1").arg(error.errorMessage));
+        emit populateUserThumbnailFailed(idempToken, QStringLiteral("Error occurred while reading user %1 info from db: %2")
+                                         .arg(userId)
+                                         .arg(error.errorMessage));
         return;
     }
 
@@ -353,11 +386,12 @@ void ImageCacheThreadWorker::populateUserThumbnail(int idempToken, int accountId
     if (!m_downloader) {
         m_downloader = new ImageDownloader(4, this);
     }
+
     ImageDownloadWatcher *watcher = m_downloader->downloadImage(
                 idempToken,
                 user.thumbnailUrl,
                 user.thumbnailFileName,
-                QStringLiteral(".thumbnails"),
+                m_downloader->userImageDownloadDir(accountId, userId, true),
                 requestTemplate);
     connect(watcher, &ImageDownloadWatcher::downloadFailed, this, [this, watcher, idempToken] (const QString &errorMessage) {
         emit populateUserThumbnailFailed(idempToken, errorMessage);
@@ -409,7 +443,7 @@ void ImageCacheThreadWorker::populateAlbumThumbnail(int idempToken, int accountI
                 idempToken,
                 album.thumbnailUrl,
                 album.thumbnailFileName,
-                QStringLiteral(".thumbnails/%1").arg(album.albumName),
+                m_downloader->albumImageDownloadDir(accountId, album.albumName, true),
                 requestTemplate);
     connect(watcher, &ImageDownloadWatcher::downloadFailed, this, [this, watcher, idempToken] (const QString &errorMessage) {
         emit populateAlbumThumbnailFailed(idempToken, errorMessage);
@@ -459,9 +493,9 @@ void ImageCacheThreadWorker::populatePhotoThumbnail(int idempToken, int accountI
     }
 
     // the thumbnail was already downloaded as the thumbnail for the album.
-    const QString subDirPath = QStringLiteral(".thumbnails/%1").arg(photo.albumPath);
-    thumbnailPath = m_downloader->imageFilePath(subDirPath, photo.fileName);
-    if (!thumbnailPath.isEmpty() && QFile::exists(thumbnailPath)) {
+    const QString &thumbnailDirPath = m_downloader->albumImageDownloadDir(accountId, photo.albumPath, true);
+    thumbnailPath = thumbnailDirPath + "/" + photo.fileName;
+    if (QFile::exists(thumbnailPath)) {
         photoThumbnailDownloadFinished(idempToken, photo, QUrl(thumbnailPath));
         return;
     }
@@ -470,7 +504,7 @@ void ImageCacheThreadWorker::populatePhotoThumbnail(int idempToken, int accountI
             idempToken,
             photo.thumbnailUrl,
             photo.fileName,
-            subDirPath,
+            thumbnailDirPath,
             requestTemplate);
     connect(watcher, &ImageDownloadWatcher::downloadFailed, this, [this, watcher, idempToken] (const QString &errorMessage) {
         emit populatePhotoThumbnailFailed(idempToken, errorMessage);
@@ -489,6 +523,7 @@ void ImageCacheThreadWorker::photoThumbnailDownloadFinished(int idempToken, cons
     Photo photoToStore = photo;
     photoToStore.thumbnailPath = filePath;
     m_db.storePhoto(photoToStore, &storeError);
+
     if (storeError.errorCode != DatabaseError::NoError) {
         QFile::remove(filePath.toString());
         emit populatePhotoThumbnailFailed(idempToken, storeError.errorMessage);
@@ -518,20 +553,30 @@ void ImageCacheThreadWorker::populatePhotoImage(int idempToken, int accountId, c
         emit populatePhotoImageFailed(idempToken, QStringLiteral("Empty image url specified for photo %1").arg(photoId));
         return;
     }
+
     if (!m_downloader) {
         m_downloader = new ImageDownloader(4, this);
     }
-    ImageDownloadWatcher *watcher = m_downloader->downloadImage(idempToken, photo.imageUrl, photo.fileName, photo.albumPath, requestTemplate);
+
+    ImageDownloadWatcher *watcher = m_downloader->downloadImage(
+                idempToken,
+                photo.imageUrl,
+                photo.fileName,
+                m_downloader->albumImageDownloadDir(accountId, photo.albumPath, false),
+                requestTemplate);
+
     connect(watcher, &ImageDownloadWatcher::downloadFailed, this, [this, watcher, idempToken] (const QString &errorMessage) {
         emit populatePhotoImageFailed(idempToken, errorMessage);
         watcher->deleteLater();
     });
+
     connect(watcher, &ImageDownloadWatcher::downloadFinished, this, [this, watcher, photo, idempToken] (const QUrl &filePath) {
         // the file has been downloaded to disk.  attempt to update the database.
         DatabaseError storeError;
         Photo photoToStore = photo;
         photoToStore.imagePath = filePath;
         m_db.storePhoto(photoToStore, &storeError);
+
         if (storeError.errorCode != DatabaseError::NoError) {
             QFile::remove(filePath.toString());
             emit populatePhotoImageFailed(idempToken, storeError.errorMessage);
@@ -558,6 +603,7 @@ ImageCachePrivate::ImageCachePrivate(ImageCache *parent)
     connect(&m_dbThread, &QThread::finished, m_worker, &QObject::deleteLater);
 
     connect(this, &ImageCachePrivate::openDatabase, m_worker, &ImageCacheThreadWorker::openDatabase);
+    connect(this, &ImageCachePrivate::requestUser, m_worker, &ImageCacheThreadWorker::requestUser);
     connect(this, &ImageCachePrivate::requestUsers, m_worker, &ImageCacheThreadWorker::requestUsers);
     connect(this, &ImageCachePrivate::requestAlbums, m_worker, &ImageCacheThreadWorker::requestAlbums);
     connect(this, &ImageCachePrivate::requestPhotos, m_worker, &ImageCacheThreadWorker::requestPhotos);
@@ -570,6 +616,8 @@ ImageCachePrivate::ImageCachePrivate(ImageCache *parent)
 
     connect(m_worker, &ImageCacheThreadWorker::openDatabaseFailed, parent, &ImageCache::openDatabaseFailed);
     connect(m_worker, &ImageCacheThreadWorker::openDatabaseFinished, parent, &ImageCache::openDatabaseFinished);
+    connect(m_worker, &ImageCacheThreadWorker::requestUserFailed, parent, &ImageCache::requestUserFailed);
+    connect(m_worker, &ImageCacheThreadWorker::requestUserFinished, parent, &ImageCache::requestUserFinished);
     connect(m_worker, &ImageCacheThreadWorker::requestUsersFailed, parent, &ImageCache::requestUsersFailed);
     connect(m_worker, &ImageCacheThreadWorker::requestUsersFinished, parent, &ImageCache::requestUsersFinished);
     connect(m_worker, &ImageCacheThreadWorker::requestAlbumsFailed, parent, &ImageCache::requestAlbumsFailed);
@@ -616,10 +664,21 @@ ImageCache::~ImageCache()
 {
 }
 
+QString ImageCache::imageCacheDir(int accountId)
+{
+    return ImageDownloader::imageDownloadDir(accountId);
+}
+
 void ImageCache::openDatabase(const QString &databaseFile)
 {
     Q_D(ImageCache);
     emit d->openDatabase(databaseFile);
+}
+
+void ImageCache::requestUser(int accountId, const QString &userId)
+{
+    Q_D(ImageCache);
+    emit d->requestUser(accountId, userId);
 }
 
 void ImageCache::requestUsers()

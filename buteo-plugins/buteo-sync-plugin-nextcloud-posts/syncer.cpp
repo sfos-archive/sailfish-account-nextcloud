@@ -30,7 +30,6 @@
 
 namespace {
     const int HTTP_UNAUTHORIZED_ACCESS = 401;
-    const QString NEXTCLOUD_USERID = QStringLiteral("nextcloud");
 
     const QString NotificationsEndpointsKey = QStringLiteral("ocs-endpoints");
 }
@@ -42,16 +41,10 @@ Syncer::Syncer(QObject *parent, Buteo::SyncProfile *syncProfile)
 
 Syncer::~Syncer()
 {
-    delete m_requestGenerator;
 }
 
 void Syncer::beginSync()
 {
-    delete m_requestGenerator;
-    m_requestGenerator = m_accessToken.isEmpty()
-                       ? new JsonRequestGenerator(&m_qnam, m_username, m_password)
-                       : new JsonRequestGenerator(&m_qnam, m_accessToken);
-
     if (!performCapabilitiesRequest()) {
         finishWithError("Capabilities request failed");
         return;
@@ -60,7 +53,7 @@ void Syncer::beginSync()
 
 bool Syncer::performCapabilitiesRequest()
 {
-    QNetworkReply *reply = m_requestGenerator->capabilities(m_serverUrl);
+    QNetworkReply *reply = m_requestGenerator->capabilities(NetworkRequestGenerator::JsonContentType);
     if (reply) {
         connect(reply, &QNetworkReply::finished,
                 this, &Syncer::handleCapabilitiesReply);
@@ -104,7 +97,7 @@ void Syncer::handleCapabilitiesReply()
 
 bool Syncer::performNotificationListRequest()
 {
-    QNetworkReply *reply = m_requestGenerator->notificationList(m_serverUrl);
+    QNetworkReply *reply = m_requestGenerator->notificationList(NetworkRequestGenerator::JsonContentType);
     if (reply) {
         connect(reply, &QNetworkReply::finished,
                 this, &Syncer::handleNotificationListReply);
@@ -245,7 +238,7 @@ bool Syncer::performNotificationDeleteRequest(const QStringList &notificationIds
     m_currentDeleteNotificationIds.clear();
 
     for (const QString &notificationId : notificationIds) {
-        QNetworkReply *reply = m_requestGenerator->deleteNotification(m_serverUrl, notificationId);
+        QNetworkReply *reply = m_requestGenerator->deleteNotification(notificationId);
         if (reply) {
             reply->setProperty("notificationId", notificationId);
             m_currentDeleteNotificationIds.insert(notificationId);
@@ -278,7 +271,7 @@ void Syncer::handleNotificationDeleteReply()
 
 bool Syncer::performNotificationDeleteAllRequest()
 {
-    QNetworkReply *reply = m_requestGenerator->deleteAllNotifications(m_serverUrl);
+    QNetworkReply *reply = m_requestGenerator->deleteAllNotifications();
     if (reply) {
         connect(reply, &QNetworkReply::finished,
                 this, &Syncer::handleNotificationDeleteAllReply);
@@ -303,8 +296,6 @@ void Syncer::handleNotificationDeleteAllReply()
 
 void Syncer::purgeAccount(int accountId)
 {
-    Q_UNUSED(accountId);
-
     SyncCache::EventDatabase db;
     SyncCache::DatabaseError error;
     db.openDatabase(

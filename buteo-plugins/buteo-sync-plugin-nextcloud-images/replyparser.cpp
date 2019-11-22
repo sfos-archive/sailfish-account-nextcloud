@@ -18,16 +18,7 @@
 #include <QJsonArray>
 #include <QJsonValue>
 
-ReplyParser::ReplyParser(Syncer *parent, int accountId, const QString &userId, const QUrl &serverUrl, const QString &webdavPath)
-    : q(parent), m_accountId(accountId), m_userId(userId), m_serverUrl(serverUrl), m_webdavPath(webdavPath)
-{
-}
-
-ReplyParser::~ReplyParser()
-{
-}
-
-ReplyParser::GalleryMetadata ReplyParser::parseGalleryMetadata(
+ReplyParser::GalleryMetadata ReplyParser::parseGalleryMetadata(Syncer *imageSyncer,
         const QByteArray &galleryListResponse)
 {
     /* We expect a response of the form:
@@ -83,17 +74,17 @@ ReplyParser::GalleryMetadata ReplyParser::parseGalleryMetadata(
         const int lastDirSep = photoPath.lastIndexOf('/');
         const QString albumPath = lastDirSep < 0 ? QString() : photoPath.mid(0, lastDirSep); // may be empty if home directory
         SyncCache::Photo photo;
-        photo.accountId = m_accountId;
-        photo.userId = m_userId;
-        photo.albumId = QStringLiteral("%1%2").arg(m_webdavPath, albumPath);
-        photo.photoId = QStringLiteral("%1%2").arg(m_webdavPath, photoPath);
+        photo.accountId = imageSyncer->accountId();
+        photo.userId = photoData.value("owner").toObject().value("uid").toString();
+        photo.albumId = QStringLiteral("%1%2").arg(imageSyncer->webDavPath(), albumPath);
+        photo.photoId = QStringLiteral("%1%2").arg(imageSyncer->webDavPath(), photoPath);
         photo.updatedTimestamp = QDateTime::fromTime_t(photoData.value("mtime").toVariant().toUInt());
         photo.createdTimestamp = photo.updatedTimestamp;
         photo.fileName = photoPath.mid(photoPath.lastIndexOf('/') + 1);
         photo.albumPath = albumPath;
-        photo.thumbnailUrl = m_serverUrl;
+        photo.thumbnailUrl = imageSyncer->serverUrl();
         photo.thumbnailUrl.setPath(QStringLiteral("/index.php/apps/gallery/api/preview/%1/128/128").arg(photoData.value("nodeid").toInt()));
-        photo.imageUrl = m_serverUrl;
+        photo.imageUrl = imageSyncer->serverUrl();
         photo.imageUrl.setPath(photo.photoId);
         photo.fileSize = photoData.value("size").toInt();
         photo.fileType = mimeType;
@@ -106,19 +97,20 @@ ReplyParser::GalleryMetadata ReplyParser::parseGalleryMetadata(
     }
 
     for (QJsonObject::const_iterator it = albums.constBegin(); it != albums.constEnd(); ++it) {
+        const QJsonObject albumData = (*it).toObject();
         const QString albumName = it.key(); // may be empty if home directory
         SyncCache::Album album;
-        album.albumId = QStringLiteral("%1%2").arg(m_webdavPath, albumName);
+        album.albumId = QStringLiteral("%1%2").arg(imageSyncer->webDavPath(), albumName);
         album.photoCount = albumPhotoCount.value(album.albumId);
         if (album.photoCount == 0) {
             continue;   // ignore empty albums
         }
 
-        album.accountId = m_accountId;
-        album.userId = m_userId;
+        album.accountId = imageSyncer->accountId();
+        album.userId = albumData.value("owner").toObject().value("uid").toString();
         album.parentAlbumId = albumName.contains('/')
-                ? QStringLiteral("%1%2").arg(m_webdavPath, albumName.mid(0, albumName.lastIndexOf('/')))
-                : m_webdavPath;
+                ? QStringLiteral("%1%2").arg(imageSyncer->webDavPath(), albumName.mid(0, albumName.lastIndexOf('/')))
+                : imageSyncer->webDavPath();
         album.albumName = albumName;
 
         const QPair<QUrl,QString> &thumbnail = albumThumbnails.value(album.albumId);

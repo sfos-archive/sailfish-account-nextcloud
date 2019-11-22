@@ -40,7 +40,6 @@ private:
     bool performNotificationDeleteAllRequest();
     void handleNotificationDeleteAllReply();
 
-    JsonRequestGenerator *m_requestGenerator = nullptr;
     bool m_deleteAllNotifsSupported = false;
     QSet<QString> m_currentDeleteNotificationIds;
 };

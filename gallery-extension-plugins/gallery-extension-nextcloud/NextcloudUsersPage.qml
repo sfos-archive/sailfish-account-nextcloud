@@ -27,49 +27,69 @@ Page {
         delegate: BackgroundItem {
             id: delegateItem
 
-            property int accountId: model.accountId
-            property string userId: model.userId
-            property int userCount: view.model.count
-
-            width: parent.width
-            height: Math.max(thumbnail.height, titleLabel.height, countLabel.height)
-
-            NextcloudPhotoModel {
-                id: photosModel
-                imageCache: NextcloudImageCache
-                accountId: delegateItem.accountId
-                userId: delegateItem.userId
-                // TODO: getThumbnailForRow()
-            }
+            height: thumbnail.height
 
             NextcloudAlbumModel {
                 id: nextcloudAlbums
 
                 imageCache: NextcloudImageCache
-                accountId: delegateItem.accountId
-                userId: delegateItem.userId
+                accountId: model.accountId
+                userId: model.userId
+            }
+
+            NextcloudPhotoModel {
+                id: photoModel
+
+                imageCache: NextcloudImageCache
+                accountId: model.accountId
+                userId: model.userId
+            }
+
+            NextcloudImageDownloader {
+                id: imageDownloader
+
+                accountId: model.accountId
+                userId: model.userId
+
+                imageCache: NextcloudImageCache
+                downloadThumbnail: true
             }
 
             Label {
                 id: titleLabel
-                elide: Text.ElideRight
-                font.pixelSize: Theme.fontSizeLarge
-                text: model.userId
-                color: delegateItem.down ? Theme.highlightColor : Theme.primaryColor
+
                 anchors {
+                    left: parent.left
+                    leftMargin: Theme.paddingLarge
                     right: thumbnail.left
                     rightMargin: Theme.paddingLarge
                     verticalCenter: parent.verticalCenter
                 }
+                horizontalAlignment: Text.AlignRight
+                elide: Text.ElideRight
+                font.pixelSize: Theme.fontSizeLarge
+                text: model.displayName
             }
 
-            Image {
+            HighlightImage {
                 id: thumbnail
+
                 anchors.left: parent.horizontalCenter
-                opacity: delegateItem.down ? Theme.opacityHigh : 1
-                source: /* photosModel.count > 0 ? photosModel.getThumbnailForRow(0) : */ "image://theme/graphic-service-nextcloud"
                 width: Theme.itemSizeExtraLarge
                 height: width
+                source: imageDownloader.status === NextcloudImageDownloader.Ready
+                        ? imageDownloader.imagePath
+                        : "image://theme/icon-l-nextcloud"
+                fillMode: imageDownloader.status === NextcloudImageDownloader.Ready
+                          ? Image.PreserveAspectCrop
+                          : Image.PreserveAspectFit
+                clip: true
+                highlighted: imageDownloader.status !== NextcloudImageDownloader.Ready
+                             && delegateItem.highlighted
+                opacity: imageDownloader.status === NextcloudImageDownloader.Ready
+                         && delegateItem.highlighted
+                         ? Theme.opacityHigh
+                         : 1
             }
 
             Label {
@@ -80,19 +100,14 @@ Page {
                     left: thumbnail.right
                     verticalCenter: parent.verticalCenter
                 }
-                text: photosModel.count
+                text: photoModel.count
                 color: Theme.highlightColor
                 font.pixelSize: Theme.fontSizeLarge
             }
 
             onClicked: {
-                var props = {
-                    "accountId": delegateItem.accountId,
-                    "userId": delegateItem.userId,
-                    "model": nextcloudAlbums,
-                    "title": root.title
-                }
-                pageStack.animatorPush(Qt.resolvedUrl("NextcloudAlbumsPage.qml"), props)
+                pageStack.animatorPush(Qt.resolvedUrl("NextcloudAlbumsPage.qml"),
+                                       { "model": nextcloudAlbums })
             }
         }
     }

@@ -50,11 +50,12 @@ QVariant NextcloudUserModel::data(const QModelIndex &index, int role) const
     //       call m_cache->populateUserThumbnail(),
     //       and when it succeeds, emit dataChanged(row).
     switch (role) {
-        case AccountIdRole:     return m_data[row].accountId;
-        case UserIdRole:        return m_data[row].userId;
-        case ThumbnailUrlRole:  return m_data[row].thumbnailUrl;
-        case ThumbnailPathRole: return m_data[row].thumbnailPath;
-        default:                return QVariant();
+        case AccountIdRole:         return m_data[row].accountId;
+        case UserIdRole:            return m_data[row].userId;
+        case DisplayNameRole:       return m_data[row].displayName;
+        case ThumbnailUrlRole:      return m_data[row].thumbnailUrl;
+        case ThumbnailPathRole:     return m_data[row].thumbnailPath;
+        default:                    return QVariant();
     }
 }
 
@@ -68,6 +69,7 @@ QHash<int, QByteArray> NextcloudUserModel::roleNames() const
     static QHash<int, QByteArray> retn {
         { AccountIdRole,        "accountId" },
         { UserIdRole,           "userId" },
+        { DisplayNameRole,      "displayName" },
         { ThumbnailUrlRole,     "thumbnailUrl" },
         { ThumbnailPathRole,    "thumbnailPath" }
     };
@@ -226,16 +228,16 @@ QVariant NextcloudAlbumModel::data(const QModelIndex &index, int role) const
     //       call m_cache->populateAlbumThumbnail(),
     //       and when it succeeds, emit dataChanged(row).
     switch (role) {
-        case AccountIdRole:     return m_data[row].accountId;
-        case UserIdRole:        return m_data[row].userId;
-        case AlbumIdRole:       return m_data[row].albumId;
-        case ParentAlbumIdRole: return m_data[row].parentAlbumId;
-        case AlbumNameRole:     return m_data[row].albumName;
-        case PhotoCountRole:    return m_data[row].photoCount;
-        case ThumbnailUrlRole:  return m_data[row].thumbnailUrl;
-        case ThumbnailPathRole: return m_data[row].thumbnailPath;
+        case AccountIdRole:         return m_data[row].accountId;
+        case UserIdRole:            return m_data[row].userId;
+        case AlbumIdRole:           return m_data[row].albumId;
+        case ParentAlbumIdRole:     return m_data[row].parentAlbumId;
+        case AlbumNameRole:         return m_data[row].albumName;
+        case PhotoCountRole:        return m_data[row].photoCount;
+        case ThumbnailUrlRole:      return m_data[row].thumbnailUrl;
+        case ThumbnailPathRole:     return m_data[row].thumbnailPath;
         case ThumbnailFileNameRole: return m_data[row].thumbnailFileName;
-        default:                return QVariant();
+        default:                    return QVariant();
     }
 }
 
@@ -247,15 +249,15 @@ int NextcloudAlbumModel::rowCount(const QModelIndex &) const
 QHash<int, QByteArray> NextcloudAlbumModel::roleNames() const
 {
     static QHash<int, QByteArray> retn {
-        { AccountIdRole,        "accountId" },
-        { UserIdRole,           "userId" },
-        { AlbumIdRole,          "albumId" },
-        { ParentAlbumIdRole,    "parentAlbumId" },
-        { AlbumNameRole,        "albumName" },
-        { PhotoCountRole,       "photoCount" },
-        { ThumbnailUrlRole,     "thumbnailUrl" },
-        { ThumbnailPathRole,    "thumbnailPath" },
-        { ThumbnailFileNameRole, "thumbnailFileName" },
+        { AccountIdRole,            "accountId" },
+        { UserIdRole,               "userId" },
+        { AlbumIdRole,              "albumId" },
+        { ParentAlbumIdRole,        "parentAlbumId" },
+        { AlbumNameRole,            "albumName" },
+        { PhotoCountRole,           "photoCount" },
+        { ThumbnailUrlRole,         "thumbnailUrl" },
+        { ThumbnailPathRole,        "thumbnailPath" },
+        { ThumbnailFileNameRole,    "thumbnailFileName" },
     };
 
     return retn;
@@ -365,6 +367,11 @@ void NextcloudAlbumModel::setUserId(const QString &id)
     }
 }
 
+QString NextcloudAlbumModel::userDisplayName() const
+{
+    return m_userDisplayName;
+}
+
 QVariantMap NextcloudAlbumModel::at(int row) const
 {
     QVariantMap retn;
@@ -429,9 +436,36 @@ void NextcloudAlbumModel::loadData()
             return;
         }
         contextObject->deleteLater();
-        qWarning() << "NextcloudAlbumModel::loadData: failed:" << errorMessage;
+        qWarning() << "NextcloudAlbumModel::requestAlbumsFailed:" << errorMessage;
     });
     m_imageCache->requestAlbums(m_accountId, m_userId);
+
+    connect(m_imageCache, &SyncCache::ImageCache::requestUserFinished,
+            contextObject, [this, contextObject] (int accountId,
+                                                  const QString &userId,
+                                                  const SyncCache::User &user) {
+        if (accountId != this->accountId()
+                || userId != this->userId()) {
+            return;
+        }
+        contextObject->deleteLater();
+        if (!user.displayName.isEmpty()) {
+            m_userDisplayName = user.displayName;
+            emit userDisplayNameChanged();
+        }
+    });
+    connect(m_imageCache, &SyncCache::ImageCache::requestUserFailed,
+            contextObject, [this, contextObject] (int accountId,
+                                                  const QString &userId,
+                                                  const QString &errorMessage) {
+        if (accountId != this->accountId()
+                || userId != this->userId()) {
+            return;
+        }
+        contextObject->deleteLater();
+        qWarning() << "NextcloudAlbumModel::requestUserFailed:" << errorMessage;
+    });
+    m_imageCache->requestUser(m_accountId, m_userId);
 }
 
 //-----------------------------------------------------------------------------

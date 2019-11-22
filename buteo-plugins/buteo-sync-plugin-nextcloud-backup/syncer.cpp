@@ -28,7 +28,6 @@
 namespace {
     const int HTTP_UNAUTHORIZED_ACCESS = 401;
     const int HTTP_METHOD_NOT_ALLOWED = 405;
-    const QString NEXTCLOUD_USERID = QStringLiteral("nextcloud");
 
     const QString DefaultLocalPath = QStringLiteral("/home/nemo/.local/share/system/privileged/Backups");
     const QString DefaultDirListLocalPath = DefaultLocalPath + "/directoryListing.txt";
@@ -41,7 +40,6 @@ Syncer::Syncer(QObject *parent, Buteo::SyncProfile *syncProfile)
 
 Syncer::~Syncer()
 {
-    delete m_requestGenerator;
 }
 
 bool Syncer::loadConfig()
@@ -99,11 +97,6 @@ bool Syncer::loadConfig()
 
 void Syncer::beginSync()
 {
-    delete m_requestGenerator;
-    m_requestGenerator = m_accessToken.isEmpty()
-                       ? new WebDavRequestGenerator(&m_qnam, m_username, m_password)
-                       : new WebDavRequestGenerator(&m_qnam, m_accessToken);
-
     if (!loadConfig()) {
         WebDavSyncer::finishWithError("Config load failed");
     } else {
@@ -118,7 +111,7 @@ void Syncer::beginSync()
 bool Syncer::performDirCreationRequest(const QStringList &remotePathParts, int remotePathPartsIndex)
 {
     QString remoteDirPath = m_webdavPath + remotePathParts.mid(0, remotePathPartsIndex + 1).join('/');
-    QNetworkReply *reply = m_requestGenerator->dirCreation(m_serverUrl, remoteDirPath);
+    QNetworkReply *reply = m_requestGenerator->dirCreation(remoteDirPath);
     if (reply) {
         reply->setProperty("remotePathParts", remotePathParts);
         reply->setProperty("remotePathPartsIndex", remotePathPartsIndex);
@@ -156,7 +149,7 @@ void Syncer::handleDirCreationReply()
 
 bool Syncer::performDirListingRequest(const QString &remoteDirPath)
 {
-    QNetworkReply *reply = m_requestGenerator->dirListing(m_serverUrl, m_webdavPath + remoteDirPath);
+    QNetworkReply *reply = m_requestGenerator->dirListing(m_webdavPath + remoteDirPath);
     if (reply) {
         reply->setProperty("remoteDirPath", remoteDirPath);
         connect(reply, &QNetworkReply::finished,
@@ -258,7 +251,7 @@ bool Syncer::performUploadRequest(const QStringList &fileNameList)
     file.close();
 
     const QString remotePath = m_webdavPath + m_backupRestoreOptions.remoteDirPath + '/' + fileNameList.at(0);
-    QNetworkReply *reply = m_requestGenerator->upload(m_serverUrl, mimeType.name(), fileData, remotePath);
+    QNetworkReply *reply = m_requestGenerator->upload(mimeType.name(), fileData, remotePath);
     if (reply) {
         reply->setProperty("fileNameList", QVariant(fileNameList.mid(1)));
 
@@ -316,7 +309,7 @@ bool Syncer::performDownloadRequest(const QStringList &fileNameList)
     }
 
     const QString remoteFilePath = m_webdavPath + m_backupRestoreOptions.remoteDirPath + '/' + fileNameList.at(0);
-    QNetworkReply *reply = m_requestGenerator->download(m_serverUrl, remoteFilePath);
+    QNetworkReply *reply = m_requestGenerator->download(remoteFilePath);
     if (reply) {
         reply->setProperty("fileNameList", QVariant(fileNameList.mid(1)));
         connect(reply, &QNetworkReply::downloadProgress,
