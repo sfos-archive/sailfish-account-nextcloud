@@ -26,7 +26,7 @@
 
 #include <functional>
 
-#define SYNCCACHE_DB_D(Class) Class##Private * const d = static_cast<Class##Private * const>(d_func())
+#define SYNCCACHE_DB_D(Class) Class##Private * const d = static_cast<Class##Private *>(d_func())
 
 namespace SyncCache {
 
