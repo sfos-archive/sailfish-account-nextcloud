@@ -11,6 +11,7 @@
 #define NEXTCLOUDPLUGININFO_H
 
 #include <transferplugininfo.h>
+#include <QStringList>
 
 class NextcloudShareServiceStatus;
 class NextcloudPluginInfo : public TransferPluginInfo
@@ -32,6 +33,7 @@ private Q_SLOTS:
 private:
     NextcloudShareServiceStatus *m_nextcloudShareServiceStatus;
     QList<TransferMethodInfo> m_info;
+    QStringList m_capabilities;
     bool m_ready;
 };
 
