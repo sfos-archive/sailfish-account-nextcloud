@@ -233,7 +233,7 @@ BuildRequires: pkgconfig(nemotransferengine-qt5)
 BuildRequires: qt5-qttools
 BuildRequires: qt5-qttools-linguist
 Requires: sailfishsilica-qt5
-Requires: declarative-transferengine-qt5
+Requires: declarative-transferengine-qt5 >= 0.3.13
 Requires: %{name} = %{version}-%{release}
 
 %description -n transferengine-plugin-nextcloud
