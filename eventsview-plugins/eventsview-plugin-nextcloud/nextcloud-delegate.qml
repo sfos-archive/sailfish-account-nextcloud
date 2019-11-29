@@ -22,8 +22,8 @@ Column {
     property bool collapsed: true
     property bool showingInActiveView
     property int eventsColumnMaxWidth
+    property bool hasRemovableItems: accountFeedRepeater.count > 0
     signal expanded(int itemPosY)
-    signal hasRemovableItemsChanged()
     signal mainContentHeightChanged()
 
     width: parent.width
