@@ -19,6 +19,6 @@ qml.files = NextcloudShareDialog.qml
 qml.path = /usr/share/nemo-transferengine/plugins
 
 SOURCES += nextcloudplugin.cpp
-OTHER_FILES += import.files qml.files
+OTHER_FILES += $$import.files $$qml.files
 
 INSTALLS += target import qml
