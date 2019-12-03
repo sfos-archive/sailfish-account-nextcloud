@@ -65,6 +65,9 @@ public:
     EventCache(QObject *parent = nullptr);
     ~EventCache();
 
+    static QString eventCacheDir(int accountId);
+    static QString eventCacheRootDir();
+
 public Q_SLOTS:
     virtual void openDatabase(const QString &accountType); // e.g. "nextcloud"
 
