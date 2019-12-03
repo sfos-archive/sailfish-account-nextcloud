@@ -73,19 +73,21 @@ ReplyParser::GalleryMetadata ReplyParser::parseGalleryMetadata(Syncer *imageSync
         const QString photoPath = photoData.value("path").toString();
         const int lastDirSep = photoPath.lastIndexOf('/');
         const QString albumPath = lastDirSep < 0 ? QString() : photoPath.mid(0, lastDirSep); // may be empty if home directory
+        const int photoId = photoData.value("nodeid").toInt();
+
         SyncCache::Photo photo;
         photo.accountId = imageSyncer->accountId();
         photo.userId = photoData.value("owner").toObject().value("uid").toString();
         photo.albumId = QStringLiteral("%1%2").arg(imageSyncer->webDavPath(), albumPath);
-        photo.photoId = QStringLiteral("%1%2").arg(imageSyncer->webDavPath(), photoPath);
+        photo.photoId = QString::number(photoId);
         photo.updatedTimestamp = QDateTime::fromTime_t(photoData.value("mtime").toVariant().toUInt());
         photo.createdTimestamp = photo.updatedTimestamp;
         photo.fileName = photoPath.mid(photoPath.lastIndexOf('/') + 1);
         photo.albumPath = albumPath;
         photo.thumbnailUrl = imageSyncer->serverUrl();
-        photo.thumbnailUrl.setPath(QStringLiteral("/index.php/apps/gallery/api/preview/%1/128/128").arg(photoData.value("nodeid").toInt()));
+        photo.thumbnailUrl.setPath(QStringLiteral("/index.php/apps/gallery/api/preview/%1/128/128").arg(photoId));
         photo.imageUrl = imageSyncer->serverUrl();
-        photo.imageUrl.setPath(photo.photoId);
+        photo.imageUrl.setPath(imageSyncer->webDavPath() + photoPath);
         photo.fileSize = photoData.value("size").toInt();
         photo.fileType = mimeType;
         retn.photos.append(photo);

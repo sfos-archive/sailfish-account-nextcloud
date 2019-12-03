@@ -18,16 +18,20 @@
 
 namespace SyncCache {
 
+QString imageDownloadDir(int accountId);
+QString userImageDownloadDir(int accountId, const QString &userId, bool thumbnail);
+QString albumImageDownloadDir(int accountId, const QString &albumName, bool thumbnail);
+
+
 class ImageDownloadWatcher : public QObject
 {
     Q_OBJECT
 
 public:
-    ImageDownloadWatcher(int idempToken, const QUrl &imageUrl, QObject *parent = nullptr);
+    ImageDownloadWatcher(int idempToken, QObject *parent = nullptr);
     ~ImageDownloadWatcher();
 
     int idempToken() const;
-    QUrl imageUrl() const;
 
 Q_SIGNALS:
     void downloadFailed(const QString &errorMessage);
@@ -35,7 +39,6 @@ Q_SIGNALS:
 
 private:
     int m_idempToken;
-    QUrl m_imageUrl;
 };
 
 class ImageDownload
@@ -64,19 +67,14 @@ class ImageDownloader : public QObject
     Q_OBJECT
 
 public:
-    ImageDownloader(int maxActive = 4, QObject *parent = nullptr);
+    ImageDownloader(QObject *parent = nullptr);
     ~ImageDownloader();
 
     ImageDownloadWatcher *downloadImage(int idempToken,
             const QUrl &imageUrl,
             const QString &fileName,
             const QString &fileDirPath,
-            const QNetworkRequest &requestTemplate);
-
-    QString userImageDownloadDir(int accountId, const QString &userId, bool thumbnail) const;
-    QString albumImageDownloadDir(int accountId, const QString &albumName, bool thumbnail) const;
-
-    static QString imageDownloadDir(int accountId);
+            const QNetworkRequest &templateRequest);
 
 private Q_SLOTS:
     void triggerDownload();
@@ -88,6 +86,58 @@ private:
     QQueue<ImageDownload*> m_pending;
     QQueue<ImageDownload*> m_active;
     int m_maxActive;
+};
+
+class BatchedImageDownload
+{
+public:
+    BatchedImageDownload();
+    BatchedImageDownload(int idempToken,
+                         const QString &photoId,
+                         const QString &filePath,
+                         SyncCache::ImageDownloadWatcher *watcher);
+    BatchedImageDownload &operator=(const BatchedImageDownload &other);
+
+    int m_idempToken = 0;
+    QString m_photoId;
+    QString m_filePath;
+    QPointer<SyncCache::ImageDownloadWatcher> m_watcher;
+};
+
+class BatchedImageDownloader : public QObject
+{
+    Q_OBJECT
+
+public:
+    BatchedImageDownloader(const QUrl &templateUrl,
+                           const QNetworkRequest &templateRequest,
+                           QObject *parent);
+
+    ImageDownloadWatcher *downloadImage(int idempToken,
+                                        const QString &photoId,
+                                        const QString &fileName,
+                                        const QString &fileDirPath);
+
+private:
+    struct ImagePreview {
+        QString photoId;
+        QString mimeType;
+        QByteArray bytes;
+    };
+
+    void triggerDownload();
+    void readImageData();
+    void downloadProgress(qint64 bytesReceived, qint64 bytesTotal);
+    void downloadFinished();
+    bool parseImagePreview(const QByteArray &previewData, ImagePreview *preview);
+
+    QTimer *m_batchTimer = nullptr;
+    QNetworkAccessManager m_qnam;
+    QQueue<BatchedImageDownload *> m_pending;
+    QMap<QString, BatchedImageDownload *> m_active;
+    QNetworkRequest m_templateRequest;
+    QByteArray m_buffer;
+    QString m_host;
 };
 
 }

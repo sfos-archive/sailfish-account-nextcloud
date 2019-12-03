@@ -196,14 +196,14 @@ void ImageCacheThreadWorker::populateUserThumbnail(int idempToken, int accountId
         return;
     }
     if (!m_downloader) {
-        m_downloader = new ImageDownloader(4, this);
+        m_downloader = new ImageDownloader(this);
     }
 
     ImageDownloadWatcher *watcher = m_downloader->downloadImage(
                 idempToken,
                 user.thumbnailUrl,
                 user.thumbnailFileName,
-                m_downloader->userImageDownloadDir(accountId, userId, true),
+                SyncCache::userImageDownloadDir(accountId, userId, true),
                 requestTemplate);
     connect(watcher, &ImageDownloadWatcher::downloadFailed, this, [this, watcher, idempToken] (const QString &errorMessage) {
         emit populateUserThumbnailFailed(idempToken, errorMessage);
@@ -249,13 +249,13 @@ void ImageCacheThreadWorker::populateAlbumThumbnail(int idempToken, int accountI
         return;
     }
     if (!m_downloader) {
-        m_downloader = new ImageDownloader(4, this);
+        m_downloader = new ImageDownloader(this);
     }
     ImageDownloadWatcher *watcher = m_downloader->downloadImage(
                 idempToken,
                 album.thumbnailUrl,
                 album.thumbnailFileName,
-                m_downloader->albumImageDownloadDir(accountId, album.albumName, true),
+                SyncCache::albumImageDownloadDir(accountId, album.albumName, true),
                 requestTemplate);
     connect(watcher, &ImageDownloadWatcher::downloadFailed, this, [this, watcher, idempToken] (const QString &errorMessage) {
         emit populateAlbumThumbnailFailed(idempToken, errorMessage);
@@ -300,24 +300,24 @@ void ImageCacheThreadWorker::populatePhotoThumbnail(int idempToken, int accountI
         emit populatePhotoThumbnailFailed(idempToken, QStringLiteral("Empty thumbnail url specified for photo %1").arg(photoId));
         return;
     }
-    if (!m_downloader) {
-        m_downloader = new ImageDownloader(4, this);
-    }
 
     // the thumbnail was already downloaded as the thumbnail for the album.
-    const QString &thumbnailDirPath = m_downloader->albumImageDownloadDir(accountId, photo.albumPath, true);
+    const QString &thumbnailDirPath = SyncCache::albumImageDownloadDir(accountId, photo.albumPath, true);
     thumbnailPath = thumbnailDirPath + "/" + photo.fileName;
     if (QFile::exists(thumbnailPath)) {
         photoThumbnailDownloadFinished(idempToken, photo, QUrl(thumbnailPath));
         return;
     }
 
-    ImageDownloadWatcher *watcher = m_downloader->downloadImage(
+    if (!m_thumbnailDownloader) {
+        m_thumbnailDownloader = new BatchedImageDownloader(photo.thumbnailUrl, requestTemplate, this);
+    }
+
+    ImageDownloadWatcher *watcher = m_thumbnailDownloader->downloadImage(
             idempToken,
-            photo.thumbnailUrl,
+            photo.photoId,
             photo.fileName,
-            thumbnailDirPath,
-            requestTemplate);
+            thumbnailDirPath);
     connect(watcher, &ImageDownloadWatcher::downloadFailed, this, [this, watcher, idempToken] (const QString &errorMessage) {
         emit populatePhotoThumbnailFailed(idempToken, errorMessage);
         watcher->deleteLater();
@@ -367,14 +367,14 @@ void ImageCacheThreadWorker::populatePhotoImage(int idempToken, int accountId, c
     }
 
     if (!m_downloader) {
-        m_downloader = new ImageDownloader(4, this);
+        m_downloader = new ImageDownloader(this);
     }
 
     ImageDownloadWatcher *watcher = m_downloader->downloadImage(
                 idempToken,
                 photo.imageUrl,
                 photo.fileName,
-                m_downloader->albumImageDownloadDir(accountId, photo.albumPath, false),
+                SyncCache::albumImageDownloadDir(accountId, photo.albumPath, false),
                 requestTemplate);
 
     connect(watcher, &ImageDownloadWatcher::downloadFailed, this, [this, watcher, idempToken] (const QString &errorMessage) {
@@ -478,7 +478,7 @@ ImageCache::~ImageCache()
 
 QString ImageCache::imageCacheDir(int accountId)
 {
-    return ImageDownloader::imageDownloadDir(accountId);
+    return SyncCache::imageDownloadDir(accountId);
 }
 
 QString ImageCache::imageCacheRootDir()
