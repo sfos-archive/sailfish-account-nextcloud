@@ -22,9 +22,26 @@ Column {
     property bool collapsed: true
     property bool showingInActiveView
     property int eventsColumnMaxWidth
-    property bool hasRemovableItems: accountFeedRepeater.count > 0
+    property bool userRemovable
+    property bool hasRemovableItems
+    property real mainContentHeight
     signal expanded(int itemPosY)
-    signal mainContentHeightChanged()
+
+    // used by lipstick
+    function findMatchingRemovableItems(filterFunc, matchingResults) {
+        for (var i = 0; i < accountFeedRepeater.count; ++i) {
+            accountFeedRepeater.itemAt(i).findMatchingRemovableItems(filterFunc, matchingResults)
+        }
+    }
+
+    // used by lipstick
+    function removeAllNotifications() {
+        if (userRemovable) {
+            for (var i = 0; i < accountFeedRepeater.count; ++i) {
+                accountFeedRepeater.itemAt(i).removeAllNotifications()
+            }
+        }
+    }
 
     width: parent.width
 
@@ -52,6 +69,36 @@ Column {
             showingInActiveView: root.showingInActiveView
 
             onExpanded: root.expanded(itemPosY)
+
+            onUserRemovableChanged: {
+                var _userRemovable = true
+                for (var i = 0; i < accountFeedRepeater.count; ++i) {
+                    if (!accountFeedRepeater.itemAt(i).userRemovable) {
+                        _userRemovable = false
+                        break
+                    }
+                }
+                root.userRemovable = _userRemovable
+            }
+
+            onHasRemovableItemsChanged: {
+                var _hasRemovableItems = true
+                for (var i = 0; i < accountFeedRepeater.count; ++i) {
+                    if (!accountFeedRepeater.itemAt(i).hasRemovableItems) {
+                        _hasRemovableItems = false
+                        break
+                    }
+                }
+                root.hasRemovableItems = _hasRemovableItems
+            }
+
+            onMainContentHeightChanged: {
+                var _mainContentHeight = 0
+                for (var i = 0; i < accountFeedRepeater.count; ++i) {
+                    _mainContentHeight += accountFeedRepeater.itemAt(i).mainContentHeight
+                }
+                root.mainContentHeight = _mainContentHeight
+            }
         }
     }
 }

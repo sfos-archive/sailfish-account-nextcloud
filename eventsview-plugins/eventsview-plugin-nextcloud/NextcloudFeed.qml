@@ -19,6 +19,10 @@ Item {
     property int accountId
     property bool collapsed
     property bool showingInActiveView
+    property bool userRemovable: (eventModel.supportedActions & NextcloudEventModel.DeleteEvent)
+                                 || eventModel.supportedActions & NextcloudEventModel.DeleteAllEvents
+    property int hasRemovableItems: userRemovable && listView.count > 0
+    property alias mainContentHeight: listView.contentHeight
 
     property int _modelCount: listView.model.count
     property int _expansionThreshold: 5
@@ -27,6 +31,34 @@ Item {
     property string _hostUrl
 
     signal expanded(int itemPosY)
+
+    function findMatchingRemovableItems(filterFunc, matchingResults) {
+        if (!userRemovable || !filterFunc(headerItem)) {
+            return
+        }
+        matchingResults.push(headerItem)
+        var yPos = listView.contentY
+        while (yPos < listView.contentHeight) {
+            var item = listView.itemAt(0, yPos)
+            if (!item) {
+                break
+            }
+            if (item.userRemovable === true) {
+                if (!filterFunc(item)) {
+                    return false
+                }
+                matchingResults.push(item)
+            }
+            yPos += item.height
+        }
+    }
+
+
+    function removeAllNotifications() {
+        if (headerItem.userRemovable) {
+            removeComponent.createObject(root, { "target": root })
+        }
+    }
 
     visible: _modelCount > 0
     width: parent.width
