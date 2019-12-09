@@ -13,91 +13,12 @@
 #include "synccacheevents.h"
 #include "synccachedatabase_p.h"
 
-#include <QtCore/QObject>
-#include <QtCore/QString>
-#include <QtCore/QUrl>
 #include <QtCore/QVector>
-#include <QtCore/QQueue>
-#include <QtCore/QTimer>
 #include <QtCore/QThread>
-#include <QtCore/QScopedPointer>
-#include <QtCore/QPointer>
-#include <QtNetwork/QNetworkAccessManager>
-#include <QtNetwork/QNetworkReply>
-#include <QtSql/QSqlDatabase>
 
 namespace SyncCache {
 
-class EventImageDownloadWatcher : public QObject
-{
-    Q_OBJECT
-
-public:
-    EventImageDownloadWatcher(int idempToken, const QUrl &imageUrl, QObject *parent = nullptr);
-    ~EventImageDownloadWatcher();
-
-    int idempToken() const;
-    QUrl imageUrl() const;
-
-Q_SIGNALS:
-    void downloadFailed(const QString &errorMessage);
-    void downloadFinished(const QUrl &filePath);
-
-private:
-    int m_idempToken;
-    QUrl m_imageUrl;
-};
-
-class EventImageDownload
-{
-public:
-    EventImageDownload(
-            int idempToken = 0,
-            const QUrl &imageUrl = QUrl(),
-            const QString &fileName = QString(),
-            const QString &eventId = QString(),
-            const QNetworkRequest &templateRequest = QNetworkRequest(QUrl()),
-            EventImageDownloadWatcher *watcher = nullptr);
-    ~EventImageDownload();
-
-    int m_idempToken = 0;
-    QUrl m_imageUrl;
-    QString m_fileName;
-    QString m_eventId;
-    QNetworkRequest m_templateRequest;
-    QTimer *m_timeoutTimer = nullptr;
-    QNetworkReply *m_reply = nullptr;
-    QPointer<SyncCache::EventImageDownloadWatcher> m_watcher;
-};
-
-class EventImageDownloader : public QObject
-{
-    Q_OBJECT
-
-public:
-    EventImageDownloader(int maxActive = 4, QObject *parent = nullptr);
-    ~EventImageDownloader();
-
-    void setImageDirectory(const QString &path);
-    EventImageDownloadWatcher *downloadImage(
-            int idempToken,
-            const QUrl &imageUrl,
-            const QString &fileName,
-            const QString &eventId,
-            const QNetworkRequest &requestTemplate);
-
-private Q_SLOTS:
-    void triggerDownload();
-
-private:
-    void eraseActiveDownload(EventImageDownload *download);
-
-    QNetworkAccessManager m_qnam;
-    QQueue<EventImageDownload*> m_pending;
-    QQueue<EventImageDownload*> m_active;
-    int m_maxActive;
-    QString m_imageDirectory;
-};
+class EventImageDownloader;
 
 class EventCacheThreadWorker : public QObject
 {

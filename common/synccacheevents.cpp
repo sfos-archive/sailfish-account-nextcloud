@@ -9,183 +9,12 @@
 
 #include "synccacheevents.h"
 #include "synccacheevents_p.h"
+#include "synccacheeventdownloads_p.h"
 
-#include <QtCore/QThread>
 #include <QtCore/QFile>
-#include <QtCore/QDir>
 #include <QtCore/QStandardPaths>
 
 using namespace SyncCache;
-
-namespace {
-    QString privilegedEventsDirPath() {
-        return QStringLiteral("%1/system/privileged/Posts").arg(QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation));
-    }
-
-    QString filenameForEvent(const QString &eventId) {
-        // parse out the image file name from the given event url.
-        return eventId.isEmpty() ? eventId : QStringLiteral("eventImage");
-    }
-}
-
-//-----------------------------------------------------------------------------
-
-EventImageDownloadWatcher::EventImageDownloadWatcher(int idempToken, const QUrl &imageUrl, QObject *parent)
-    : QObject(parent), m_idempToken(idempToken), m_imageUrl(imageUrl)
-{
-}
-
-EventImageDownloadWatcher::~EventImageDownloadWatcher()
-{
-}
-
-int EventImageDownloadWatcher::idempToken() const
-{
-    return m_idempToken;
-}
-
-QUrl EventImageDownloadWatcher::imageUrl() const
-{
-    return m_imageUrl;
-}
-
-//-----------------------------------------------------------------------------
-
-EventImageDownload::EventImageDownload(
-        int idempToken,
-        const QUrl &imageUrl,
-        const QString &fileName,
-        const QString &eventId,
-        const QNetworkRequest &templateRequest,
-        EventImageDownloadWatcher *watcher)
-    : m_idempToken(idempToken)
-    , m_imageUrl(imageUrl)
-    , m_fileName(fileName)
-    , m_eventId(eventId)
-    , m_templateRequest(templateRequest)
-    , m_watcher(watcher)
-{
-    m_timeoutTimer = new QTimer;
-}
-
-EventImageDownload::~EventImageDownload()
-{
-    m_timeoutTimer->deleteLater();
-    if (m_reply) {
-        m_reply->deleteLater();
-    }
-}
-
-//-----------------------------------------------------------------------------
-
-EventImageDownloader::EventImageDownloader(int maxActive, QObject *parent)
-    : QObject(parent), m_maxActive(maxActive > 0 && maxActive < 20 ? maxActive : 4), m_imageDirectory(QStringLiteral("Nextcloud"))
-{
-}
-
-EventImageDownloader::~EventImageDownloader()
-{
-}
-
-void EventImageDownloader::setImageDirectory(const QString &path)
-{
-    m_imageDirectory = path;
-}
-
-EventImageDownloadWatcher *EventImageDownloader::downloadImage(int idempToken, const QUrl &imageUrl, const QString &fileName, const QString &eventId, const QNetworkRequest &templateRequest)
-{
-    EventImageDownloadWatcher *watcher = new EventImageDownloadWatcher(idempToken, imageUrl, this);
-    EventImageDownload *download = new EventImageDownload(idempToken, imageUrl, fileName, eventId, templateRequest, watcher);
-    m_pending.enqueue(download);
-    QMetaObject::invokeMethod(this, "triggerDownload", Qt::QueuedConnection);
-    return watcher; // caller takes ownership.
-}
-
-void EventImageDownloader::triggerDownload()
-{
-    while (m_active.size() && (m_active.head() == nullptr || !m_active.head()->m_timeoutTimer->isActive())) {
-        delete m_active.dequeue();
-    }
-
-    while (m_active.size() < m_maxActive && m_pending.size()) {
-        EventImageDownload *download = m_pending.dequeue();
-        m_active.enqueue(download);
-
-        connect(download->m_timeoutTimer, &QTimer::timeout, this, [this, download] {
-            if (download->m_watcher) {
-                emit download->m_watcher->downloadFailed(QStringLiteral("Event Image download timed out"));
-            }
-            eraseActiveDownload(download);
-        });
-
-        download->m_timeoutTimer->setInterval(20 * 1000);
-        download->m_timeoutTimer->setSingleShot(true);
-        download->m_timeoutTimer->start();
-
-        QNetworkRequest request(download->m_templateRequest);
-        QUrl imageUrl(download->m_imageUrl);
-        imageUrl.setUserName(download->m_templateRequest.url().userName());
-        imageUrl.setPassword(download->m_templateRequest.url().password());
-        request.setUrl(imageUrl);
-        QNetworkReply *reply = m_qnam.get(request);
-        download->m_reply = reply;
-        if (reply) {
-            connect(reply, &QNetworkReply::finished, this, [this, reply, download] {
-                if (reply->error() != QNetworkReply::NoError) {
-                    if (download->m_watcher) {
-                        emit download->m_watcher->downloadFailed(QStringLiteral("Event Image download error: %1").arg(reply->errorString()));
-                    }
-                } else {
-                    // save the file to the appropriate location.
-                    const QByteArray replyData = reply->readAll();
-                    if (replyData.isEmpty()) {
-                        if (download->m_watcher) {
-                            emit download->m_watcher->downloadFailed(QStringLiteral("Empty image data received, aborting"));
-                        }
-                    } else {
-                        // const QString eventId = download->m_eventId; // XXX TODO: use this?  subdirectory for this post/event?
-                        const QString filename = download->m_fileName;
-                        const QString filepath = QStringLiteral("%1/%2/%3")
-                                .arg(privilegedEventsDirPath(), m_imageDirectory, filename);
-                        QDir dir = QFileInfo(filepath).dir();
-                        if (!dir.exists()) {
-                            dir.mkpath(QStringLiteral("."));
-                        }
-                        QFile file(filepath);
-                        if (!file.open(QFile::WriteOnly)) {
-                            if (download->m_watcher) {
-                                emit download->m_watcher->downloadFailed(QStringLiteral("Error opening event image file %1 for writing: %2")
-                                                                                   .arg(filepath, file.errorString()));
-                            }
-                        } else {
-                            file.write(replyData);
-                            file.close();
-                            emit download->m_watcher->downloadFinished(filepath);
-                        }
-                    }
-                }
-
-                eraseActiveDownload(download);
-            });
-        }
-    }
-}
-
-void EventImageDownloader::eraseActiveDownload(EventImageDownload *download)
-{
-    QQueue<EventImageDownload*>::iterator it = m_active.begin();
-    QQueue<EventImageDownload*>::iterator end = m_active.end();
-    for ( ; it != end; ++it) {
-        if (*it == download) {
-            m_active.erase(it);
-            break;
-        }
-    }
-
-    delete download;
-
-    QMetaObject::invokeMethod(this, "triggerDownload", Qt::QueuedConnection);
-}
 
 //-----------------------------------------------------------------------------
 
@@ -202,7 +31,7 @@ void EventCacheThreadWorker::openDatabase(const QString &accountType)
 {
     DatabaseError error;
     m_db.openDatabase(
-            QStringLiteral("%1/%2.db").arg(privilegedEventsDirPath(), accountType),
+            QStringLiteral("%1/%2.db").arg(EventCache::eventCacheRootDir(), accountType),
             &error);
     if (error.errorCode != DatabaseError::NoError) {
         emit openDatabaseFailed(error.errorMessage);
@@ -265,14 +94,24 @@ void EventCacheThreadWorker::populateEventImage(int idempToken, int accountId, c
     }
 
     // download the image.
+    if (event.eventId.isEmpty()) {
+        emit populateEventImageFailed(idempToken, QStringLiteral("Event id is missing"));
+        return;
+    }
+
+    // download the image.
     if (event.imageUrl.isEmpty()) {
         emit populateEventImageFailed(idempToken, QStringLiteral("Empty image url specified for event"));
         return;
     }
     if (!m_downloader) {
-        m_downloader = new EventImageDownloader(4, this);
+        m_downloader = new EventImageDownloader(this);
     }
-    EventImageDownloadWatcher *watcher = m_downloader->downloadImage(idempToken, event.imageUrl, filenameForEvent(event.eventId), event.eventId, requestTemplate);
+    EventImageDownloadWatcher *watcher = m_downloader->downloadImage(
+                idempToken,
+                event.imageUrl,
+                QStringLiteral("%1/event-%2-icon").arg(EventCache::eventCacheDir(accountId)).arg(event.eventId),
+                requestTemplate);
     connect(watcher, &EventImageDownloadWatcher::downloadFailed, this, [this, watcher, idempToken] (const QString &errorMessage) {
         emit populateEventImageFailed(idempToken, errorMessage);
         watcher->deleteLater();
@@ -351,6 +190,17 @@ EventCache::EventCache(QObject *parent)
 
 EventCache::~EventCache()
 {
+}
+
+QString EventCache::eventCacheDir(int accountId)
+{
+    return QStringLiteral("%1/nextcloud/account-%2")
+            .arg(EventCache::eventCacheRootDir()).arg(accountId);
+}
+
+QString EventCache::eventCacheRootDir()
+{
+    return QStringLiteral("%1/system/privileged/Posts").arg(QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation));
 }
 
 void EventCache::openDatabase(const QString &databaseFile)
