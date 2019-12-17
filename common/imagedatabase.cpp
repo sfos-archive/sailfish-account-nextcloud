@@ -13,6 +13,7 @@
 #include <QtCore/QFile>
 #include <QtCore/QDir>
 #include <QtCore/QUuid>
+#include <QtCore/QDebug>
 
 #include <QtSql/QSqlQuery>
 #include <QtSql/QSqlDatabase>

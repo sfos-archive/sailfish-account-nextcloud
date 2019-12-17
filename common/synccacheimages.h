@@ -121,6 +121,7 @@ public:
     ~ImageCache();
 
     static QString imageCacheDir(int accountId);
+    static QString imageCacheRootDir();
 
 public Q_SLOTS:
     virtual void openDatabase(const QString &accountType); // e.g. "nextcloud"

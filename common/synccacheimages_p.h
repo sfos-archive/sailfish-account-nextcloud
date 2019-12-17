@@ -13,92 +13,14 @@
 #include "synccacheimages.h"
 #include "synccachedatabase_p.h"
 
-#include <QtCore/QObject>
-#include <QtCore/QString>
-#include <QtCore/QUrl>
 #include <QtCore/QVector>
-#include <QtCore/QQueue>
-#include <QtCore/QTimer>
 #include <QtCore/QThread>
-#include <QtCore/QScopedPointer>
-#include <QtCore/QPointer>
-#include <QtNetwork/QNetworkAccessManager>
-#include <QtNetwork/QNetworkReply>
 #include <QtSql/QSqlDatabase>
 
 namespace SyncCache {
 
-class ImageDownloadWatcher : public QObject
-{
-    Q_OBJECT
-
-public:
-    ImageDownloadWatcher(int idempToken, const QUrl &imageUrl, QObject *parent = nullptr);
-    ~ImageDownloadWatcher();
-
-    int idempToken() const;
-    QUrl imageUrl() const;
-
-Q_SIGNALS:
-    void downloadFailed(const QString &errorMessage);
-    void downloadFinished(const QUrl &filePath);
-
-private:
-    int m_idempToken;
-    QUrl m_imageUrl;
-};
-
-class ImageDownload
-{
-public:
-    ImageDownload(int idempToken = 0,
-            const QUrl &imageUrl = QUrl(),
-            const QString &fileName = QString(),
-            const QString &fileDirPath = QString(),
-            const QNetworkRequest &templateRequest = QNetworkRequest(QUrl()),
-            ImageDownloadWatcher *watcher = nullptr);
-    ~ImageDownload();
-
-    int m_idempToken = 0;
-    QUrl m_imageUrl;
-    QString m_fileName;
-    QString m_fileDirPath;
-    QNetworkRequest m_templateRequest;
-    QTimer *m_timeoutTimer = nullptr;
-    QNetworkReply *m_reply = nullptr;
-    QPointer<SyncCache::ImageDownloadWatcher> m_watcher;
-};
-
-class ImageDownloader : public QObject
-{
-    Q_OBJECT
-
-public:
-    ImageDownloader(int maxActive = 4, QObject *parent = nullptr);
-    ~ImageDownloader();
-
-    ImageDownloadWatcher *downloadImage(int idempToken,
-            const QUrl &imageUrl,
-            const QString &fileName,
-            const QString &fileDirPath,
-            const QNetworkRequest &requestTemplate);
-
-    QString userImageDownloadDir(int accountId, const QString &userId, bool thumbnail) const;
-    QString albumImageDownloadDir(int accountId, const QString &albumName, bool thumbnail) const;
-
-    static QString imageDownloadDir(int accountId);
-
-private Q_SLOTS:
-    void triggerDownload();
-
-private:
-    void eraseActiveDownload(ImageDownload *download);
-
-    QNetworkAccessManager m_qnam;
-    QQueue<ImageDownload*> m_pending;
-    QQueue<ImageDownload*> m_active;
-    int m_maxActive;
-};
+class ImageDownloader;
+class BatchedImageDownloader;
 
 class ImageCacheThreadWorker : public QObject
 {
@@ -165,7 +87,8 @@ private:
     void photoThumbnailDownloadFinished(int idempToken, const SyncCache::Photo &photo, const QUrl &filePath);
 
     ImageDatabase m_db;
-    ImageDownloader *m_downloader;
+    ImageDownloader *m_downloader = nullptr;
+    BatchedImageDownloader *m_thumbnailDownloader = nullptr;
 };
 
 class ImageCachePrivate : public QObject
