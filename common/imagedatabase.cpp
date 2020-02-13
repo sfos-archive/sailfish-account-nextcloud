@@ -423,10 +423,9 @@ QVector<SyncCache::Photo> ImageDatabase::photos(int accountId, const QString &us
             error);
 }
 
-User ImageDatabase::user(int accountId, const QString &userId, DatabaseError *error) const
+User ImageDatabase::user(int accountId, DatabaseError *error) const
 {
     SYNCCACHE_DB_D(const ImageDatabase);
-    Q_UNUSED(userId)
 
     if (accountId <= 0) {
         setDatabaseError(error, DatabaseError::InvalidArgumentError,
@@ -622,7 +621,7 @@ void ImageDatabase::storeUser(const User &user, DatabaseError *error)
     }
 
     DatabaseError err;
-    const User existingUser = this->user(user.accountId, user.userId, &err);
+    const User existingUser = this->user(user.accountId, &err);
     if (err.errorCode != DatabaseError::NoError) {
         setDatabaseError(error, err.errorCode,
                          QStringLiteral("Error while querying existing user %1 for store: %2")
@@ -831,7 +830,7 @@ void ImageDatabase::deleteUser(const User &user, DatabaseError *error)
     }
 
     DatabaseError err;
-    const User existingUser = this->user(user.accountId, user.userId, &err);
+    const User existingUser = this->user(user.accountId, &err);
     if (err.errorCode != DatabaseError::NoError) {
         setDatabaseError(error, err.errorCode,
                          QStringLiteral("Error while querying existing user %1 for delete: %2")
