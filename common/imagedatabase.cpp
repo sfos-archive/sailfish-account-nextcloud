@@ -426,6 +426,7 @@ QVector<SyncCache::Photo> ImageDatabase::photos(int accountId, const QString &us
 User ImageDatabase::user(int accountId, const QString &userId, DatabaseError *error) const
 {
     SYNCCACHE_DB_D(const ImageDatabase);
+    Q_UNUSED(userId)
 
     if (accountId <= 0) {
         setDatabaseError(error, DatabaseError::InvalidArgumentError,
@@ -433,16 +434,12 @@ User ImageDatabase::user(int accountId, const QString &userId, DatabaseError *er
         return User();
     }
 
-    QList<QPair<QString, QVariant> > bindValues {
+    const QList<QPair<QString, QVariant> > bindValues {
         qMakePair<QString, QVariant>(QStringLiteral(":accountId"), accountId)
     };
 
-    QString queryString = QStringLiteral("SELECT userId, displayName, thumbnailUrl, thumbnailPath, thumbnailFileName FROM USERS"
-                                         " WHERE accountId = :accountId");
-    if (!userId.isEmpty()) {
-        queryString += QStringLiteral(" AND userId = :userId");
-        bindValues.append(qMakePair<QString, QVariant>(QStringLiteral(":userId"), userId));
-    }
+    const QString queryString = QStringLiteral("SELECT userId, displayName, thumbnailUrl, thumbnailPath, thumbnailFileName FROM USERS"
+                                               " WHERE accountId = :accountId");
 
     auto resultHandler = [accountId](DatabaseQuery &selectQuery) -> SyncCache::User {
         int whichValue = 0;
@@ -635,8 +632,8 @@ void ImageDatabase::storeUser(const User &user, DatabaseError *error)
 
     const QString insertString = QStringLiteral("INSERT INTO Users (accountId, userId, displayName, thumbnailUrl, thumbnailPath, thumbnailFileName)"
                                                 " VALUES(:accountId, :userId, :displayName, :thumbnailUrl, :thumbnailPath, :thumbnailFileName)");
-    const QString updateString = QStringLiteral("UPDATE Users SET displayName = :displayName, thumbnailUrl = :thumbnailUrl, thumbnailPath = :thumbnailPath, thumbnailFileName = :thumbnailFileName"
-                                                " WHERE accountId = :accountId AND userId = :userId");
+    const QString updateString = QStringLiteral("UPDATE Users SET userId = :userId, displayName = :displayName, thumbnailUrl = :thumbnailUrl, thumbnailPath = :thumbnailPath, thumbnailFileName = :thumbnailFileName"
+                                                " WHERE accountId = :accountId");
 
     const bool insert = existingUser.userId.isEmpty();
     const QString queryString = insert ? insertString : updateString;
