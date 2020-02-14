@@ -43,11 +43,14 @@ FullscreenContentPage {
             id: delegateItem
 
             readonly property string mimeType: model.fileType
+            readonly property bool downloading: imageDownloader.status === NextcloudImageDownloader.Downloading
 
             width: slideshowView.width
             height: slideshowView.height
 
-            source: imageDownloader.imagePath
+            source: imageDownloader.status === NextcloudImageDownloader.Ready
+                     ? imageDownloader.imagePath
+                     : ""
             active: PathView.isCurrentItem
             viewMoving: slideshowView.moving
 
@@ -58,6 +61,13 @@ FullscreenContentPage {
                 } else {
                     overlay.active = !overlay.active
                 }
+            }
+
+            InfoLabel {
+                //% "Image download failed"
+                text: qsTrId("jolla_gallery_nextcloud-la-image_download_failed")
+                anchors.centerIn: parent
+                visible: imageDownloader.status === NextcloudImageDownloader.Error
             }
 
             NextcloudImageDownloader {
@@ -109,6 +119,6 @@ FullscreenContentPage {
     BusyIndicator {
         anchors.centerIn: parent
         size: BusyIndicatorSize.Large
-        running: slideshowView.currentItem && slideshowView.currentItem.source.toString().length === 0
+        running: slideshowView.currentItem && slideshowView.currentItem.downloading
     }
 }
