@@ -41,9 +41,9 @@ Page {
 
             size: grid.cellSize
 
-            source: thumbDownloader.status === NextcloudImageDownloader.Ready
-                    ? thumbDownloader.imagePath
-                    : model.imagePath
+            source: model.imagePath.toString().length > 0
+                    ? model.imagePath
+                    : (thumbDownloader.status === NextcloudImageDownloader.Ready ? thumbDownloader.imagePath : "")
 
             onClicked: {
                 var props = {
@@ -69,7 +69,7 @@ Page {
                 source: "image://theme/icon-l-nextcloud"
                 highlighted: delegateItem.containsMouse
                 opacity: highlighted ? Theme.opacityHigh : 1
-                visible: delegateItem.status !== Thumbnail.Ready
+                visible: model.imagePath.toString().length === 0 && thumbDownloader.status !== NextcloudImageDownloader.Ready
             }
         }
     }

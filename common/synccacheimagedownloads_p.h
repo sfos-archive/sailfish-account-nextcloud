@@ -44,6 +44,11 @@ private:
 class ImageDownload
 {
 public:
+    enum Status {
+        InProgress,
+        Downloaded,
+        Error
+    };
     ImageDownload(int idempToken = 0,
             const QUrl &imageUrl = QUrl(),
             const QString &fileName = QString(),
@@ -52,10 +57,14 @@ public:
             ImageDownloadWatcher *watcher = nullptr);
     ~ImageDownload();
 
+    void setStatus(Status status, const QString &error = QString());
+
+    Status m_status = InProgress;
     int m_idempToken = 0;
     QUrl m_imageUrl;
     QString m_fileName;
     QString m_fileDirPath;
+    QString m_errorString;
     QNetworkRequest m_templateRequest;
     QTimer *m_timeoutTimer = nullptr;
     QNetworkReply *m_reply = nullptr;
@@ -78,10 +87,9 @@ public:
 
 private Q_SLOTS:
     void triggerDownload();
+    void eraseInactiveDownloads();
 
 private:
-    void eraseActiveDownload(ImageDownload *download);
-
     QNetworkAccessManager m_qnam;
     QQueue<ImageDownload*> m_pending;
     QQueue<ImageDownload*> m_active;

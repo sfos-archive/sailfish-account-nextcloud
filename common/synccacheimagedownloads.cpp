@@ -98,6 +98,12 @@ ImageDownload::~ImageDownload()
     }
 }
 
+void ImageDownload::setStatus(Status status, const QString &error)
+{
+    m_status = status;
+    m_errorString = error;
+}
+
 //-----------------------------------------------------------------------------
 
 ImageDownloader::ImageDownloader(QObject *parent)
@@ -133,11 +139,9 @@ void ImageDownloader::triggerDownload()
         m_active.enqueue(download);
 
         connect(download->m_timeoutTimer, &QTimer::timeout, this, [this, download] {
-            if (download->m_watcher) {
-                emit download->m_watcher->downloadFailed(QStringLiteral("Image download timed out for %1")
-                                                         .arg(download->m_imageUrl.toString()));
-            }
-            eraseActiveDownload(download);
+            download->setStatus(ImageDownload::Error,
+                                QStringLiteral("Image download timed out for %1").arg(download->m_imageUrl.toString()));
+            QMetaObject::invokeMethod(this, "eraseInactiveDownloads", Qt::QueuedConnection);
         });
 
         download->m_timeoutTimer->setInterval(ImageDownloadTimeout);
@@ -155,16 +159,12 @@ void ImageDownloader::triggerDownload()
         if (reply) {
             connect(reply, &QNetworkReply::finished, this, [this, reply, download] {
                 if (reply->error() != QNetworkReply::NoError) {
-                    if (download->m_watcher) {
-                        emit download->m_watcher->downloadFailed(QStringLiteral("Image download error: %1").arg(reply->errorString()));
-                    }
+                    download->setStatus(ImageDownload::Error, QStringLiteral("Image download error: %1").arg(reply->errorString()));
                 } else {
                     // save the file to the appropriate location.
                     const QByteArray replyData = reply->readAll();
                     if (replyData.isEmpty()) {
-                        if (download->m_watcher) {
-                            emit download->m_watcher->downloadFailed(QStringLiteral("Empty image data received, aborting"));
-                        }
+                        download->setStatus(ImageDownload::Error, QStringLiteral("Empty image data received, aborting"));
                     } else {
                         QDir dir(download->m_fileDirPath);
                         if (!dir.exists()) {
@@ -172,36 +172,43 @@ void ImageDownloader::triggerDownload()
                         }
                         QFile file(dir.absoluteFilePath(download->m_fileName));
                         if (!file.open(QFile::WriteOnly)) {
-                            if (download->m_watcher) {
-                                emit download->m_watcher->downloadFailed(QStringLiteral("Error opening image file %1 for writing: %2")
-                                                                                   .arg(file.fileName(), file.errorString()));
-                            }
+                            download->setStatus(ImageDownload::Error,
+                                                QStringLiteral("Error opening image file %1 for writing: %2")
+                                                        .arg(file.fileName(), file.errorString()));
                         } else {
                             file.write(replyData);
                             file.close();
-                            emit download->m_watcher->downloadFinished(file.fileName());
+                            download->setStatus(ImageDownload::Downloaded);
                         }
                     }
                 }
 
-                eraseActiveDownload(download);
+                QMetaObject::invokeMethod(this, "eraseInactiveDownloads", Qt::QueuedConnection);
             });
         }
     }
 }
 
-void ImageDownloader::eraseActiveDownload(ImageDownload *download)
+void ImageDownloader::eraseInactiveDownloads()
 {
-    QQueue<ImageDownload*>::iterator it = m_active.begin();
-    QQueue<ImageDownload*>::iterator end = m_active.end();
-    for ( ; it != end; ++it) {
-        if (*it == download) {
-            m_active.erase(it);
-            break;
+    for (QQueue<ImageDownload*>::iterator it = m_active.begin() ; it != m_active.end();) {
+        ImageDownload *download = *it;
+        if (download->m_status == ImageDownload::InProgress) {
+            ++it;
+        } else if (download->m_status == ImageDownload::Downloaded) {
+            if (download->m_watcher) {
+                emit download->m_watcher->downloadFinished(download->m_fileDirPath + '/' + download->m_fileName);
+            }
+            it = m_active.erase(it);
+            delete download;
+        } else if (download->m_status == ImageDownload::Error) {
+            if (download->m_watcher) {
+                emit download->m_watcher->downloadFailed(download->m_errorString);
+            }
+            it = m_active.erase(it);
+            delete download;
         }
     }
-
-    delete download;
 
     QMetaObject::invokeMethod(this, "triggerDownload", Qt::QueuedConnection);
 }
