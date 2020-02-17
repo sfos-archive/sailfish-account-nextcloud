@@ -131,7 +131,7 @@ void ImageCacheThreadWorker::requestUsers()
 void ImageCacheThreadWorker::requestUser(int accountId, const QString &userId)
 {
     DatabaseError error;
-    SyncCache::User user = m_db.user(accountId, userId, &error);
+    SyncCache::User user = m_db.user(accountId, &error);
     if (error.errorCode != DatabaseError::NoError) {
         emit requestUserFailed(accountId, userId, error.errorMessage);
     } else {
@@ -175,7 +175,7 @@ void ImageCacheThreadWorker::requestPhotoCount()
 void ImageCacheThreadWorker::populateUserThumbnail(int idempToken, int accountId, const QString &userId, const QNetworkRequest &requestTemplate)
 {
     DatabaseError error;
-    User user = m_db.user(accountId, userId, &error);
+    User user = m_db.user(accountId, &error);
     if (error.errorCode != DatabaseError::NoError) {
         emit populateUserThumbnailFailed(idempToken, QStringLiteral("Error occurred while reading user %1 info from db: %2")
                                          .arg(userId)

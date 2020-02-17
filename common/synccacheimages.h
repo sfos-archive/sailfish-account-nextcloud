@@ -87,7 +87,7 @@ public:
     QVector<SyncCache::Album> albums(int accountId, const QString &userId, SyncCache::DatabaseError *error) const;
     QVector<SyncCache::Photo> photos(int accountId, const QString &userId, const QString &albumId, SyncCache::DatabaseError *error) const;
 
-    SyncCache::User user(int accountId, const QString &userId, SyncCache::DatabaseError *error) const;
+    SyncCache::User user(int accountId, SyncCache::DatabaseError *error) const;
     SyncCache::Album album(int accountId, const QString &userId, const QString &albumId, SyncCache::DatabaseError *error) const;
     SyncCache::Photo photo(int accountId, const QString &userId, const QString &albumId, const QString &photoId, SyncCache::DatabaseError *error) const;
 
