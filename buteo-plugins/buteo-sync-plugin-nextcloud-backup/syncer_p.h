@@ -23,7 +23,14 @@ class Syncer : public WebDavSyncer
     Q_OBJECT
 
 public:
-    Syncer(QObject *parent, Buteo::SyncProfile *profile);
+    enum Operation {
+        Backup,
+        BackupQuery,
+        BackupRestore
+    };
+    Q_ENUM(Operation)
+
+    Syncer(QObject *parent, Buteo::SyncProfile *profile, Operation operation);
    ~Syncer();
 
     void purgeAccount(int accountId) override;
@@ -55,6 +62,7 @@ private:
     AccountSyncManager m_accountSyncManager;
     AccountSyncManager::BackupRestoreOptions m_backupRestoreOptions;
     QStringList m_backupFileNames;
+    Operation m_operation;
 };
 
 #endif // NEXTCLOUD_BACKUP_SYNCER_P_H

@@ -138,10 +138,18 @@ Provides synchronisation of backup/restore blobs with Nextcloud.
 %defattr(-,root,root,-)
 #out-of-process-plugin form:
 /usr/lib/buteo-plugins-qt5/oopp/nextcloud-backup-client
+/usr/lib/buteo-plugins-qt5/oopp/nextcloud-backupquery-client
+/usr/lib/buteo-plugins-qt5/oopp/nextcloud-backuprestore-client
 #in-process-plugin form:
 #/usr/lib/buteo-plugins-qt5/libnextcloud-backup-client.so
+#/usr/lib/buteo-plugins-qt5/libnextcloud-backupquery-client.so
+#/usr/lib/buteo-plugins-qt5/libnextcloud-backuprestore-client.so
 %config %{_sysconfdir}/buteo/profiles/client/nextcloud-backup.xml
+%config %{_sysconfdir}/buteo/profiles/client/nextcloud-backupquery.xml
+%config %{_sysconfdir}/buteo/profiles/client/nextcloud-backuprestore.xml
 %config %{_sysconfdir}/buteo/profiles/sync/nextcloud.Backup.xml
+%config %{_sysconfdir}/buteo/profiles/sync/nextcloud.BackupQuery.xml
+%config %{_sysconfdir}/buteo/profiles/sync/nextcloud.BackupRestore.xml
 
 
 %package -n buteo-sync-plugin-nextcloud-images

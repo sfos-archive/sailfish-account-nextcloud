@@ -1,14 +1,14 @@
 /****************************************************************************************
 **
-** Copyright (C) 2019 Open Mobile Platform LLC
+** Copyright (c) 2020 Open Mobile Platform LLC
 ** All rights reserved.
 **
 ** License: Proprietary.
 **
 ****************************************************************************************/
 
-#ifndef NEXTCLOUD_BACKUP_CLIENT_H
-#define NEXTCLOUD_BACKUP_CLIENT_H
+#ifndef NEXTCLOUD_BACKUPOPERATIONCLIENT_H
+#define NEXTCLOUD_BACKUPOPERATIONCLIENT_H
 
 // Buteo
 #include <ClientPlugin.h>
@@ -16,20 +16,17 @@
 #include <SyncResults.h>
 #include <SyncCommonDefs.h>
 
-#include <QtCore/QString>
-#include <QtCore/QObject>
-
 class Syncer;
-class Q_DECL_EXPORT NextcloudBackupClient : public Buteo::ClientPlugin
+class Q_DECL_EXPORT NextcloudBackupOperationClient : public Buteo::ClientPlugin
 {
     Q_OBJECT
 
 public:
-    NextcloudBackupClient(
+    NextcloudBackupOperationClient(
             const QString &pluginName,
             const Buteo::SyncProfile &profile,
             Buteo::PluginCbInterface *cbInterface);
-    ~NextcloudBackupClient();
+    ~NextcloudBackupOperationClient();
 
     bool init();
     bool uninit();
@@ -40,6 +37,9 @@ public:
 
 public Q_SLOTS:
     void connectivityStateChanged(Sync::ConnectivityType aType, bool aState);
+
+protected:
+    virtual Syncer *newSyncer() = 0;
 
 private Q_SLOTS:
     void syncSucceeded();
@@ -59,10 +59,4 @@ private:
     int m_accountId;
 };
 
-extern "C" NextcloudBackupClient* createPlugin(const QString &pluginName,
-                                               const Buteo::SyncProfile &profile,
-                                               Buteo::PluginCbInterface *cbInterface);
-
-extern "C" void destroyPlugin(NextcloudBackupClient *client);
-
-#endif // NEXTCLOUD_BACKUP_CLIENT_H
+#endif // NEXTCLOUD_BACKUPOPERATIONCLIENT_H

@@ -33,8 +33,9 @@ namespace {
     const QString DefaultDirListLocalPath = DefaultLocalPath + "/directoryListing.txt";
 }
 
-Syncer::Syncer(QObject *parent, Buteo::SyncProfile *syncProfile)
+Syncer::Syncer(QObject *parent, Buteo::SyncProfile *syncProfile, Syncer::Operation operation)
     : WebDavSyncer(parent, syncProfile, QStringLiteral("nextcloud-backup"))
+    , m_operation(operation)
 {
 }
 
@@ -68,8 +69,8 @@ bool Syncer::loadConfig()
     }
 
     // Set up local directory
-    if (m_backupRestoreOptions.operation == AccountSyncManager::BackupRestoreOptions::DirectoryListing
-            || m_backupRestoreOptions.operation == AccountSyncManager::BackupRestoreOptions::Download) {
+    if (m_operation == BackupQuery
+            || m_operation == BackupRestore) {
         QDir dir;
         if (!dir.mkpath(m_backupRestoreOptions.localDirPath)) {
             LOG_WARNING("Cannot create local dir" << m_backupRestoreOptions.localDirPath);
@@ -78,7 +79,7 @@ bool Syncer::loadConfig()
     }
 
     // Set up backup file names
-    if (m_backupRestoreOptions.operation == AccountSyncManager::BackupRestoreOptions::Upload) {
+    if (m_operation == Backup) {
         m_backupFileNames = m_backupRestoreOptions.localDirFileNames();
         if (m_backupFileNames.isEmpty()) {
             LOG_WARNING("Upload failed, no files found in" << m_backupRestoreOptions.localDirPath);
@@ -86,7 +87,7 @@ bool Syncer::loadConfig()
         }
         LOG_DEBUG("Will upload files:" << m_backupFileNames);
 
-    } else if (m_backupRestoreOptions.operation == AccountSyncManager::BackupRestoreOptions::Download) {
+    } else if (m_operation == BackupRestore) {
         if (!m_backupRestoreOptions.fileName.isEmpty()) {
             m_backupFileNames = QStringList(m_backupRestoreOptions.fileName);
         }
@@ -100,7 +101,7 @@ void Syncer::beginSync()
     if (!loadConfig()) {
         WebDavSyncer::finishWithError("Config load failed");
     } else {
-        LOG_DEBUG("Starting Nextcloud operation:" << m_backupRestoreOptions.operation);
+        LOG_DEBUG("Starting Nextcloud operation:" << m_operation);
         // All operations require an initial directory listing request
         if (!performDirListingRequest(m_backupRestoreOptions.remoteDirPath)) {
             WebDavSyncer::finishWithError("Directory list request failed");
@@ -169,14 +170,14 @@ void Syncer::handleDirListingReply()
     const QString remoteDirPath = reply->property("remoteDirPath").toString();
 
     bool dirNotFound = (httpCode == 404);
-    if (m_backupRestoreOptions.operation == AccountSyncManager::BackupRestoreOptions::Upload && dirNotFound) {
+    if (m_operation == Backup && dirNotFound) {
         // Remote backup directory doesn't exist, so create it.
         performDirCreationRequest(m_backupRestoreOptions.remoteDirPath.split('/'), 0);
         return;
     }
 
     if (reply->error() != QNetworkReply::NoError) {
-        if (m_backupRestoreOptions.operation == AccountSyncManager::BackupRestoreOptions::DirectoryListing
+        if (m_operation == BackupQuery
                 && dirNotFound) {
             // No backups created yet, that's OK
         } else {
@@ -185,7 +186,7 @@ void Syncer::handleDirListingReply()
         }
     }
 
-    if (m_backupRestoreOptions.operation == AccountSyncManager::BackupRestoreOptions::DirectoryListing) {
+    if (m_operation == BackupQuery) {
         const QList<NetworkReplyParser::Resource> resourceList = XmlReplyParser::parsePropFindResponse(
                 replyData, remoteDirPath);
         QFile file(m_backupRestoreOptions.localDirPath + '/' + m_backupRestoreOptions.fileName);
@@ -203,12 +204,12 @@ void Syncer::handleDirListingReply()
         }
         file.close();
         WebDavSyncer::finishWithSuccess();
-    } else if (m_backupRestoreOptions.operation == AccountSyncManager::BackupRestoreOptions::Upload) {
+    } else if (m_operation == Backup) {
         // Remote backup directory exists, so upload the file
         if (!performUploadRequest(m_backupFileNames)) {
             WebDavSyncer::finishWithError("Upload request failed");
         }
-    } else if (m_backupRestoreOptions.operation == AccountSyncManager::BackupRestoreOptions::Download) {
+    } else if (m_operation == BackupRestore) {
         const QList<NetworkReplyParser::Resource> resourceList = XmlReplyParser::parsePropFindResponse(
                 replyData, remoteDirPath);
         for (const NetworkReplyParser::Resource &resource : resourceList) {
@@ -228,7 +229,7 @@ void Syncer::handleDirListingReply()
             WebDavSyncer::finishWithError("Dir list request failed");
         }
     } else {
-        WebDavSyncer::finishWithError("Unexpected operation after dir listing finished: " + m_backupRestoreOptions.operation);
+        WebDavSyncer::finishWithError("Unexpected operation after dir listing finished: " + m_operation);
     }
 }
 

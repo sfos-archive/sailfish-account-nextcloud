@@ -33,6 +33,7 @@ WebDavSyncer::~WebDavSyncer()
 
 void WebDavSyncer::abortSync()
 {
+    LOG_DEBUG(Q_FUNC_INFO << "Aborting sync for" << m_serviceName << "sync with account" << m_accountId);
     m_syncAborted = true;
 }
 
@@ -52,11 +53,14 @@ void WebDavSyncer::startSync(int accountId)
 
 void WebDavSyncer::signInError()
 {
+    LOG_DEBUG(Q_FUNC_INFO << "Sign-in failed for" << m_serviceName << "sync with account" << m_accountId);
     emit syncFailed();
 }
 
 void WebDavSyncer::sync(int, const QString &, const QString &serverUrl, const QString &webdavPath, const QString &username, const QString &password, const QString &accessToken, bool ignoreSslErrors)
 {
+    LOG_DEBUG(Q_FUNC_INFO << "Auth succeeded, start sync for service" << m_serviceName << "with account" << m_accountId);
+
     m_serverUrl = serverUrl;
     m_webdavPath = webdavPath.isEmpty() ? QStringLiteral("/remote.php/webdav/") : webdavPath;
     m_username = username;

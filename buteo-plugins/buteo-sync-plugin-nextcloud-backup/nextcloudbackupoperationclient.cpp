@@ -1,13 +1,13 @@
 /****************************************************************************************
 **
-** Copyright (C) 2019 Open Mobile Platform LLC
+** Copyright (c) 2020 Open Mobile Platform LLC
 ** All rights reserved.
 **
 ** License: Proprietary.
 **
 ****************************************************************************************/
 
-#include "nextcloudbackupclient.h"
+#include "nextcloudbackupoperationclient.h"
 #include "syncer_p.h"
 #include "networkrequestgenerator_p.h"
 #include "networkreplyparser_p.h"
@@ -18,21 +18,7 @@
 #include <ProfileEngineDefs.h>
 #include <ProfileManager.h>
 
-extern "C" NextcloudBackupClient* createPlugin(
-        const QString& pluginName,
-        const Buteo::SyncProfile& profile,
-        Buteo::PluginCbInterface *cbInterface)
-{
-    return new NextcloudBackupClient(pluginName, profile, cbInterface);
-}
-
-extern "C" void destroyPlugin(NextcloudBackupClient *client)
-{
-    delete client;
-}
-
-NextcloudBackupClient::NextcloudBackupClient(
-        const QString& pluginName,
+NextcloudBackupOperationClient::NextcloudBackupOperationClient(const QString& pluginName,
         const Buteo::SyncProfile& profile,
         Buteo::PluginCbInterface *cbInterface)
     : ClientPlugin(pluginName, profile, cbInterface)
@@ -45,11 +31,11 @@ NextcloudBackupClient::NextcloudBackupClient(
     }
 }
 
-NextcloudBackupClient::~NextcloudBackupClient()
+NextcloudBackupOperationClient::~NextcloudBackupOperationClient()
 {
 }
 
-void NextcloudBackupClient::connectivityStateChanged(Sync::ConnectivityType type, bool state)
+void NextcloudBackupOperationClient::connectivityStateChanged(Sync::ConnectivityType type, bool state)
 {
     LOG_DEBUG("Received connectivity change event:" << type << " changed to " << state);
     if (type == Sync::CONNECTIVITY_INTERNET && !state) {
@@ -58,7 +44,7 @@ void NextcloudBackupClient::connectivityStateChanged(Sync::ConnectivityType type
     }
 }
 
-bool NextcloudBackupClient::init()
+bool NextcloudBackupOperationClient::init()
 {
     QString accountIdString = iProfile.key(Buteo::KEY_ACCOUNT_ID);
     m_accountId = accountIdString.toInt();
@@ -71,24 +57,24 @@ bool NextcloudBackupClient::init()
     m_conflictResPolicy = iProfile.conflictResolutionPolicy();
 
     if (!m_syncer) {
-        m_syncer = new Syncer(this, &iProfile);
+        m_syncer = newSyncer();
         connect(m_syncer, &Syncer::syncSucceeded,
-                this, &NextcloudBackupClient::syncSucceeded);
+                this, &NextcloudBackupOperationClient::syncSucceeded);
         connect(m_syncer, &Syncer::syncFailed,
-                this, &NextcloudBackupClient::syncFailed);
+                this, &NextcloudBackupOperationClient::syncFailed);
     }
 
     return true;
 }
 
-bool NextcloudBackupClient::uninit()
+bool NextcloudBackupOperationClient::uninit()
 {
     delete m_syncer;
     m_syncer = 0;
     return true;
 }
 
-bool NextcloudBackupClient::startSync()
+bool NextcloudBackupOperationClient::startSync()
 {
     if (m_accountId == 0) {
         return false;
@@ -98,28 +84,28 @@ bool NextcloudBackupClient::startSync()
     return true;
 }
 
-void NextcloudBackupClient::syncSucceeded()
+void NextcloudBackupOperationClient::syncSucceeded()
 {
     syncFinished(Buteo::SyncResults::NO_ERROR, QString());
 }
 
-void NextcloudBackupClient::syncFailed()
+void NextcloudBackupOperationClient::syncFailed()
 {
     syncFinished(Buteo::SyncResults::INTERNAL_ERROR, QString());
 }
 
-void NextcloudBackupClient::abortSync(Sync::SyncStatus status)
+void NextcloudBackupOperationClient::abortSync(Sync::SyncStatus status)
 {
     abort(status);
 }
 
-void NextcloudBackupClient::abort(Sync::SyncStatus status)
+void NextcloudBackupOperationClient::abort(Sync::SyncStatus status)
 {
     m_syncer->abortSync();
     syncFinished(status, QStringLiteral("Sync aborted"));
 }
 
-void NextcloudBackupClient::syncFinished(int minorErrorCode, const QString &message)
+void NextcloudBackupOperationClient::syncFinished(int minorErrorCode, const QString &message)
 {
     if (minorErrorCode == Buteo::SyncResults::NO_ERROR) {
         LOG_DEBUG("Nextcloud Backup sync succeeded!" << message);
@@ -136,12 +122,12 @@ void NextcloudBackupClient::syncFinished(int minorErrorCode, const QString &mess
     }
 }
 
-Buteo::SyncResults NextcloudBackupClient::getSyncResults() const
+Buteo::SyncResults NextcloudBackupOperationClient::getSyncResults() const
 {
     return m_results;
 }
 
-bool NextcloudBackupClient::cleanUp()
+bool NextcloudBackupOperationClient::cleanUp()
 {
     // This function is called after the account has been deleted.
     QString accountIdString = iProfile.key(Buteo::KEY_ACCOUNT_ID);
@@ -152,7 +138,7 @@ bool NextcloudBackupClient::cleanUp()
     }
 
     if (!m_syncer) {
-        m_syncer = new Syncer(this, &iProfile);
+        m_syncer = newSyncer();
     }
 
     m_syncer->purgeAccount(m_accountId);
