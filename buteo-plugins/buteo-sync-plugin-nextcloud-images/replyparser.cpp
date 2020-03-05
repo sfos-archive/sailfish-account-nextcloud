@@ -60,6 +60,8 @@ ReplyParser::GalleryMetadata ReplyParser::parseGalleryMetadata(Syncer *imageSync
     const QJsonObject obj = doc.object();
     const QJsonArray files = obj.value("files").toArray();
     const QJsonObject albums = obj.value("albums").toObject();
+    retn.currAlbumId = QStringLiteral("%1%2").arg(imageSyncer->webDavPath(),
+                                                  obj.value("albumpath").toString());
 
     QHash<QString, int> albumPhotoCount;
     QHash<QString, QPair<QUrl,QString> > albumThumbnails;

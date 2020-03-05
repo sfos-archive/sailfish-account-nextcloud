@@ -114,8 +114,10 @@ void Syncer::handleConfigReply()
         return;
     }
 
-    QNetworkReply *listReply = m_requestGenerator->galleryList(NetworkRequestGenerator::JsonContentType);
+    QNetworkReply *listReply = m_requestGenerator->galleryList(NetworkRequestGenerator::JsonContentType,
+                                                               QStringLiteral("Photos"));
     if (listReply) {
+        m_galleryListRequests.append(listReply);
         connect(listReply, &QNetworkReply::finished,
                 this, &Syncer::handleGalleryMetaDataReply);
     } else {
@@ -127,6 +129,7 @@ void Syncer::handleConfigReply()
 void Syncer::handleGalleryMetaDataReply()
 {
     QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
+    m_galleryListRequests.removeOne(reply);
     reply->deleteLater();
     const QByteArray replyData = reply->readAll();
     const int httpCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
@@ -138,18 +141,34 @@ void Syncer::handleGalleryMetaDataReply()
     }
 
     const ReplyParser::GalleryMetadata metadata = ReplyParser::parseGalleryMetadata(this, replyData);
+    LOG_DEBUG("Parsed metadata for Nextcloud gallery album:" << metadata.currAlbumId);
 
-    QHash<QString, SyncCache::Album> albums;
     for (const SyncCache::Album &album : metadata.albums) {
-        albums.insert(album.albumId, album);
+        m_albums.insert(album.albumId, album);
+        if (album.albumId != metadata.currAlbumId) {
+            LOG_DEBUG("Requesting metadata for Nextcloud gallery sub-album:" << album.albumId);
+            QNetworkReply *listReply = m_requestGenerator->galleryList(
+                    NetworkRequestGenerator::JsonContentType,
+                    album.albumName);
+            if (listReply) {
+                m_galleryListRequests.append(listReply);
+                connect(listReply, &QNetworkReply::finished,
+                        this, &Syncer::handleGalleryMetaDataReply);
+            } else {
+                LOG_WARNING("Failed to start recursive gallery list request");
+                finishWithHttpError(QStringLiteral("Failed to start recursive gallery list request"), 0);
+                return;
+            }
+        }
     }
 
-    QHash<QString, SyncCache::Photo> photos;
     for (const SyncCache::Photo &photo : metadata.photos) {
-        photos.insert(photo.photoId, photo);
+        m_photos.insert(photo.photoId, photo);
     }
 
-    calculateAndApplyDelta(albums, photos, metadata.photos.count() > 0 ? metadata.photos.first().photoId : QString());
+    if (m_galleryListRequests.isEmpty()) {
+        calculateAndApplyDelta(m_albums, m_photos, m_photos.count() > 0 ? m_photos.values().first().photoId : QString());
+    }
 }
 
 void Syncer::calculateAndApplyDelta(
