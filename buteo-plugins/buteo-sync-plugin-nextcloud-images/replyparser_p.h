@@ -24,6 +24,7 @@ public:
     struct GalleryMetadata {
         QVector<SyncCache::Album> albums;
         QVector<SyncCache::Photo> photos;
+        QString currAlbumId;
     };
 
     static GalleryMetadata parseGalleryMetadata(Syncer *imageSyncer, const QByteArray &galleryListResponse);

@@ -16,6 +16,9 @@
 
 #include <QList>
 #include <QHash>
+#include <QVector>
+
+class QNetworkReply;
 
 class ReplyParser;
 class JsonRequestGenerator;
@@ -43,6 +46,10 @@ private:
 
     ReplyParser *m_replyParser = nullptr;
     QString m_userId;
+
+    QHash<QString, SyncCache::Album> m_albums;
+    QHash<QString, SyncCache::Photo> m_photos;
+    QVector<QNetworkReply *> m_galleryListRequests;
 };
 
 #endif // NEXTCLOUD_IMAGES_SYNCER_P_H
