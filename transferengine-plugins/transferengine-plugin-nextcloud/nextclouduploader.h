@@ -20,6 +20,7 @@
 
 class NextcloudApi;
 class AccountSettings;
+class QFile;
 
 class NextcloudUploader : public MediaTransferInterface
 {
@@ -48,9 +49,12 @@ private Q_SLOTS:
 
 private:
     void postFile();
-    NextcloudApi *m_api;
-    NextcloudShareServiceStatus *m_nextcloudShareServiceStatus;
-    QNetworkAccessManager *m_qnam;
+    void cleanUp();
+
+    NextcloudApi *m_api = nullptr;
+    NextcloudShareServiceStatus *m_nextcloudShareServiceStatus = nullptr;
+    QNetworkAccessManager *m_qnam = nullptr;
+    QFile *m_contentFile = nullptr;
     NextcloudShareServiceStatus::AccountDetails m_accountDetails;
     QString m_filePath;
     QString m_token;
