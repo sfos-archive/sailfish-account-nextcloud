@@ -1,5 +1,3 @@
-QT -= gui
-
 include($$PWD/../../common/webdav.pri)
 include($$PWD/../../common/synccacheimages.pri)
 

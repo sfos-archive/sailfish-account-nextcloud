@@ -11,11 +11,10 @@
 #define NEXTCLOUD_IMAGES_REPLYPARSER_P_H
 
 #include <QObject>
-#include <QString>
 #include <QList>
-#include <QByteArray>
 
 #include "synccacheimages.h"
+#include "networkreplyparser_p.h"
 
 class Syncer;
 class ReplyParser
@@ -27,7 +26,10 @@ public:
         QString currAlbumId;
     };
 
-    static GalleryMetadata parseGalleryMetadata(Syncer *imageSyncer, const QByteArray &galleryListResponse);
+    static GalleryMetadata galleryMetadataFromResources(Syncer *imageSyncer,
+                                                        const QString &rootPath,
+                                                        const QString &albumRemotePath,
+                                                        const QList<NetworkReplyParser::Resource> &resources);
 };
 
 Q_DECLARE_METATYPE(ReplyParser::GalleryMetadata)

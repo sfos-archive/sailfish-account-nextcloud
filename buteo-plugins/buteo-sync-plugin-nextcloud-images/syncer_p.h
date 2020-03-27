@@ -11,7 +11,7 @@
 #define NEXTCLOUD_IMAGES_SYNCER_P_H
 
 #include "webdavsyncer_p.h"
-
+#include "replyparser_p.h"
 #include "synccacheimages.h"
 
 #include <QList>
@@ -35,9 +35,8 @@ public:
 
 private:
     void handleUserInfoReply();
-    bool performConfigRequest();
-    void handleConfigReply();
-    void handleGalleryMetaDataReply();
+    bool performDirListingRequest(const QString &remoteDirPath);
+    void handleDirListingReply();
 
     void beginSync() override;
     void calculateAndApplyDelta(const QHash<QString, SyncCache::Album> &albums,
@@ -45,11 +44,10 @@ private:
                                 const QString &firstPhotoId);
 
     ReplyParser *m_replyParser = nullptr;
+    ReplyParser::GalleryMetadata m_dirListingResults;
+    QStringList m_pendingAlbumListings;
     QString m_userId;
-
-    QHash<QString, SyncCache::Album> m_albums;
-    QHash<QString, SyncCache::Photo> m_photos;
-    QVector<QNetworkReply *> m_galleryListRequests;
+    QString m_dirListingRootPath;
 };
 
 #endif // NEXTCLOUD_IMAGES_SYNCER_P_H

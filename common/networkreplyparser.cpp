@@ -453,6 +453,10 @@ QList<NetworkReplyParser::Resource> XmlReplyParser::parsePropFindResponse(const 
                 QByteArray::fromPercentEncoding(
                         rmap.value(QStringLiteral("href")).toMap().value(
                                 XmlElementTextKey).toString().toUtf8()));
+        if (entryHref == remotePath) {
+            continue;
+        }
+
         QVariantList propstats;
         if (rmap.value(QStringLiteral("propstat")).type() == QVariant::List) {
             propstats = rmap.value(QStringLiteral("propstat")).toList();
@@ -460,32 +464,33 @@ QList<NetworkReplyParser::Resource> XmlReplyParser::parsePropFindResponse(const 
             QVariantMap propstat = rmap.value(QStringLiteral("propstat")).toMap();
             propstats << propstat;
         }
-        bool resourcetypeCollection = false;
-        QDateTime lastModified;
-        QString contentType;
+
+        NetworkReplyParser::Resource resource;
+        resource.href = entryHref;
+
         for (const QVariant &vpropstat : propstats) {
             const QVariantMap propstat = vpropstat.toMap();
             const QVariantMap &prop(propstat.value(QStringLiteral("prop")).toMap());
-            if (prop.contains(QStringLiteral("resourcetype"))) {
-                const QStringList resourceTypeKeys = prop.value(QStringLiteral("resourcetype")).toMap().keys();
-                resourcetypeCollection = resourceTypeKeys.contains(QStringLiteral("collection"), Qt::CaseInsensitive);
-            }
-            if (prop.contains(QStringLiteral("getlastmodified"))) {
-                lastModified = QDateTime::fromString(prop.value(QStringLiteral("getlastmodified")).toMap().value(XmlElementTextKey).toString(), Qt::RFC2822Date);
-            }
-            if (prop.contains(QStringLiteral("getcontenttype"))) {
-                contentType = prop.value(QStringLiteral("getcontenttype")).toMap().value(XmlElementTextKey).toString();
-            }
-        }
+            for (QVariantMap::ConstIterator it = prop.constBegin(); it != prop.constEnd(); ++it) {
+                const QString &key = it.key();
 
-        if (entryHref != remotePath) {
-            NetworkReplyParser::Resource resource;
-            resource.lastModified = lastModified;
-            resource.href = entryHref;
-            resource.contentType = contentType;
-            resource.isCollection = resourcetypeCollection;
-            result.append(resource);
+                if (key == QStringLiteral("getlastmodified")) {
+                    resource.lastModified = QDateTime::fromString(it.value().toMap().value(XmlElementTextKey).toString(), Qt::RFC2822Date);
+                } else if (key == QStringLiteral("getcontenttype")) {
+                    resource.contentType = it.value().toMap().value(XmlElementTextKey).toString();
+                } else if (key == QStringLiteral("owner-id")) {
+                    resource.ownerId = it.value().toMap().value(XmlElementTextKey).toString();
+                } else if (key == QStringLiteral("fileid")) {
+                    resource.fileId = it.value().toMap().value(XmlElementTextKey).toString();
+                } else if (key == QStringLiteral("size")) {
+                    resource.size = it.value().toMap().value(XmlElementTextKey).toInt();
+                } else if (key == QStringLiteral("resourcetype")) {
+                    const QStringList resourceTypeKeys = it.value().toMap().keys();
+                    resource.isCollection = resourceTypeKeys.contains(QStringLiteral("collection"), Qt::CaseInsensitive);
+                }
+            }
         }
+        result.append(resource);
     }
 
     return result;

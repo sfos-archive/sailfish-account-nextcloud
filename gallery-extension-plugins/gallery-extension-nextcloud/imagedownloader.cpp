@@ -182,7 +182,6 @@ void NextcloudImageDownloader::setStatus(Status status)
 void NextcloudImageDownloader::loadImage()
 {
     if (!m_imageCache) {
-        qmlInfo(this) << "imageCache not set, cannot load image";
         return;
     }
 
@@ -260,7 +259,7 @@ void NextcloudImageDownloader::populateFinished(int idempToken, const QString &p
             m_imagePath = imagePath;
             emit imagePathChanged();
         }
-        setStatus(Ready);
+        setStatus(path.isEmpty() ? Error : Ready);
     }
 }
 
