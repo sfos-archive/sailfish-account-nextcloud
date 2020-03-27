@@ -16,21 +16,22 @@
 #include <imageoperation.h>
 
 #include <QFile>
+#include <QDir>
 #include <QMimeDatabase>
 #include <QMimeData>
 #include <QMimeType>
+#include <QStandardPaths>
 #include <QtDebug>
 
 NextcloudUploader::NextcloudUploader(QNetworkAccessManager *qnam, QObject *parent)
     : MediaTransferInterface(parent)
-    , m_api(0)
-    , m_nextcloudShareServiceStatus(0)
     , m_qnam(qnam)
 {
 }
 
 NextcloudUploader::~NextcloudUploader()
 {
+    cleanUp();
 }
 
 QString NextcloudUploader::displayName() const
@@ -95,6 +96,7 @@ void NextcloudUploader::startUploading()
 void NextcloudUploader::transferFinished()
 {
     setStatus(MediaTransferInterface::TransferFinished);
+    cleanUp();
 }
 
 void NextcloudUploader::transferProgress(qreal progress)
@@ -106,12 +108,14 @@ void NextcloudUploader::transferError()
 {
     setStatus(MediaTransferInterface::TransferInterrupted);
     qWarning() << Q_FUNC_INFO << "Transfer interrupted";
+    cleanUp();
 }
 
 void NextcloudUploader::transferCanceled()
 {
     setStatus(MediaTransferInterface::TransferCanceled);
     qWarning() << Q_FUNC_INFO << "Transfer canceled";
+    cleanUp();
 }
 
 void NextcloudUploader::credentialsExpired()
@@ -123,6 +127,39 @@ void NextcloudUploader::credentialsExpired()
 void NextcloudUploader::postFile()
 {
     m_filePath = mediaItem()->value(MediaItem::Url).toUrl().toLocalFile();
+
+    if (m_filePath.isEmpty()) {
+        QByteArray content = mediaItem()->value(MediaItem::ContentData).toByteArray();
+        if (content.isEmpty()) {
+            qWarning() << Q_FUNC_INFO << "No file name and no content specified, nothing to send";
+            transferError();
+            return;
+        }
+
+        static const QString dirPath = QStandardPaths::writableLocation(QStandardPaths::HomeLocation)
+                + QStringLiteral("/.local/share/system/privileged/Sharing/tmp");
+        QDir dir(dirPath);
+        if (!dir.mkpath(".")) {
+            qWarning() << "Cannot make path:" << dir.absolutePath();
+            transferError();
+            return;
+        }
+
+        m_contentFile = new QFile(dir.absoluteFilePath(mediaItem()->value(MediaItem::ResourceName).toString()), this);
+        if (!m_contentFile->open(QFile::WriteOnly)) {
+            qWarning() << Q_FUNC_INFO << "Cannot open file for writing:" << m_contentFile->fileName();
+            transferError();
+            return;
+        }
+        if (m_contentFile->write(content) < 0) {
+            qWarning() << Q_FUNC_INFO << "Cannot write content data to file:" << m_contentFile->fileName();
+            transferError();
+            return;
+        }
+        m_contentFile->close();
+        m_filePath = m_contentFile->fileName();
+    }
+
     if (!m_api) {
         m_api = new NextcloudApi(m_qnam, this);
         connect(m_api, &NextcloudApi::transferProgressUpdated, this, &NextcloudUploader::transferProgress);
@@ -153,4 +190,15 @@ void NextcloudUploader::postFile()
                         m_accountDetails.password,
                         m_accountDetails.serverAddress,
                         mimeTypeIsImage ? m_accountDetails.photosPath : m_accountDetails.documentsPath);
+}
+
+void NextcloudUploader::cleanUp()
+{
+    if (m_contentFile) {
+        if (!m_contentFile->remove()) {
+            qWarning() << "unable to remove file" << m_contentFile->fileName();
+        }
+        delete m_contentFile;
+        m_contentFile = nullptr;
+    }
 }
