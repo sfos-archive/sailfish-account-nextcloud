@@ -137,29 +137,6 @@ QNetworkReply *NetworkRequestGenerator::capabilities(const QByteArray &acceptCon
     return sendRequest(request, "GET");
 }
 
-QNetworkReply *NetworkRequestGenerator::galleryConfig(const QByteArray &acceptContentType)
-{
-    QNetworkRequest request = networkRequest(networkRequestUrl("/index.php/apps/gallery/api/config"), QString(), QByteArray(), true);
-    if (!acceptContentType.isEmpty()) {
-        request.setRawHeader("Accept", acceptContentType);
-    }
-    return sendRequest(request, "GET");
-}
-
-QNetworkReply *NetworkRequestGenerator::galleryList(const QByteArray &acceptContentType, const QString &location)
-{
-    const QUrlQuery query(QStringLiteral("location=%1&mediatypes=%2&features=%3&etag=%4")
-                                    .arg(location.isEmpty() ? QStringLiteral("/") : location)
-                                    .arg(QStringLiteral("image/jpeg;image/gif;image/png;image/bmp"))
-                                    .arg(QString())
-                                    .arg(QString()));
-    QNetworkRequest request = networkRequest(networkRequestUrl("/index.php/apps/gallery/api/files/list", query), QString(), QByteArray(), true);
-    if (!acceptContentType.isEmpty()) {
-        request.setRawHeader("Accept", acceptContentType);
-    }
-    return sendRequest(request, "GET");
-}
-
 QNetworkReply *NetworkRequestGenerator::notificationList(const QByteArray &acceptContentType)
 {
     QNetworkRequest request = networkRequest(networkRequestUrl("/ocs/v2.php/apps/notifications/api/v2/notifications"));
@@ -191,7 +168,14 @@ QNetworkReply *NetworkRequestGenerator::dirListing(const QString &remoteDirPath)
     }
 
     QByteArray requestData = "<d:propfind xmlns:d=\"DAV:\">" \
-          "<d:propname/>" \
+        "<d:prop xmlns:oc=\"http://owncloud.org/ns\">" \
+             "<d:getlastmodified />" \
+             "<d:getcontenttype />" \
+             "<d:resourcetype />" \
+             "<oc:fileid />" \
+             "<oc:owner-id />" \
+             "<oc:size />" \
+            "</d:prop>" \
         "</d:propfind>";
 
     QNetworkRequest request = networkRequest(networkRequestUrl(remoteDirPath), XmlContentType, requestData);

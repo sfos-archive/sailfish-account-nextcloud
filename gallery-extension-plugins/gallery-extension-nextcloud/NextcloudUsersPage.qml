@@ -45,16 +45,6 @@ Page {
                 userId: model.userId
             }
 
-            NextcloudImageDownloader {
-                id: imageDownloader
-
-                accountId: model.accountId
-                userId: model.userId
-
-                imageCache: NextcloudImageCache
-                downloadThumbnail: true
-            }
-
             Label {
                 id: titleLabel
 
@@ -77,19 +67,11 @@ Page {
                 anchors.left: parent.horizontalCenter
                 width: Theme.itemSizeExtraLarge
                 height: width
-                source: imageDownloader.status === NextcloudImageDownloader.Ready
-                        ? imageDownloader.imagePath
-                        : "image://theme/icon-l-nextcloud"
-                fillMode: imageDownloader.status === NextcloudImageDownloader.Ready
-                          ? Image.PreserveAspectCrop
-                          : Image.PreserveAspectFit
+                source: "image://theme/icon-l-nextcloud"
+                fillMode: Image.PreserveAspectFit
                 clip: true
-                highlighted: imageDownloader.status !== NextcloudImageDownloader.Ready
-                             && delegateItem.highlighted
-                opacity: imageDownloader.status === NextcloudImageDownloader.Ready
-                         && delegateItem.highlighted
-                         ? Theme.opacityHigh
-                         : 1
+                highlighted: delegateItem.highlighted
+                opacity: delegateItem.highlighted ? Theme.opacityHigh : 1
             }
 
             Label {

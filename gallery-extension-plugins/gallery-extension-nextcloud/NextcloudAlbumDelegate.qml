@@ -27,9 +27,10 @@ BackgroundItem {
     HighlightImage {
         id: image
 
-        anchors.left: parent.left
         width: Theme.itemSizeExtraLarge
         height: width
+        sourceSize.width: width
+        sourceSize.height: width
         source: albumThumbnailPath.length ? albumThumbnailPath : "image://theme/icon-l-nextcloud"
         fillMode: albumThumbnailPath.length ? Image.PreserveAspectCrop : Image.PreserveAspectFit
         clip: true
@@ -44,7 +45,9 @@ BackgroundItem {
         userId: root.userId
         albumId: root.albumId
 
-        imageCache: NextcloudImageCache
+        imageCache: albumThumbnailPath.length === 0
+                    ? NextcloudImageCache
+                    : null
         downloadThumbnail: true
     }
 

@@ -20,7 +20,6 @@
 namespace SyncCache {
 
 class ImageDownloader;
-class BatchedImageDownloader;
 
 class ImageCacheThreadWorker : public QObject
 {
@@ -88,7 +87,6 @@ private:
 
     ImageDatabase m_db;
     ImageDownloader *m_downloader = nullptr;
-    BatchedImageDownloader *m_thumbnailDownloader = nullptr;
 };
 
 class ImageCachePrivate : public QObject

@@ -24,9 +24,6 @@ public:
     QNetworkReply *userInfo(const QByteArray &acceptContentType);
     QNetworkReply *capabilities(const QByteArray &acceptContentType);
 
-    QNetworkReply *galleryConfig(const QByteArray &acceptContentType);
-    QNetworkReply *galleryList(const QByteArray &acceptContentType, const QString &location = QString());
-
     QNetworkReply *notificationList(const QByteArray &acceptContentType);
     QNetworkReply *deleteNotification(const QString &notificationId);
     QNetworkReply *deleteAllNotifications();
