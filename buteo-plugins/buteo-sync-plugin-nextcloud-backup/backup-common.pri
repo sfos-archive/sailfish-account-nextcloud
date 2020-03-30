@@ -1,4 +1,3 @@
-PKGCONFIG += sailfishaccounts
 QT -= gui
 
 include($$PWD/../../common/webdav.pri)

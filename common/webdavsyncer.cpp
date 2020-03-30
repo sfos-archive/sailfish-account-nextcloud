@@ -89,11 +89,13 @@ void WebDavSyncer::finishWithError(const QString &errorMessage)
 {
     LOG_WARNING("Nextcloud" << m_serviceName << "sync for account" << m_accountId << "finished with error:" << errorMessage);
     m_syncError = true;
+    cleanUp();
     emit syncFailed();
 }
 
 void WebDavSyncer::finishWithSuccess()
 {
     LOG_DEBUG(Q_FUNC_INFO << "Nextcloud" << m_serviceName << "sync with account" << m_accountId << "finished successfully!");
+    cleanUp();
     emit syncSucceeded();
 }

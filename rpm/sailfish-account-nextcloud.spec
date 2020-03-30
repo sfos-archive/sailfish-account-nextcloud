@@ -65,7 +65,6 @@ BuildRequires: pkgconfig(libsignon-qt5)
 BuildRequires: pkgconfig(accounts-qt5)
 BuildRequires: pkgconfig(socialcache)
 BuildRequires: pkgconfig(libsailfishkeyprovider)
-BuildRequires: pkgconfig(sailfishaccounts)
 Requires: %{name} = %{version}-%{release}
 Requires: buteo-syncfw-qt5-msyncd
 Requires: systemd
@@ -125,7 +124,6 @@ BuildRequires: pkgconfig(libsignon-qt5)
 BuildRequires: pkgconfig(accounts-qt5)
 BuildRequires: pkgconfig(socialcache)
 BuildRequires: pkgconfig(libsailfishkeyprovider)
-BuildRequires: pkgconfig(sailfishaccounts)
 Requires: %{name} = %{version}-%{release}
 Requires: buteo-syncfw-qt5-msyncd
 Requires: systemd

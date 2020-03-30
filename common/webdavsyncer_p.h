@@ -48,6 +48,7 @@ protected Q_SLOTS:
 
 protected:
     virtual void beginSync() = 0;
+    virtual void cleanUp() {}
     void finishWithHttpError(const QString &errorMessage, int httpCode);
     void finishWithError(const QString &errorMessage);
     void finishWithSuccess();
