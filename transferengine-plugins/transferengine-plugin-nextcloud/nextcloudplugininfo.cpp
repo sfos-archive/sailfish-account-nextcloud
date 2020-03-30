@@ -15,8 +15,13 @@ NextcloudPluginInfo::NextcloudPluginInfo()
     , m_nextcloudShareServiceStatus(new NextcloudShareServiceStatus(this))
     , m_ready(false)
 {
-    m_capabilities << QLatin1String("image/*")
-                   << QLatin1String("*");
+    m_capabilities << QLatin1String("application/*")
+                   << QLatin1String("audio/*")
+                   << QLatin1String("image/*")
+                   << QLatin1String("video/*")
+                   << QLatin1String("text/x-vnote")
+                   << QLatin1String("text/xml")
+                   << QLatin1String("text/plain");
 
     QVariantMap meta;
     meta.insert(QStringLiteral("accountProviderName"), QStringLiteral("nextcloud"));
