@@ -202,6 +202,13 @@ void AccountAuthenticator::signOnError(const SignOn::Error &error)
     for (int i = 0; i < authDataSize; ++i) {
         if (m_authData[i].accountId == accountId) {
             AuthData authData = m_authData.takeAt(i);
+
+            // Signon failed due to credentials not existing in the database.
+            // Set the CredentialsNeedUpdate key to force user to update credentials.
+            if (error.type() == SignOn::Error::UserInteraction) {
+                setCredentialsNeedUpdate(accountId, authData.serviceName);
+            }
+
             authData.identity->destroySession(authData.authSession);
             authData.identity->deleteLater();
             authData.account->deleteLater();
@@ -219,15 +226,13 @@ void AccountAuthenticator::setCredentialsNeedUpdate(int accountId, const QString
 {
     Accounts::Account *account = m_manager.account(accountId);
     if (account) {
-        Accounts::ServiceList services = account->services();
-        Q_FOREACH (const Accounts::Service &s, services) {
-            if (s.serviceType().toLower() == serviceName) {
-                account->setValue(QStringLiteral("CredentialsNeedUpdate"), QVariant::fromValue<bool>(true));
-                account->setValue(QStringLiteral("CredentialsNeedUpdateFrom"), QVariant::fromValue<QString>(serviceName));
-                account->selectService(Accounts::Service());
-                account->syncAndBlock();
-                break;
-            }
+        Accounts::Service service(m_manager.service(serviceName));
+        if (service.isValid()) {
+            account->selectService(service);
+            account->setValue(QStringLiteral("CredentialsNeedUpdate"), QVariant::fromValue<bool>(true));
+            account->setValue(QStringLiteral("CredentialsNeedUpdateFrom"), QVariant::fromValue<QString>(serviceName));
+            account->selectService(Accounts::Service());
+            account->syncAndBlock();
         }
     }
 }
