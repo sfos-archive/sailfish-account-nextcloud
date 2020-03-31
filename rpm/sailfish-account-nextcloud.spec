@@ -180,7 +180,7 @@ Summary:   Provides integration of Nextcloud images into Gallery application
 Group:     System/Libraries
 BuildRequires: pkgconfig(Qt5Gui)
 BuildRequires: pkgconfig(Qt5Qml)
-Requires: sailfish-components-gallery-qt5 >= 1.1.1
+Requires: sailfish-components-gallery-qt5 >= 1.1.9
 
 %description -n jolla-gallery-extension-nextcloud
 Provides integration of Nextcloud images into Gallery application.

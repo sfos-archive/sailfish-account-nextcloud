@@ -40,10 +40,7 @@ Page {
             id: delegateItem
 
             size: grid.cellSize
-
-            source: model.imagePath.toString().length > 0
-                    ? model.imagePath
-                    : (thumbDownloader.status === NextcloudImageDownloader.Ready ? thumbDownloader.imagePath : "")
+            source: thumbDownloader.imagePath
 
             onClicked: {
                 var props = {
@@ -67,9 +64,28 @@ Page {
             HighlightImage {
                 anchors.fill: parent
                 source: "image://theme/icon-l-nextcloud"
-                highlighted: delegateItem.containsMouse
-                opacity: highlighted ? Theme.opacityHigh : 1
-                visible: model.imagePath.toString().length === 0 && thumbDownloader.status !== NextcloudImageDownloader.Ready
+                highlighted: delegateItem.containsMouse && imageGrid.highlightActive
+                opacity: delegateItem.status !== Thumbnail.Ready
+                         ? (highlighted ? imageGrid.highlightOpacity : 1)
+                         : 0
+            }
+
+            Label {
+                anchors {
+                    bottom: parent.bottom
+                    bottomMargin: Theme.paddingMedium
+                    left: parent.left
+                    leftMargin: Theme.paddingMedium
+                    right: parent.right
+                    rightMargin: Theme.paddingMedium
+                }
+                horizontalAlignment: implicitWidth > width
+                                     ? Text.AlignLeft
+                                     : Text.AlignHCenter
+                text: model.fileName
+                font.pixelSize: Theme.fontSizeTiny
+                truncationMode: TruncationMode.Fade
+                visible: delegateItem.status !== Thumbnail.Ready
             }
         }
     }

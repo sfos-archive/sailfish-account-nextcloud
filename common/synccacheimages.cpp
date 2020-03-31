@@ -16,6 +16,7 @@
 #include <QtCore/QDir>
 #include <QtCore/QStandardPaths>
 #include <QtCore/QDebug>
+#include <QtGui/QImage>
 
 using namespace SyncCache;
 
@@ -174,6 +175,8 @@ void ImageCacheThreadWorker::requestPhotoCount()
 
 void ImageCacheThreadWorker::populateUserThumbnail(int idempToken, int accountId, const QString &userId, const QNetworkRequest &requestTemplate)
 {
+    Q_UNUSED(requestTemplate)
+
     DatabaseError error;
     User user = m_db.user(accountId, &error);
     if (error.errorCode != DatabaseError::NoError) {
@@ -190,43 +193,15 @@ void ImageCacheThreadWorker::populateUserThumbnail(int idempToken, int accountId
         return;
     }
 
-    // download the thumbnail.
-    if (user.thumbnailUrl.isEmpty()) {
-        emit populateUserThumbnailFailed(idempToken, QStringLiteral("Empty thumbnail url specified for user %1").arg(userId));
-        return;
-    }
-    if (!m_downloader) {
-        m_downloader = new ImageDownloader(this);
-    }
-
-    ImageDownloadWatcher *watcher = m_downloader->downloadImage(
-                idempToken,
-                user.thumbnailUrl,
-                user.thumbnailFileName,
-                SyncCache::userImageDownloadDir(accountId, userId, true),
-                requestTemplate);
-    connect(watcher, &ImageDownloadWatcher::downloadFailed, this, [this, watcher, idempToken] (const QString &errorMessage) {
-        emit populateUserThumbnailFailed(idempToken, errorMessage);
-        watcher->deleteLater();
-    });
-    connect(watcher, &ImageDownloadWatcher::downloadFinished, this, [this, watcher, user, idempToken] (const QUrl &filePath) {
-        // the file has been downloaded to disk.  attempt to update the database.
-        DatabaseError storeError;
-        User userToStore = user;
-        userToStore.thumbnailPath = filePath;
-        m_db.storeUser(userToStore, &storeError);
-        if (storeError.errorCode != DatabaseError::NoError) {
-            QFile::remove(filePath.toString());
-            emit populateUserThumbnailFailed(idempToken, storeError.errorMessage);
-        } else {
-            emit populateUserThumbnailFinished(idempToken, filePath.toString());
-        }
-        watcher->deleteLater();
-    });
+    // Thumbnail downloading is not supported at the moment. This is not an error,
+    // so just return an empty string.
+    emit populateUserThumbnailFinished(idempToken, QString());
 }
 
 void ImageCacheThreadWorker::populateAlbumThumbnail(int idempToken, int accountId, const QString &userId, const QString &albumId, const QNetworkRequest &requestTemplate)
 {
+    Q_UNUSED(requestTemplate)
+
     DatabaseError error;
     Album album = m_db.album(accountId, userId, albumId, &error);
     if (error.errorCode != DatabaseError::NoError) {
@@ -237,48 +212,40 @@ void ImageCacheThreadWorker::populateAlbumThumbnail(int idempToken, int accountI
     }
 
     // the thumbnail already exists.
-    const QString thumbnailPath = album.thumbnailPath.toString();
+    QString thumbnailPath = album.thumbnailPath.toString();
     if (!thumbnailPath.isEmpty() && QFile::exists(thumbnailPath)) {
         emit populateAlbumThumbnailFinished(idempToken, thumbnailPath);
         return;
     }
 
-    // download the thumbnail.
-    if (album.thumbnailUrl.isEmpty()) {
-        emit populateAlbumThumbnailFailed(idempToken, QStringLiteral("Empty thumbnail url specified for album %1").arg(albumId));
+    thumbnailPath = m_db.findThumbnailForAlbum(accountId, userId, albumId, &error);
+    if (error.errorCode != DatabaseError::NoError) {
+        qWarning() << "Unable to fetch album thumbnail" << thumbnailPath << ":"
+                   << error.errorCode
+                   << error.errorMessage;
+    } else if (!thumbnailPath.isEmpty()) {
+        album.thumbnailPath = thumbnailPath;
+        m_db.storeAlbum(album, &error);
+        if (error.errorCode != DatabaseError::NoError) {
+            emit populateAlbumThumbnailFinished(idempToken, thumbnailPath);
+        } else {
+            emit populateAlbumThumbnailFailed(idempToken, QStringLiteral("Cannot save thumbnail %1 for album %2 to db: %3")
+                                              .arg(thumbnailPath)
+                                              .arg(albumId)
+                                              .arg(error.errorMessage));
+        }
         return;
     }
-    if (!m_downloader) {
-        m_downloader = new ImageDownloader(this);
-    }
-    ImageDownloadWatcher *watcher = m_downloader->downloadImage(
-                idempToken,
-                album.thumbnailUrl,
-                album.thumbnailFileName,
-                SyncCache::albumImageDownloadDir(accountId, album.albumName, true),
-                requestTemplate);
-    connect(watcher, &ImageDownloadWatcher::downloadFailed, this, [this, watcher, idempToken] (const QString &errorMessage) {
-        emit populateAlbumThumbnailFailed(idempToken, errorMessage);
-        watcher->deleteLater();
-    });
-    connect(watcher, &ImageDownloadWatcher::downloadFinished, this, [this, watcher, album, idempToken] (const QUrl &filePath) {
-        // the file has been downloaded to disk.  attempt to update the database.
-        DatabaseError storeError;
-        Album albumToStore = album;
-        albumToStore.thumbnailPath = filePath;
-        m_db.storeAlbum(albumToStore, &storeError);
-        if (storeError.errorCode != DatabaseError::NoError) {
-            QFile::remove(filePath.toString());
-            emit populateAlbumThumbnailFailed(idempToken, storeError.errorMessage);
-        } else {
-            emit populateAlbumThumbnailFinished(idempToken, filePath.toString());
-        }
-        watcher->deleteLater();
-    });
+
+    // Thumbnail downloading is not supported at the moment. This is not an error,
+    // so just return an empty string.
+    emit populateAlbumThumbnailFinished(idempToken, QString());
 }
 
 void ImageCacheThreadWorker::populatePhotoThumbnail(int idempToken, int accountId, const QString &userId, const QString &albumId, const QString &photoId, const QNetworkRequest &requestTemplate)
 {
+    Q_UNUSED(requestTemplate)
+
     DatabaseError error;
     Photo photo = m_db.photo(accountId, userId, albumId, photoId, &error);
     if (error.errorCode != DatabaseError::NoError) {
@@ -295,38 +262,15 @@ void ImageCacheThreadWorker::populatePhotoThumbnail(int idempToken, int accountI
         return;
     }
 
-    // download the thumbnail.
-    if (photo.thumbnailUrl.isEmpty()) {
-        emit populatePhotoThumbnailFailed(idempToken, QStringLiteral("Empty thumbnail url specified for photo %1").arg(photoId));
+    // the full-size photo exists, so use that.
+    if (QFile::exists(photo.imagePath.toString())) {
+        emit populatePhotoThumbnailFinished(idempToken, photo.imagePath.toString());
         return;
     }
 
-    // the thumbnail was already downloaded as the thumbnail for the album.
-    const QString &thumbnailDirPath = SyncCache::albumImageDownloadDir(accountId, photo.albumPath, true);
-    thumbnailPath = thumbnailDirPath + "/" + photo.fileName;
-    if (QFile::exists(thumbnailPath)) {
-        photoThumbnailDownloadFinished(idempToken, photo, QUrl(thumbnailPath));
-        return;
-    }
-
-    if (!m_thumbnailDownloader) {
-        m_thumbnailDownloader = new BatchedImageDownloader(photo.thumbnailUrl, requestTemplate, this);
-    }
-
-    ImageDownloadWatcher *watcher = m_thumbnailDownloader->downloadImage(
-            idempToken,
-            photo.photoId,
-            photo.fileName,
-            thumbnailDirPath);
-    connect(watcher, &ImageDownloadWatcher::downloadFailed, this, [this, watcher, idempToken] (const QString &errorMessage) {
-        emit populatePhotoThumbnailFailed(idempToken, errorMessage);
-        watcher->deleteLater();
-    });
-    connect(watcher, &ImageDownloadWatcher::downloadFinished, this, [this, watcher, photo, idempToken] (const QUrl &filePath) {
-        // the file has been downloaded to disk.  attempt to update the database.
-        photoThumbnailDownloadFinished(idempToken, photo, filePath);
-        watcher->deleteLater();
-    });
+    // Thumbnail downloading is not supported at the moment. This is not an error,
+    // so just return an empty string.
+    emit populatePhotoThumbnailFinished(idempToken, QString());
 }
 
 void ImageCacheThreadWorker::photoThumbnailDownloadFinished(int idempToken, const SyncCache::Photo &photo, const QUrl &filePath)
@@ -382,19 +326,43 @@ void ImageCacheThreadWorker::populatePhotoImage(int idempToken, int accountId, c
         watcher->deleteLater();
     });
 
-    connect(watcher, &ImageDownloadWatcher::downloadFinished, this, [this, watcher, photo, idempToken] (const QUrl &filePath) {
+    connect(watcher, &ImageDownloadWatcher::downloadFinished, this, [this, watcher, photo, idempToken, accountId] (const QUrl &filePath) {
         // the file has been downloaded to disk.  attempt to update the database.
         DatabaseError storeError;
         Photo photoToStore = photo;
         photoToStore.imagePath = filePath;
+
+        bool thumbnailAdded = false;
+        if (photoToStore.thumbnailPath.isEmpty()) {
+            // Use the full-size photo as the thumbnail as well.
+            photoToStore.thumbnailPath = photoToStore.imagePath;
+            thumbnailAdded = true;
+        }
+
         m_db.storePhoto(photoToStore, &storeError);
 
         if (storeError.errorCode != DatabaseError::NoError) {
             QFile::remove(filePath.toString());
             emit populatePhotoImageFailed(idempToken, storeError.errorMessage);
         } else {
+            if (thumbnailAdded) {
+                emit populatePhotoThumbnailFinished(idempToken, photoToStore.thumbnailPath.toString());
+            }
             emit populatePhotoImageFinished(idempToken, filePath.toString());
+
+            // If the album doesn't have a thumbnail yet, use this photo as the thumbnail.
+            Album album = m_db.album(accountId, photo.userId, photo.albumId, &storeError);
+            if (storeError.errorCode == DatabaseError::NoError&& album.thumbnailPath.isEmpty()) {
+                album.thumbnailPath = photoToStore.thumbnailPath;
+                m_db.storeAlbum(album, &storeError);
+                if (storeError.errorCode != DatabaseError::NoError) {
+                    emit populateAlbumThumbnailFinished(idempToken, photoToStore.thumbnailPath.toString());
+                } else {
+                    qWarning() << "Unable to store photo as album thumbnail";
+                }
+            }
         }
+
         watcher->deleteLater();
     });
 }

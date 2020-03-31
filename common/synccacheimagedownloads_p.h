@@ -96,58 +96,6 @@ private:
     int m_maxActive;
 };
 
-class BatchedImageDownload
-{
-public:
-    BatchedImageDownload();
-    BatchedImageDownload(int idempToken,
-                         const QString &photoId,
-                         const QString &filePath,
-                         SyncCache::ImageDownloadWatcher *watcher);
-    BatchedImageDownload &operator=(const BatchedImageDownload &other);
-
-    int m_idempToken = 0;
-    QString m_photoId;
-    QString m_filePath;
-    QPointer<SyncCache::ImageDownloadWatcher> m_watcher;
-};
-
-class BatchedImageDownloader : public QObject
-{
-    Q_OBJECT
-
-public:
-    BatchedImageDownloader(const QUrl &templateUrl,
-                           const QNetworkRequest &templateRequest,
-                           QObject *parent);
-
-    ImageDownloadWatcher *downloadImage(int idempToken,
-                                        const QString &photoId,
-                                        const QString &fileName,
-                                        const QString &fileDirPath);
-
-private:
-    struct ImagePreview {
-        QString photoId;
-        QString mimeType;
-        QByteArray bytes;
-    };
-
-    void triggerDownload();
-    void readImageData();
-    void downloadProgress(qint64 bytesReceived, qint64 bytesTotal);
-    void downloadFinished();
-    bool parseImagePreview(const QByteArray &previewData, ImagePreview *preview);
-
-    QTimer *m_batchTimer = nullptr;
-    QNetworkAccessManager m_qnam;
-    QQueue<BatchedImageDownload *> m_pending;
-    QMap<QString, BatchedImageDownload *> m_active;
-    QNetworkRequest m_templateRequest;
-    QByteArray m_buffer;
-    QString m_host;
-};
-
 }
 
 #endif

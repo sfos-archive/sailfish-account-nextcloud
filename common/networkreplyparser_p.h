@@ -32,6 +32,9 @@ public:
         QDateTime lastModified;
         QString href;
         QString contentType;
+        QString ownerId;
+        QString fileId;
+        int size = 0;
         bool isCollection = false;
     };
 

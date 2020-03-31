@@ -83,91 +83,80 @@ void Syncer::handleUserInfoReply()
     }
 
     m_userId = user.userId;
+    m_dirListingRootPath = QString("/remote.php/dav/files/%1/Photos/").arg(user.userId);
+    m_dirListingResults.photos.clear();
+    m_dirListingResults.albums.clear();
 
-    if (!performConfigRequest()) {
-        finishWithError(QStringLiteral("Failed to start gallery config request"));
+    if (!performDirListingRequest(m_dirListingRootPath)) {
+        WebDavSyncer::finishWithError("Directory list request failed");
     }
 }
 
-bool Syncer::performConfigRequest()
+bool Syncer::performDirListingRequest(const QString &remoteDirPath)
 {
-    QNetworkReply *reply = m_requestGenerator->galleryConfig(NetworkRequestGenerator::JsonContentType);
+    LOG_DEBUG("Fetching directory listing for" << remoteDirPath);
+
+    QNetworkReply *reply = m_requestGenerator->dirListing(remoteDirPath);
     if (reply) {
+        reply->setProperty("remoteDirPath", remoteDirPath);
         connect(reply, &QNetworkReply::finished,
-                this, &Syncer::handleConfigReply);
+                this, &Syncer::handleDirListingReply);
         return true;
     }
+
     return false;
 }
 
-void Syncer::handleConfigReply()
-{
-    // expect a response of the form:
-    // {"features":[],"mediatypes":["image/png","image/jpeg","image/gif","image/x-xbitmap","image/bmp","image/heic","image/heif"]}
-    QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
-    reply->deleteLater();
-    const int httpCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-
-    if (reply->error() != QNetworkReply::NoError) {
-        // TODO: fall back to plain old WebDAV requests
-        finishWithHttpError("Server does not support Gallery app", httpCode);
-        return;
-    }
-
-    QNetworkReply *listReply = m_requestGenerator->galleryList(NetworkRequestGenerator::JsonContentType,
-                                                               QStringLiteral("Photos"));
-    if (listReply) {
-        m_galleryListRequests.append(listReply);
-        connect(listReply, &QNetworkReply::finished,
-                this, &Syncer::handleGalleryMetaDataReply);
-    } else {
-        LOG_WARNING("Failed to start gallery list request");
-        finishWithHttpError(QStringLiteral("Failed to start gallery list request"), 0);
-    }
-}
-
-void Syncer::handleGalleryMetaDataReply()
+void Syncer::handleDirListingReply()
 {
     QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
-    m_galleryListRequests.removeOne(reply);
     reply->deleteLater();
     const QByteArray replyData = reply->readAll();
     const int httpCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    const QString remoteDirPath = reply->property("remoteDirPath").toString();
 
-    if (reply->error() != QNetworkReply::NoError) {
-        LOG_WARNING("handleGalleryMetaDataReply: error:" << reply->error() << reply->errorString());
-        finishWithHttpError(QStringLiteral("gallery metadata reply error: %1").arg(reply->errorString()), httpCode);
+    if (httpCode == 404) {
+        // if directory doesn't exist, that's okay, there are no photos.
+        WebDavSyncer::finishWithSuccess();
         return;
     }
 
-    const ReplyParser::GalleryMetadata metadata = ReplyParser::parseGalleryMetadata(this, replyData);
-    LOG_DEBUG("Parsed metadata for Nextcloud gallery album:" << metadata.currAlbumId);
+    if (reply->error() != QNetworkReply::NoError) {
+        WebDavSyncer::finishWithHttpError("Remote directory listing failed", httpCode);
+        return;
+    }
 
-    for (const SyncCache::Album &album : metadata.albums) {
-        m_albums.insert(album.albumId, album);
-        if (album.albumId != metadata.currAlbumId) {
-            LOG_DEBUG("Requesting metadata for Nextcloud gallery sub-album:" << album.albumId);
-            QNetworkReply *listReply = m_requestGenerator->galleryList(
-                    NetworkRequestGenerator::JsonContentType,
-                    album.albumName);
-            if (listReply) {
-                m_galleryListRequests.append(listReply);
-                connect(listReply, &QNetworkReply::finished,
-                        this, &Syncer::handleGalleryMetaDataReply);
-            } else {
-                LOG_WARNING("Failed to start recursive gallery list request");
-                finishWithHttpError(QStringLiteral("Failed to start recursive gallery list request"), 0);
-                return;
-            }
+    const QList<NetworkReplyParser::Resource> resourceList = XmlReplyParser::parsePropFindResponse(
+            replyData, remoteDirPath);
+    const ReplyParser::GalleryMetadata metadata =
+            ReplyParser::galleryMetadataFromResources(this, m_dirListingRootPath, remoteDirPath, resourceList);
+    m_dirListingResults.albums += metadata.albums;
+    m_dirListingResults.photos += metadata.photos;
+
+    for (const NetworkReplyParser::Resource &resource : resourceList) {
+        if (resource.isCollection && resource.href != remoteDirPath) {
+            m_pendingAlbumListings.append(resource.href);
         }
     }
 
-    for (const SyncCache::Photo &photo : metadata.photos) {
-        m_photos.insert(photo.photoId, photo);
-    }
+    if (!m_pendingAlbumListings.isEmpty()) {
+        performDirListingRequest(m_pendingAlbumListings.takeLast());
+    } else {
+        QHash<QString, SyncCache::Album> albums;
+        for (const SyncCache::Album &album : m_dirListingResults.albums) {
+            albums.insert(album.albumId, album);
+        }
 
-    if (m_galleryListRequests.isEmpty()) {
-        calculateAndApplyDelta(m_albums, m_photos, m_photos.count() > 0 ? m_photos.values().first().photoId : QString());
+        QHash<QString, SyncCache::Photo> photos;
+        for (const SyncCache::Photo &photo : m_dirListingResults.photos) {
+            photos.insert(photo.photoId, photo);
+        }
+        m_dirListingResults.photos.clear();
+        m_dirListingResults.albums.clear();
+
+        calculateAndApplyDelta(albums, photos, metadata.photos.count() > 0 ? metadata.photos.first().photoId : QString());
+
+        WebDavSyncer::finishWithSuccess();
     }
 }
 
