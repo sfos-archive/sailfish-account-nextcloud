@@ -9,6 +9,7 @@
 
 import QtQuick 2.0
 import Sailfish.Silica 1.0
+import Sailfish.Accounts 1.0
 import com.jolla.gallery 1.0
 import com.jolla.gallery.nextcloud 1.0
 import com.jolla.gallery.extensions 1.0
@@ -25,7 +26,7 @@ MediaSource {
           ? nextcloudAlbums
           : nextcloudUsers
     count: photoCounter.count
-    ready: nextcloudUsers.count > 0
+    ready: nextcloudUsers.count > 0 && accountManager.cloudServiceReady
     page: nextcloudUsers.count == 1
           ? "/usr/lib/qt5/qml/com/jolla/gallery/nextcloud/NextcloudAlbumsPage.qml"
           : "/usr/lib/qt5/qml/com/jolla/gallery/nextcloud/NextcloudUsersPage.qml"
@@ -44,5 +45,13 @@ MediaSource {
         imageCache: NextcloudImageCache
         accountId: nextcloudUsers.count > 0 ? nextcloudUsers.at(0).accountId : 0
         userId: nextcloudUsers.count > 0 ? nextcloudUsers.at(0).userId : ""
+    }
+
+    property AccountManager accountManager: AccountManager {
+        property bool cloudServiceReady
+
+        Component.onCompleted: {
+            cloudServiceReady = enabledAccounts("nextcloud", "nextcloud-images").length > 0
+        }
     }
 }
