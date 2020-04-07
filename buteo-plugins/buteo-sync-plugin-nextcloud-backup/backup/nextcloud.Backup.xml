@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<profile name="nextcloud.Images" type="sync" >
+<profile name="nextcloud.Backup" type="sync" >
     <key name="destinationtype" value="online"/>
     <key name="enabled" value="false"/>
     <key name="hidden" value="true"/>

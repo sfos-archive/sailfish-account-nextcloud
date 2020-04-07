@@ -12,21 +12,34 @@
 
 #include "webdavsyncer_p.h"
 
-// sailfishaccounts
-#include <accountsyncmanager.h>
+#include <QFileInfo>
 
 class QFile;
 class WebDavRequestGenerator;
+class QDBusInterface;
 
 class Syncer : public WebDavSyncer
 {
     Q_OBJECT
 
 public:
-    Syncer(QObject *parent, Buteo::SyncProfile *profile);
+    enum Operation {
+        Backup,
+        BackupQuery,
+        BackupRestore
+    };
+    Q_ENUM(Operation)
+
+    Syncer(QObject *parent, Buteo::SyncProfile *profile, Operation operation);
    ~Syncer();
 
     void purgeAccount(int accountId) override;
+
+private Q_SLOTS:
+    void cloudBackupStatusChanged(int accountId, const QString &status);
+    void cloudBackupError(int accountId, const QString &error, const QString &errorString);
+    void cloudRestoreStatusChanged(int accountId, const QString &status);
+    void cloudRestoreError(int accountId, const QString &error, const QString &errorString);
 
 private:
     void beginSync() override;
@@ -37,11 +50,11 @@ private:
     bool performDirListingRequest(const QString &remoteDirPath);
     void handleDirListingReply();
 
-    bool performUploadRequest(const QStringList &fileNameList);
+    bool performUploadRequest(const QString &fileNameList);
     void handleUploadProgress(qint64 bytesSent, qint64 bytesTotal);
     void handleUploadReply();
 
-    bool performDownloadRequest(const QStringList &fileNameList);
+    bool performDownloadRequest(const QString &fileName);
     void handleDownloadProgress(qint64 bytesReceived, qint64 bytesTotal);
     void handleDownloadReply();
 
@@ -49,12 +62,13 @@ private:
     void finishWithError(const QString &errorMessage);
     void finishWithSuccess();
 
-    bool loadConfig();
+    void cleanUp();
 
     QFile *m_downloadedFile = nullptr;
-    AccountSyncManager m_accountSyncManager;
-    AccountSyncManager::BackupRestoreOptions m_backupRestoreOptions;
-    QStringList m_backupFileNames;
+    QDBusInterface *m_sailfishBackup = nullptr;
+    QFileInfo m_localFileInfo;
+    QString m_remoteDirPath;
+    Operation m_operation = BackupQuery;
 };
 
 #endif // NEXTCLOUD_BACKUP_SYNCER_P_H
