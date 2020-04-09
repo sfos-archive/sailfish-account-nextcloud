@@ -10,6 +10,7 @@ import QtQuick 2.6
 import Sailfish.Silica 1.0
 import Sailfish.TransferEngine 1.0
 import Sailfish.TransferEngine.Nextcloud 1.0 // for translations
+import Nemo.Configuration 1.0
 
 ShareFilePreviewDialog {
     id: root
@@ -18,18 +19,37 @@ ShareFilePreviewDialog {
     descriptionVisible: false
     metaDataSwitchVisible: false
 
-    remoteDirName: fileInfo.mimeFileType == "image"
-                     //: Target folder in Nextcloud. Nextcloud has a special folder called Photos
-                     //: where images are uploaded. Localization should match that.
-                     //% "Photos"
-                   ? qsTrId("webshare-la-nextcloud-uploads-images")
-                     //: Target folder in Nextcloud. Nextcloud has a special folder called Documents
-                     //: where files other than images are uploaded. Localization should match that.
-                     //% "Documents"
-                   : qsTrId("webshare-la-nextcloud-uploads-documents")
+    remoteDirName: {
+        switch (fileInfo.mimeFileType) {
+        case "image":
+            return pathConfig.images
+        default:
+            return pathConfig.documents
+        }
+    }
+    remoteDirReadOnly: false
+
+    onRemoteDirNameChanged: {
+        switch (fileInfo.mimeFileType) {
+        case "image":
+            pathConfig.images = remoteDirName
+            break
+        default:
+            pathConfig.documents = remoteDirName
+            break
+        }
+    }
 
     onAccepted: {
         shareItem.start()
     }
-}
 
+    ConfigurationGroup {
+        id: pathConfig
+
+        property string images: "Photos"
+        property string documents: "Documents"
+
+        path: "/sailfish/nemo-transferengine/plugins/nextcloud"
+    }
+}

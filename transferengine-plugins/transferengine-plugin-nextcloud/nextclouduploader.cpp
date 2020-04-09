@@ -17,9 +17,6 @@
 
 #include <QFile>
 #include <QDir>
-#include <QMimeDatabase>
-#include <QMimeData>
-#include <QMimeType>
 #include <QStandardPaths>
 #include <QtDebug>
 
@@ -160,6 +157,21 @@ void NextcloudUploader::postFile()
         m_filePath = m_contentFile->fileName();
     }
 
+    const QVariantMap userData = mediaItem()->value(MediaItem::UserData).toMap();
+
+    QString remoteDirPath = m_accountDetails.webdavPath;
+    if (!remoteDirPath.endsWith("/")) {
+        remoteDirPath += '/';
+    }
+    QString remoteDirName = userData.value("remoteDirName").toString();
+    while (remoteDirName.startsWith('/')) {
+        remoteDirName = remoteDirName.mid(1);
+    }
+    remoteDirPath += remoteDirName;
+    if (!remoteDirName.isEmpty() && !remoteDirPath.endsWith('/')) {
+        remoteDirPath += '/';
+    }
+
     if (!m_api) {
         m_api = new NextcloudApi(m_qnam, this);
         connect(m_api, &NextcloudApi::transferProgressUpdated, this, &NextcloudUploader::transferProgress);
@@ -170,26 +182,22 @@ void NextcloudUploader::postFile()
     }
     setStatus(MediaTransferInterface::TransferStarted);
 
-    QMimeDatabase mimeDb;
-    QMimeType mimeType = mimeDb.mimeTypeForFile(m_filePath);
-    const bool mimeTypeIsImage = mimeType.name().startsWith(QStringLiteral("image"), Qt::CaseInsensitive);
-
     QObject *contextObj = new QObject(this);
-    connect(m_api, &NextcloudApi::propfindFinished, contextObj, [this, contextObj, mimeTypeIsImage] {
+    connect(m_api, &NextcloudApi::propfindFinished, contextObj, [this, contextObj, remoteDirPath] {
         contextObj->deleteLater();
         m_api->uploadFile(m_filePath,
                           m_accountDetails.accessToken,
                           m_accountDetails.username,
                           m_accountDetails.password,
                           m_accountDetails.serverAddress,
-                          mimeTypeIsImage ? m_accountDetails.photosPath : m_accountDetails.documentsPath,
+                          remoteDirPath,
                           m_accountDetails.ignoreSslErrors);
     });
     m_api->propfindPath(m_accountDetails.accessToken,
                         m_accountDetails.username,
                         m_accountDetails.password,
                         m_accountDetails.serverAddress,
-                        mimeTypeIsImage ? m_accountDetails.photosPath : m_accountDetails.documentsPath);
+                        remoteDirPath);
 }
 
 void NextcloudUploader::cleanUp()
