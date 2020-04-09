@@ -102,7 +102,7 @@ void NextcloudApi::propfindPath(const QString &accessToken,
         buffer->setParent(propfindReply);
         connect(propfindReply, &QNetworkReply::finished, [this, propfindReply] {
             if (propfindReply->error() != QNetworkReply::NoError) {
-                qWarning() << "Propfind request failed prior to upload:" << propfindReply->errorString();
+                qWarning() << "Propfind request failed prior to upload:" << propfindReply->error();
             }
             emit this->propfindFinished();
             propfindReply->deleteLater();
