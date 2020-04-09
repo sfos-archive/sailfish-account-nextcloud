@@ -115,7 +115,7 @@ void Syncer::handleNotificationListReply()
     const int httpCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
 
     if (reply->error() != QNetworkReply::NoError) {
-        finishWithHttpError("Notifications request failed: " + reply->errorString(), httpCode);
+        finishWithHttpError("Notifications request failed: " + reply->error(), httpCode);
         return;
     }
 
@@ -245,7 +245,7 @@ bool Syncer::performNotificationDeleteRequest(const QStringList &notificationIds
             connect(reply, &QNetworkReply::finished,
                     this, &Syncer::handleNotificationDeleteReply);
         } else {
-            LOG_WARNING("Failed to start request to delete notification:" << reply->errorString());
+            LOG_WARNING("Failed to start request to delete notification:" << reply->error());
         }
     }
 
@@ -259,7 +259,7 @@ void Syncer::handleNotificationDeleteReply()
     reply->deleteLater();
 
     if (reply->error() != QNetworkReply::NoError) {
-        finishWithHttpError("Notifications delete request failed: " + reply->errorString(), httpCode);
+        finishWithHttpError("Notifications delete request failed: " + reply->error(), httpCode);
         return;
     }
 
@@ -287,7 +287,7 @@ void Syncer::handleNotificationDeleteAllReply()
     reply->deleteLater();
 
     if (reply->error() != QNetworkReply::NoError) {
-        finishWithHttpError("Notifications delete-all request failed: " + reply->errorString(), httpCode);
+        finishWithHttpError("Notifications delete-all request failed: " + reply->error(), httpCode);
         return;
     }
 
