@@ -8,9 +8,9 @@
 ****************************************************************************************/
 import QtQuick 2.6
 import Sailfish.Silica 1.0
+import Sailfish.Accounts 1.0
 import Sailfish.TransferEngine 1.0
 import Sailfish.TransferEngine.Nextcloud 1.0 // for translations
-import Nemo.Configuration 1.0
 
 ShareFilePreviewDialog {
     id: root
@@ -19,37 +19,52 @@ ShareFilePreviewDialog {
     descriptionVisible: false
     metaDataSwitchVisible: false
 
-    remoteDirName: {
-        switch (fileInfo.mimeFileType) {
-        case "image":
-            return pathConfig.images
-        default:
-            return pathConfig.documents
-        }
-    }
+    remoteDirName: account.savedRemoteDirName
     remoteDirReadOnly: false
 
-    onRemoteDirNameChanged: {
-        switch (fileInfo.mimeFileType) {
-        case "image":
-            pathConfig.images = remoteDirName
-            break
-        default:
-            pathConfig.documents = remoteDirName
-            break
-        }
-    }
-
     onAccepted: {
+        if (account.updateShareConfig()) {
+            // Do blocking sync, else the sync may not finish before the page is popped and
+            // possibly destroyed.
+            account.blockingSync()
+        }
         shareItem.start()
     }
 
-    ConfigurationGroup {
-        id: pathConfig
+    Account {
+        id: account
 
-        property string images: "Photos"
-        property string documents: "Documents"
+        readonly property string imagesDirKey: "share_images_dir"
+        readonly property string otherFilesDirKey: "share_other_files_dir"
+        readonly property string dirConfigKey: (root.fileInfo.mimeFileType === "image")
+                                               ? imagesDirKey
+                                               : otherFilesDirKey
 
-        path: "/sailfish/nemo-transferengine/plugins/nextcloud"
+        property string savedRemoteDirName
+
+        function updateShareConfig() {
+            if (savedRemoteDirName === root.remoteDirName) {
+                return false
+            }
+            var config = configurationValues("nextcloud-sharing")
+            var value = config[dirConfigKey]
+            setConfigurationValue("nextcloud-sharing", dirConfigKey, root.remoteDirName)
+            return true
+        }
+
+        identifier: root.accountId
+
+        onStatusChanged: {
+            if (status === Account.Initialized) {
+                var config = configurationValues("nextcloud-sharing")
+                var savedValue = config[dirConfigKey]
+                account.savedRemoteDirName = (savedValue === undefined)
+                        ? (root.fileInfo.mimeFileType === "image"
+                          ? "Photos"
+                          : "Documents")
+                        : savedValue
+
+            }
+        }
     }
 }

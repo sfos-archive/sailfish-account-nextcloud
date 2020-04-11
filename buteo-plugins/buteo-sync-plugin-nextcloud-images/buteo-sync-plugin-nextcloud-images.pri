@@ -1,6 +1,9 @@
 include($$PWD/../../common/webdav.pri)
 include($$PWD/../../common/synccacheimages.pri)
 
+CONFIG += link_pkgconfig
+PKGCONFIG += accounts-qt5
+
 INCLUDEPATH += $$PWD
 
 SOURCES += \

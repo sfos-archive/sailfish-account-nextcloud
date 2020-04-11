@@ -14,6 +14,9 @@
 #include "replyparser_p.h"
 #include "synccacheimages.h"
 
+// libaccounts-qt5
+#include <Accounts/Manager>
+
 #include <QList>
 #include <QHash>
 #include <QVector>
@@ -43,6 +46,7 @@ private:
                                 const QHash<QString, SyncCache::Photo> &photos,
                                 const QString &firstPhotoId);
 
+    Accounts::Manager *m_manager = nullptr;
     ReplyParser *m_replyParser = nullptr;
     ReplyParser::GalleryMetadata m_dirListingResults;
     QStringList m_pendingAlbumListings;

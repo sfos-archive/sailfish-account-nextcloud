@@ -24,6 +24,11 @@
 #include <SyncProfile.h>
 #include <LogMacros.h>
 
+// libaccounts-qt5
+#include <Accounts/Account>
+#include <Accounts/Service>
+
+
 Syncer::Syncer(QObject *parent, Buteo::SyncProfile *syncProfile)
     : WebDavSyncer(parent, syncProfile, QStringLiteral("nextcloud-images"))
 {
@@ -31,6 +36,7 @@ Syncer::Syncer(QObject *parent, Buteo::SyncProfile *syncProfile)
 
 Syncer::~Syncer()
 {
+    delete m_manager;
 }
 
 void Syncer::beginSync()
@@ -82,8 +88,26 @@ void Syncer::handleUserInfoReply()
                     << error.errorCode << error.errorMessage);
     }
 
+    if (!m_manager) {
+        m_manager = new Accounts::Manager;
+    }
+    Accounts::Account *account = m_manager->account(m_accountId);
+    if (account) {
+        const Accounts::ServiceList services = account->services();
+        for (const Accounts::Service &service : services) {
+            if (service.name() == m_serviceName) {
+                account->selectService(service);
+                m_dirListingRootPath = account->value(QStringLiteral("images_path")).toString().trimmed();
+                break;
+            }
+        }
+    }
+    account->selectService(Accounts::Service());
+
     m_userId = user.userId;
-    m_dirListingRootPath = QString("/remote.php/dav/files/%1/Photos/").arg(user.userId);
+    if (m_dirListingRootPath.isEmpty()) {
+        m_dirListingRootPath = QString("/remote.php/dav/files/%1/Photos/").arg(user.userId);
+    }
     m_dirListingResults.photos.clear();
     m_dirListingResults.albums.clear();
 
