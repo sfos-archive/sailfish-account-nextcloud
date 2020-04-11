@@ -2,7 +2,7 @@
 <service id="nextcloud-images">
     <type>sync</type>
     <name>Images</name>
-    <icon>image://theme/icon-m-sync</icon>
+    <icon>image://theme/icon-m-file-image</icon>
     <provider>nextcloud</provider>
 
     <template>
