@@ -1,6 +1,6 @@
 Name: sailfish-account-nextcloud
 License: Proprietary
-Version: 0.0.1
+Version: 0.1.2
 Release: 1
 Source0: %{name}-%{version}.tar.bz2
 Summary: Account plugin for Nextcloud
