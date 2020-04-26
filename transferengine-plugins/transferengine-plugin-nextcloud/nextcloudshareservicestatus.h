@@ -44,8 +44,6 @@ public:
         QString password;
         QString serverAddress;
         QString webdavPath;
-        QString photosPath;
-        QString documentsPath;
         bool ignoreSslErrors;
     };
     AccountDetails details(int index = 0) const;
