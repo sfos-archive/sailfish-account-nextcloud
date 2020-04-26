@@ -28,26 +28,32 @@ BuildRequires: sailfish-svg2png
 %{_datadir}/themes/sailfish-default/meegotouch/z1.0/icons/graphic-m-service-nextcloud.png
 %{_datadir}/themes/sailfish-default/meegotouch/z1.0/icons/graphic-s-service-nextcloud.png
 %{_datadir}/themes/sailfish-default/meegotouch/z1.0/icons/icon-l-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/z1.0/icons/icon-m-file-folder-nextcloud.png
 %{_datadir}/themes/sailfish-default/meegotouch/z1.25/icons/graphic-service-nextcloud.png
 %{_datadir}/themes/sailfish-default/meegotouch/z1.25/icons/graphic-m-service-nextcloud.png
 %{_datadir}/themes/sailfish-default/meegotouch/z1.25/icons/graphic-s-service-nextcloud.png
 %{_datadir}/themes/sailfish-default/meegotouch/z1.25/icons/icon-l-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/z1.25/icons/icon-m-file-folder-nextcloud.png
 %{_datadir}/themes/sailfish-default/meegotouch/z1.5/icons/graphic-service-nextcloud.png
 %{_datadir}/themes/sailfish-default/meegotouch/z1.5/icons/graphic-m-service-nextcloud.png
 %{_datadir}/themes/sailfish-default/meegotouch/z1.5/icons/graphic-s-service-nextcloud.png
 %{_datadir}/themes/sailfish-default/meegotouch/z1.5/icons/icon-l-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/z1.5/icons/icon-m-file-folder-nextcloud.png
 %{_datadir}/themes/sailfish-default/meegotouch/z1.5-large/icons/graphic-service-nextcloud.png
 %{_datadir}/themes/sailfish-default/meegotouch/z1.5-large/icons/graphic-m-service-nextcloud.png
 %{_datadir}/themes/sailfish-default/meegotouch/z1.5-large/icons/graphic-s-service-nextcloud.png
 %{_datadir}/themes/sailfish-default/meegotouch/z1.5-large/icons/icon-l-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/z1.5-large/icons/icon-m-file-folder-nextcloud.png
 %{_datadir}/themes/sailfish-default/meegotouch/z1.75/icons/graphic-service-nextcloud.png
 %{_datadir}/themes/sailfish-default/meegotouch/z1.75/icons/graphic-m-service-nextcloud.png
 %{_datadir}/themes/sailfish-default/meegotouch/z1.75/icons/graphic-s-service-nextcloud.png
 %{_datadir}/themes/sailfish-default/meegotouch/z1.75/icons/icon-l-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/z1.75/icons/icon-m-file-folder-nextcloud.png
 %{_datadir}/themes/sailfish-default/meegotouch/z2.0/icons/graphic-service-nextcloud.png
 %{_datadir}/themes/sailfish-default/meegotouch/z2.0/icons/graphic-m-service-nextcloud.png
 %{_datadir}/themes/sailfish-default/meegotouch/z2.0/icons/graphic-s-service-nextcloud.png
 %{_datadir}/themes/sailfish-default/meegotouch/z2.0/icons/icon-l-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/z2.0/icons/icon-m-file-folder-nextcloud.png
 
 
 %package -n buteo-sync-plugin-nextcloud-posts
@@ -187,6 +193,7 @@ Group:     System/Libraries
 BuildRequires: pkgconfig(Qt5Gui)
 BuildRequires: pkgconfig(Qt5Qml)
 Requires: sailfish-components-gallery-qt5 >= 1.1.9
+Requires: sailfish-components-filemanager >= 0.2.17
 
 %description -n jolla-gallery-extension-nextcloud
 Provides integration of Nextcloud images into Gallery application.
@@ -199,7 +206,8 @@ Provides integration of Nextcloud images into Gallery application.
 %{_libdir}/qt5/qml/com/jolla/gallery/nextcloud/NextcloudUsersPage.qml
 %{_libdir}/qt5/qml/com/jolla/gallery/nextcloud/NextcloudAlbumsPage.qml
 %{_libdir}/qt5/qml/com/jolla/gallery/nextcloud/NextcloudAlbumDelegate.qml
-%{_libdir}/qt5/qml/com/jolla/gallery/nextcloud/NextcloudPhotoGridPage.qml
+%{_libdir}/qt5/qml/com/jolla/gallery/nextcloud/NextcloudDirectoryItem.qml
+%{_libdir}/qt5/qml/com/jolla/gallery/nextcloud/NextcloudPhotoListPage.qml
 %{_libdir}/qt5/qml/com/jolla/gallery/nextcloud/NextcloudFullscreenPhotoPage.qml
 %{_libdir}/qt5/qml/com/jolla/gallery/nextcloud/NextcloudImageDetailsPage.qml
 %{_libdir}/qt5/qml/com/jolla/gallery/nextcloud/qmldir

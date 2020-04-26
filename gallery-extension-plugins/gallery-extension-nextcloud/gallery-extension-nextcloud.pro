@@ -19,7 +19,8 @@ import.files = \
     NextcloudUsersPage.qml \
     NextcloudAlbumsPage.qml \
     NextcloudAlbumDelegate.qml \
-    NextcloudPhotoGridPage.qml \
+    NextcloudDirectoryItem.qml \
+    NextcloudPhotoListPage.qml \
     NextcloudFullscreenPhotoPage.qml \
     NextcloudImageDetailsPage.qml \
     qmldir
