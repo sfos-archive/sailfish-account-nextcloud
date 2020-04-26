@@ -2,7 +2,7 @@
 <service id="nextcloud-caldav">
     <type>caldav</type>
     <name>Calendar</name>
-    <icon>image://theme/graphic-service-generic-cdav</icon>
+    <icon>image://theme/icon-m-date</icon>
     <provider>nextcloud</provider>
 
     <template>

@@ -2,7 +2,7 @@
 <service id="nextcloud-carddav">
     <type>carddav</type>
     <name>Contacts</name>
-    <icon>image://theme/graphic-service-contacts</icon>
+    <icon>image://theme/icon-m-file-vcard</icon>
     <provider>nextcloud</provider>
 
     <template>
