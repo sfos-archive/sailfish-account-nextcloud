@@ -25,11 +25,14 @@ Item {
             leftMargin: Theme.paddingLarge
             right: iconContainer.left
             rightMargin: Theme.paddingLarge
-            verticalCenter: parent.verticalCenter
+            top: parent.top
+            bottom: parent.bottom
         }
         horizontalAlignment: Text.AlignRight
-        elide: Text.ElideRight
+        verticalAlignment: Text.AlignVCenter
+        wrapMode: Text.WrapAnywhere
         font.pixelSize: Theme.fontSizeLarge
+        fontSizeMode: Text.VerticalFit
     }
 
     Rectangle {
