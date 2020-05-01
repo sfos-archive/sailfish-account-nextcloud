@@ -62,7 +62,9 @@ void WebDavSyncer::sync(int, const QString &, const QString &serverUrl, const QS
     LOG_DEBUG(Q_FUNC_INFO << "Auth succeeded, start sync for service" << m_serviceName << "with account" << m_accountId);
 
     m_serverUrl = serverUrl;
-    m_webdavPath = webdavPath.isEmpty() ? QStringLiteral("/remote.php/webdav/") : webdavPath;
+    m_webdavPath = webdavPath.isEmpty()
+            ? QStringLiteral("/remote.php/dav/files/") + username
+            : webdavPath;
     m_username = username;
     m_password = password;
     m_accessToken = accessToken;
