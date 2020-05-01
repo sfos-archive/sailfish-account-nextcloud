@@ -29,12 +29,9 @@
 #include <SyncProfile.h>
 #include <LogMacros.h>
 
-namespace {
-
-const int HTTP_UNAUTHORIZED_ACCESS = 401;
-const int HTTP_METHOD_NOT_ALLOWED = 405;
-
-}
+// libaccounts-qt5
+#include <Accounts/Account>
+#include <Accounts/Service>
 
 Syncer::Syncer(QObject *parent, Buteo::SyncProfile *syncProfile, Syncer::Operation operation)
     : WebDavSyncer(parent, syncProfile, QStringLiteral("nextcloud-backup"))
@@ -63,13 +60,11 @@ void Syncer::beginSync()
 {
     LOG_DEBUG("Starting Nextcloud operation:" << m_operation);
 
-    QDBusReply<QString> backupDeviceIdReply = m_sailfishBackup->call("backupFileDeviceId");
-    if (backupDeviceIdReply.value().isEmpty()) {
-        WebDavSyncer::finishWithError("Backup device ID is invalid!");
+    m_remoteBackupDirPath = initBackupDir();
+    if (m_remoteBackupDirPath.isEmpty()) {
+        WebDavSyncer::finishWithError("Unable to initialize remote backups directory!");
         return;
     }
-
-    m_remoteDirPath = "Sailfish OS/Backups/" + backupDeviceIdReply.value();
 
     switch (m_operation) {
     case Backup:
@@ -90,7 +85,7 @@ void Syncer::beginSync()
     }
     case BackupQuery:
     {
-        if (!performDirListingRequest(m_remoteDirPath)) {
+        if (!performDirListingRequest(m_remoteBackupDirPath)) {
             WebDavSyncer::finishWithError("Directory list request failed");
         }
         break;
@@ -103,13 +98,8 @@ void Syncer::beginSync()
            return;
         }
 
-        if (filePath.isEmpty()) {
-            WebDavSyncer::finishWithError("Error: no remote file specified to download for backup restore!");
-            return;
-        }
-
         m_localFileInfo = QFileInfo(filePath);
-        if (!performDirListingRequest(m_remoteDirPath)) {
+        if (!performDirListingRequest(m_remoteBackupDirPath)) {
             WebDavSyncer::finishWithError("Directory list request failed");
         }
         break;
@@ -135,7 +125,7 @@ void Syncer::cloudBackupStatusChanged(int accountId, const QString &status)
         LOG_DEBUG("Will upload" << m_localFileInfo.absoluteFilePath());
 
         // Verify the remote dir exists before uploading the file.
-        if (!performDirListingRequest(m_remoteDirPath)) {
+        if (!performDirListingRequest(m_remoteBackupDirPath)) {
             WebDavSyncer::finishWithError("Directory list request failed");
         }
 
@@ -183,7 +173,7 @@ void Syncer::cloudRestoreError(int accountId, const QString &error, const QStrin
 
 bool Syncer::performDirCreationRequest(const QStringList &remotePathParts, int remotePathPartsIndex)
 {
-    QString remoteDirPath = m_webdavPath + remotePathParts.mid(0, remotePathPartsIndex + 1).join('/');
+    const QString remoteDirPath = remotePathParts.mid(0, remotePathPartsIndex + 1).join('/');
     QNetworkReply *reply = m_requestGenerator->dirCreation(remoteDirPath);
     if (reply) {
         reply->setProperty("remotePathParts", remotePathParts);
@@ -204,25 +194,26 @@ void Syncer::handleDirCreationReply()
     const QStringList remotePathParts = reply->property("remotePathParts").toStringList();
     int remotePathPartsIndex = reply->property("remotePathPartsIndex").toInt();
 
-    const bool dirAlreadyExists = (httpCode == HTTP_METHOD_NOT_ALLOWED);
-    if (dirAlreadyExists
-            || reply->error() == QNetworkReply::NoError) {
-        if ((remotePathPartsIndex + 1) >= remotePathParts.length()) {
+    if ((remotePathPartsIndex + 1) >= remotePathParts.length()) {
+        // This was the last sub-directory creation request.
+        if (reply->error() == QNetworkReply::NoError) {
             // Full directory path has been created. The backup file can now be uploaded.
             performUploadRequest(m_localFileInfo.fileName());
         } else {
-            // Continue creating the rest of the remote directories in the remote ptah
-            performDirCreationRequest(remotePathParts, remotePathPartsIndex + 1);
+            WebDavSyncer::finishWithError("Dir creation request returned HTTP status: " + httpCode);
         }
     } else {
-        WebDavSyncer::finishWithError("Dir creation request returned HTTP status: " + httpCode);
-        return;
+        // Continue creating the rest of the remote directories in the remote path. Do this even
+        // if the request failed, because it will fail with e.g. HTTP error 405 if the directory
+        // already exists, or 401/403 if the directory exists and is above the level at which
+        // the user has permissions to create directories.
+        performDirCreationRequest(remotePathParts, remotePathPartsIndex + 1);
     }
 }
 
 bool Syncer::performDirListingRequest(const QString &remoteDirPath)
 {
-    QNetworkReply *reply = m_requestGenerator->dirListing(m_webdavPath + remoteDirPath);
+    QNetworkReply *reply = m_requestGenerator->dirListing(remoteDirPath);
     if (reply) {
         reply->setProperty("remoteDirPath", remoteDirPath);
         connect(reply, &QNetworkReply::finished,
@@ -244,7 +235,16 @@ void Syncer::handleDirListingReply()
     bool dirNotFound = (httpCode == 404);
     if (m_operation == Backup && dirNotFound) {
         // Remote backup directory doesn't exist, so create it.
-        performDirCreationRequest(remoteDirPath.split('/'), 0);
+        QStringList pathParts = remoteDirPath.split('/');
+        for (QStringList::iterator it = pathParts.begin(); it != pathParts.end();) {
+            const QString part = (*it).remove('/');
+            if (part.isEmpty()) {
+                it = pathParts.erase(it);
+            } else {
+                ++it;
+            }
+        }
+        performDirCreationRequest(pathParts, 0);
         return;
     }
 
@@ -329,7 +329,7 @@ bool Syncer::performUploadRequest(const QString &fileName)
     const QByteArray fileData = file.readAll();
     file.close();
 
-    const QString remotePath = m_webdavPath + m_remoteDirPath + '/' + fileName;
+    const QString remotePath = m_remoteBackupDirPath + '/' + fileName;
     QNetworkReply *reply = m_requestGenerator->upload(mimeType.name(), fileData, remotePath);
     if (reply) {
         connect(reply, &QNetworkReply::uploadProgress,
@@ -380,7 +380,7 @@ bool Syncer::performDownloadRequest(const QString &fileName)
         return false;
     }
 
-    const QString remoteFilePath = m_webdavPath + m_remoteDirPath + '/' + fileName;
+    const QString remoteFilePath = m_remoteBackupDirPath + '/' + fileName;
     QNetworkReply *reply = m_requestGenerator->download(remoteFilePath);
     if (reply) {
         connect(reply, &QNetworkReply::downloadProgress,
@@ -446,4 +446,34 @@ void Syncer::purgeAccount(int)
 {
     // Don't delete backup blobs from server.
     // Nothing to do.
+}
+
+QString Syncer::initBackupDir()
+{
+    QDBusReply<QString> backupDeviceIdReply = m_sailfishBackup->call("backupFileDeviceId");
+    const QString backupDeviceId = backupDeviceIdReply.value();
+    if (backupDeviceId.isEmpty()) {
+        LOG_WARNING("Backup device ID is invalid! D-Bus error was:"
+                    << backupDeviceIdReply.error().message());
+        return QString();
+    }
+
+    if (!m_manager) {
+        m_manager = new Accounts::Manager(this);
+    }
+
+    Accounts::Account *account = m_manager->account(m_accountId);
+    if (account) {
+        const Accounts::ServiceList services = account->services();
+        for (const Accounts::Service &service : services) {
+            if (service.name() == m_serviceName) {
+                account->selectService(service);
+                QString backupDir = account->value(QStringLiteral("backups_path")).toString().trimmed();
+                account->selectService(Accounts::Service());
+                return QDir(backupDir).filePath(backupDeviceId);
+            }
+        }
+    }
+
+    return QDir(webDavPath()).filePath("Sailfish OS/Backups/" + backupDeviceId);
 }

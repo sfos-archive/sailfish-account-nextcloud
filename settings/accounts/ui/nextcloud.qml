@@ -25,6 +25,7 @@ OnlineSyncAccountCreationAgent {
 
     webdavPath: AccountsUtil.joinServerPathInAddress(serverAddress, "/remote.php/webdav/")
     imagesPath: AccountsUtil.joinServerPathInAddress(serverAddress, "/remote.php/dav/files/" + username + "/Photos")
+    backupsPath: AccountsUtil.joinServerPathInAddress(serverAddress, "/remote.php/dav/files/" + username + "/Sailfish OS/Backups")
 
     showAdvancedSettings: true
 }
