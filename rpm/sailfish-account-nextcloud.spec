@@ -192,6 +192,7 @@ Summary:   Provides integration of Nextcloud images into Gallery application
 Group:     System/Libraries
 BuildRequires: pkgconfig(Qt5Gui)
 BuildRequires: pkgconfig(Qt5Qml)
+BuildRequires: pkgconfig(accounts-qt5)
 Requires: sailfish-components-gallery-qt5 >= 1.1.9
 Requires: sailfish-components-filemanager >= 0.2.17
 

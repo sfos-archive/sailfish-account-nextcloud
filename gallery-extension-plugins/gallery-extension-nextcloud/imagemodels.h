@@ -16,8 +16,13 @@
 #include <QtCore/QVector>
 #include <QtCore/QList>
 #include <QtCore/QHash>
+#include <QtCore/QMap>
 #include <QtCore/QPair>
 #include <QtQml/QQmlParserStatus>
+
+// libaccounts-qt
+#include <Accounts/Manager>
+#include <Accounts/Account>
 
 class NextcloudUserModel : public QAbstractListModel, public QQmlParserStatus
 {
@@ -59,10 +64,28 @@ Q_SIGNALS:
 
 private:
     void loadData();
+    void addAccount(int index, int accountId);
+    void addAllAccounts();
+    void removeAccount(int index);
+    void removeAllAccounts();
+    void enabledChanged(const QString &serviceName, bool enabled);
+    void accountDestroyed();
+    void reload();
+
+    class AccountInfo
+    {
+    public:
+        Accounts::Account *account = nullptr;
+        bool accountEnabled = false;
+        bool imageServiceEnabled = false;
+    };
 
     bool m_deferLoad = false;
     SyncCache::ImageCache *m_imageCache = nullptr;
+    Accounts::Manager *m_accountManager = nullptr;
     QVector<SyncCache::User> m_data;
+    QVector<SyncCache::User> m_filteredData;
+    QVector<AccountInfo> m_accounts;
 };
 
 class NextcloudAlbumModel : public QAbstractListModel, public QQmlParserStatus
