@@ -1,3 +1,12 @@
+/****************************************************************************************
+**
+** Copyright (C) 2019 Open Mobile Platform LLC
+** All rights reserved.
+**
+** License: Proprietary.
+**
+****************************************************************************************/
+
 import QtQuick 2.6
 import Sailfish.Silica 1.0
 import Sailfish.Gallery 1.0
@@ -24,11 +33,15 @@ Page {
         model: photoModel
 
         header: PageHeader {
-            title: albumName.length > 0
-                   ? albumName
-                     //: Heading for Nextcloud photos
-                     //% "Nextcloud"
-                   : qsTrId("jolla_gallery_nextcloud-la-nextcloud")
+            title: {
+                if (albumName.length > 0) {
+                    var lastSlash = albumName.lastIndexOf('/')
+                    return lastSlash >= 0 ? albumName.substring(lastSlash + 1) : albumName
+                }
+                //: Heading for Nextcloud photos
+                //% "Nextcloud"
+                return qsTrId("jolla_gallery_nextcloud-la-nextcloud")
+            }
         }
 
         delegate: BackgroundItem {
