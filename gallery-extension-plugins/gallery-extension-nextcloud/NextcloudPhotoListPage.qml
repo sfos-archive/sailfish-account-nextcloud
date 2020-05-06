@@ -1,6 +1,6 @@
 /****************************************************************************************
 **
-** Copyright (C) 2019 Open Mobile Platform LLC
+** Copyright (c) 2019 - 2020 Open Mobile Platform LLC
 ** All rights reserved.
 **
 ** License: Proprietary.
