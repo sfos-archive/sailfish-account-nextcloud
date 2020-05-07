@@ -39,8 +39,10 @@ public:
     static const QByteArray JsonContentType;
 
 private:
-    QNetworkRequest networkRequest(const QUrl &url, const QString &contentType = QString(), const QByteArray &requestData = QByteArray(), bool basicAuth = false) const;
-    QUrl networkRequestUrl(const QString &path, const QUrlQuery &query = QUrlQuery());
+    QNetworkRequest networkRequest(const QString &path,
+                                   const QString &contentType = QString(),
+                                   const QByteArray &requestData = QByteArray()) const;
+    QUrl networkRequestUrl(const QString &path);
     QNetworkReply *sendRequest(const QNetworkRequest &request, const QByteArray &requestType, const QByteArray &requestData = QByteArray()) const;
 
     QString m_username;

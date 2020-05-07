@@ -22,6 +22,9 @@ OnlineSyncAccountCreationAgent {
         accountManager.service("nextcloud-posts"),
         accountManager.service("nextcloud-sharing")
     ]
-    webdavPath: "/remote.php/webdav/"
+
+    webdavPath: AccountsUtil.joinServerPathInAddress(serverAddress, "/remote.php/webdav/")
+    imagesPath: AccountsUtil.joinServerPathInAddress(serverAddress, "/remote.php/dav/files/" + username + "/Photos")
+
     showAdvancedSettings: true
 }

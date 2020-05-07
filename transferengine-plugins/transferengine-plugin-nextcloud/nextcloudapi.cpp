@@ -71,10 +71,11 @@ void NextcloudApi::propfindPath(const QString &accessToken,
           "<d:propname/>"
         "</d:propfind>");
 
-    const QString urlStr = QStringLiteral("%1%2%3")
-            .arg(serverAddress, uploadPath,
+    const QString remotePath = QStringLiteral("%1%2")
+            .arg(uploadPath,
                  accessToken.isEmpty() ? QString() : QStringLiteral("?access_token=%1").arg(accessToken));
-    QUrl url(urlStr);
+    QUrl url(serverAddress);
+    url.setPath(remotePath);
     if (accessToken.isEmpty() && !username.isEmpty()) {
         url.setUserName(username);
         url.setPassword(password);
@@ -143,11 +144,12 @@ void NextcloudApi::uploadFile(const QString &filePath,
     f.close();
 
     const QString fileName = QFileInfo(filePath).fileName();
-    const QString urlStr = QStringLiteral("%1%2%3%4")
-            .arg(serverAddress, uploadPath, fileName,
+    const QString remotePath = QStringLiteral("%1%2%3")
+            .arg(uploadPath, fileName,
                  accessToken.isEmpty() ? QString() : QStringLiteral("?access_token=%1").arg(accessToken));
 
-    QUrl url(urlStr);
+    QUrl url(serverAddress);
+    url.setPath(remotePath);
     if (accessToken.isEmpty() && !username.isEmpty()) {
         url.setUserName(username);
         url.setPassword(password);

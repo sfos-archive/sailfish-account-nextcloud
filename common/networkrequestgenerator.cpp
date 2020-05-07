@@ -55,12 +55,41 @@ QNetworkReply *NetworkRequestGenerator::sendRequest(const QNetworkRequest &reque
     return reply;
 }
 
-QNetworkRequest NetworkRequestGenerator::networkRequest(const QUrl &url, const QString &contentType, const QByteArray &requestData, bool basicAuth) const
+QNetworkRequest NetworkRequestGenerator::networkRequest(const QString &path, const QString &contentType, const QByteArray &requestData) const
 {
+    const bool isOcsRequest = path.startsWith(QStringLiteral("/ocs/"));
+
+    QUrl url(m_serverUrl);
+    if (!path.isEmpty()) {
+        QString modifiedPath(path);
+
+        // common case: the path may contain %40 instead of @ symbol,
+        // if the server returns paths in percent-encoded form.
+        // QUrl::setPath() will automatically percent-encode the input,
+        // so if we have received percent-encoded path, we need to undo
+        // the percent encoding first.  This is suboptimal but works
+        // at least for the common case.
+        if (modifiedPath.contains(QStringLiteral("%40"))) {
+            modifiedPath = QUrl::fromPercentEncoding(modifiedPath.toUtf8());
+        }
+
+        if (isOcsRequest) {
+            // Append the request path instead of overwriting the existing url.path() in case the
+            // server url ends with a subdirectory path.
+            QString serverPath = url.path();
+            if (serverPath.endsWith('/')) {
+                serverPath = serverPath.mid(0, serverPath.length() - 1);
+            }
+            url.setPath(serverPath + modifiedPath);
+        } else {
+            url.setPath(modifiedPath.startsWith('/') ? modifiedPath : '/' + modifiedPath);
+        }
+    }
+
     QNetworkRequest request(url);
 
-    if (url.path().startsWith(QStringLiteral("/ocs/")) || basicAuth) {
-        // Nextcloud APIs require Basic Authentication. Qt 5.6 QNetworkAccessManager does not
+    if (isOcsRequest) {
+        // Nextcloud OCS APIs require Basic Authentication. Qt 5.6 QNetworkAccessManager does not
         // generate the expected request headers for this if user/pass are set in the URL, so
         // set them manually instead.
         QByteArray credentials((m_username + ':' + m_password).toUtf8());
@@ -88,40 +117,9 @@ QNetworkRequest NetworkRequestGenerator::networkRequest(const QUrl &url, const Q
     return request;
 }
 
-QUrl NetworkRequestGenerator::networkRequestUrl(const QString &path, const QUrlQuery &query)
-{
-    QUrl ret(m_serverUrl);
-    QString modifiedPath(path);
-    if (!path.isEmpty()) {
-        // common case: the path may contain %40 instead of @ symbol,
-        // if the server returns paths in percent-encoded form.
-        // QUrl::setPath() will automatically percent-encode the input,
-        // so if we have received percent-encoded path, we need to undo
-        // the percent encoding first.  This is suboptimal but works
-        // at least for the common case.
-        if (path.contains(QStringLiteral("%40"))) {
-            modifiedPath = QUrl::fromPercentEncoding(path.toUtf8());
-        }
-
-        // override the path from the given url with the path argument.
-        // this is because the initial URL may be a user-principals URL
-        // but subsequent paths are not relative to that one, but instead
-        // are relative to the root path /
-        if (path.startsWith('/')) {
-            ret.setPath(modifiedPath);
-        } else {
-            ret.setPath('/' + modifiedPath);
-        }
-    }
-    if (!query.isEmpty()) {
-        ret.setQuery(query);
-    }
-    return ret;
-}
-
 QNetworkReply *NetworkRequestGenerator::userInfo(const QByteArray &acceptContentType)
 {
-    QNetworkRequest request = networkRequest(networkRequestUrl("/ocs/v2.php/cloud/user"));
+    QNetworkRequest request = networkRequest("/ocs/v2.php/cloud/user");
     if (!acceptContentType.isEmpty()) {
         request.setRawHeader("Accept", acceptContentType);
     }
@@ -130,7 +128,7 @@ QNetworkReply *NetworkRequestGenerator::userInfo(const QByteArray &acceptContent
 
 QNetworkReply *NetworkRequestGenerator::capabilities(const QByteArray &acceptContentType)
 {
-    QNetworkRequest request = networkRequest(networkRequestUrl("/ocs/v2.php/cloud/capabilities"));
+    QNetworkRequest request = networkRequest("/ocs/v2.php/cloud/capabilities");
     if (!acceptContentType.isEmpty()) {
         request.setRawHeader("Accept", acceptContentType);
     }
@@ -139,7 +137,7 @@ QNetworkReply *NetworkRequestGenerator::capabilities(const QByteArray &acceptCon
 
 QNetworkReply *NetworkRequestGenerator::notificationList(const QByteArray &acceptContentType)
 {
-    QNetworkRequest request = networkRequest(networkRequestUrl("/ocs/v2.php/apps/notifications/api/v2/notifications"));
+    QNetworkRequest request = networkRequest("/ocs/v2.php/apps/notifications/api/v2/notifications");
     if (!acceptContentType.isEmpty()) {
         request.setRawHeader("Accept", acceptContentType);
     }
@@ -148,15 +146,13 @@ QNetworkReply *NetworkRequestGenerator::notificationList(const QByteArray &accep
 
 QNetworkReply *NetworkRequestGenerator::deleteNotification(const QString &notificationId)
 {
-    QNetworkRequest request = networkRequest(
-                networkRequestUrl("/ocs/v2.php/apps/notifications/api/v2/notifications/" + notificationId));
+    QNetworkRequest request = networkRequest("/ocs/v2.php/apps/notifications/api/v2/notifications/" + notificationId);
     return sendRequest(request, "DELETE");
 }
 
 QNetworkReply *NetworkRequestGenerator::deleteAllNotifications()
 {
-    QNetworkRequest request = networkRequest(
-                networkRequestUrl("/ocs/v2.php/apps/notifications/api/v2/notifications"));
+    QNetworkRequest request = networkRequest("/ocs/v2.php/apps/notifications/api/v2/notifications");
     return sendRequest(request, "DELETE");
 }
 
@@ -178,7 +174,7 @@ QNetworkReply *NetworkRequestGenerator::dirListing(const QString &remoteDirPath)
             "</d:prop>" \
         "</d:propfind>";
 
-    QNetworkRequest request = networkRequest(networkRequestUrl(remoteDirPath), XmlContentType, requestData);
+    QNetworkRequest request = networkRequest(remoteDirPath, XmlContentType, requestData);
     request.setRawHeader("Depth", "1");
     return sendRequest(request, "PROPFIND", requestData);
 }
@@ -190,7 +186,7 @@ QNetworkReply *NetworkRequestGenerator::dirCreation(const QString &remoteDirPath
         return nullptr;
     }
 
-    QNetworkRequest request = networkRequest(networkRequestUrl(remoteDirPath));
+    QNetworkRequest request = networkRequest(remoteDirPath);
     return sendRequest(request, "MKCOL");
 }
 
@@ -207,7 +203,7 @@ QNetworkReply *NetworkRequestGenerator::upload(const QString &dataContentType, c
     }
 
     // dataContentType may be empty.
-    QNetworkRequest request = networkRequest(networkRequestUrl(remoteDirPath), dataContentType.toUtf8(), data);
+    QNetworkRequest request = networkRequest(remoteDirPath, dataContentType.toUtf8(), data);
     return sendRequest(request, "PUT", data);
 }
 
@@ -218,7 +214,7 @@ QNetworkReply *NetworkRequestGenerator::download(const QString &remoteFilePath)
         return nullptr;
     }
 
-    QNetworkRequest request = networkRequest(networkRequestUrl(remoteFilePath));
+    QNetworkRequest request = networkRequest(remoteFilePath);
     request.setRawHeader("Depth", "1");
     return sendRequest(request, "GET");
 }
