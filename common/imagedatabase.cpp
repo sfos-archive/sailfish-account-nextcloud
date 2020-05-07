@@ -1059,7 +1059,7 @@ void ImageDatabase::deletePhoto(const Photo &photo, DatabaseError *error)
         qMakePair<QString, QVariant>(QStringLiteral(":accountId"), photo.accountId),
         qMakePair<QString, QVariant>(QStringLiteral(":userId"), photo.userId),
         qMakePair<QString, QVariant>(QStringLiteral(":albumId"), photo.albumId),
-        qMakePair<QString, QVariant>(QStringLiteral(":photoId"), photo.albumId)
+        qMakePair<QString, QVariant>(QStringLiteral(":photoId"), photo.photoId)
     };
 
     auto deleteResultHandler = [d, existingPhoto]() -> void {
