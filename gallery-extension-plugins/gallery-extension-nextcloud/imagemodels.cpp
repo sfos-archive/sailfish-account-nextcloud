@@ -12,8 +12,17 @@
 #include <QtCore/QDebug>
 #include <QtQml/QQmlInfo>
 
+#include <Accounts/Service>
+
+namespace {
+
+const QString NextcloudImagesService = QStringLiteral("nextcloud-images");
+
+}
+
 NextcloudUserModel::NextcloudUserModel(QObject *parent)
     : QAbstractListModel(parent)
+    , m_accountManager(new Accounts::Manager(this))
 {
     qRegisterMetaType<SyncCache::User>();
     qRegisterMetaType<QVector<SyncCache::User> >();
@@ -34,7 +43,7 @@ void NextcloudUserModel::componentComplete()
 
 QModelIndex NextcloudUserModel::index(int row, int column, const QModelIndex &parent) const
 {
-    return !parent.isValid() && column == 0 && row >= 0 && row < m_data.size()
+    return !parent.isValid() && column == 0 && row >= 0 && row < m_filteredData.size()
             ? createIndex(row, column)
             : QModelIndex();
 }
@@ -42,7 +51,7 @@ QModelIndex NextcloudUserModel::index(int row, int column, const QModelIndex &pa
 QVariant NextcloudUserModel::data(const QModelIndex &index, int role) const
 {
     const int row = index.row();
-    if (!index.isValid() || row < 0 || row >= m_data.size()) {
+    if (!index.isValid() || row < 0 || row >= m_filteredData.size()) {
         return QVariant();
     }
 
@@ -50,18 +59,18 @@ QVariant NextcloudUserModel::data(const QModelIndex &index, int role) const
     //       call m_cache->populateUserThumbnail(),
     //       and when it succeeds, emit dataChanged(row).
     switch (role) {
-        case AccountIdRole:         return m_data[row].accountId;
-        case UserIdRole:            return m_data[row].userId;
-        case DisplayNameRole:       return m_data[row].displayName;
-        case ThumbnailUrlRole:      return m_data[row].thumbnailUrl;
-        case ThumbnailPathRole:     return m_data[row].thumbnailPath;
+        case AccountIdRole:         return m_filteredData[row].accountId;
+        case UserIdRole:            return m_filteredData[row].userId;
+        case DisplayNameRole:       return m_filteredData[row].displayName;
+        case ThumbnailUrlRole:      return m_filteredData[row].thumbnailUrl;
+        case ThumbnailPathRole:     return m_filteredData[row].thumbnailPath;
         default:                    return QVariant();
     }
 }
 
 int NextcloudUserModel::rowCount(const QModelIndex &) const
 {
-    return m_data.size();
+    return m_filteredData.size();
 }
 
 QHash<int, QByteArray> NextcloudUserModel::roleNames() const
@@ -108,16 +117,17 @@ void NextcloudUserModel::setImageCache(SyncCache::ImageCache *cache)
                 if (user.accountId == existing.accountId
                         && user.userId == existing.userId) {
                     m_data.replace(row, user);
-                    emit dataChanged(index(row, 0, QModelIndex()), index(row, 0, QModelIndex()));
+                    removeAccount(existing.accountId);
+                    addAccount(row, user.accountId);
+                    reload();
                     foundUser = true;
                 }
             }
 
             if (!foundUser) {
-                emit beginInsertRows(QModelIndex(), m_data.size(), m_data.size());
                 m_data.append(user);
-                emit endInsertRows();
-                emit rowCountChanged();
+                addAccount(m_data.size()-1, user.accountId);
+                reload();
             }
         }
     });
@@ -129,10 +139,9 @@ void NextcloudUserModel::setImageCache(SyncCache::ImageCache *cache)
                 const SyncCache::User &existing(m_data[row]);
                 if (user.accountId == existing.accountId
                         && user.userId == existing.userId) {
-                    emit beginRemoveRows(QModelIndex(), row, row);
                     m_data.remove(row);
-                    emit endRemoveRows();
-                    emit rowCountChanged();
+                    removeAccount(row);
+                    reload();
                 }
             }
         }
@@ -165,19 +174,19 @@ void NextcloudUserModel::loadData()
     connect(m_imageCache, &SyncCache::ImageCache::requestUsersFinished,
             contextObject, [this, contextObject] (const QVector<SyncCache::User> &users) {
         contextObject->deleteLater();
-        const int oldSize = m_data.size();
+        bool changed = false;
         if (m_data.size()) {
-            emit beginRemoveRows(QModelIndex(), 0, m_data.size() - 1);
             m_data.clear();
-            emit endRemoveRows();
+            removeAllAccounts();
+            changed = true;
         }
         if (users.size()) {
-            emit beginInsertRows(QModelIndex(), 0, users.size() - 1);
             m_data = users;
-            emit endInsertRows();
+            addAllAccounts();
+            changed = true;
         }
-        if (m_data.size() != oldSize) {
-            emit rowCountChanged();
+        if (changed) {
+            reload();
         }
     });
     connect(m_imageCache, &SyncCache::ImageCache::requestUsersFailed,
@@ -186,6 +195,128 @@ void NextcloudUserModel::loadData()
         qWarning() << "NextcloudUserModel::loadData: failed:" << errorMessage;
     });
     m_imageCache->requestUsers();
+}
+
+void NextcloudUserModel::addAccount(int index, int accountId)
+{
+    Accounts::Account *account = Accounts::Account::fromId(m_accountManager, accountId, this);
+    if (!account) {
+        return;
+    }
+
+    connect(account, &Accounts::Account::enabledChanged,
+            this, &NextcloudUserModel::enabledChanged, Qt::UniqueConnection);
+    connect(account, &Accounts::Account::destroyed,
+            this, &NextcloudUserModel::accountDestroyed, Qt::UniqueConnection);
+
+    Accounts::Service imagesService = m_accountManager->service(NextcloudImagesService);
+    if (!imagesService.isValid()) {
+        qmlInfo(this) << "Cannot find account service" << NextcloudImagesService;
+        return;
+    }
+
+    AccountInfo info;
+    info.account = account;
+
+    account->selectService(Accounts::Service());
+    info.accountEnabled = account->enabled();
+
+    account->selectService(imagesService);
+    info.imageServiceEnabled = account->enabled();
+    account->selectService(Accounts::Service());
+
+    m_accounts.insert(index, info);
+}
+
+void NextcloudUserModel::addAllAccounts()
+{
+    for (const SyncCache::User &user : m_data) {
+        addAccount(m_accounts.size(), user.accountId);
+    }
+}
+
+void NextcloudUserModel::removeAccount(int index)
+{
+    if (index < 0 || index >= m_accounts.size()) {
+        return;
+    }
+
+    const AccountInfo info = m_accounts.takeAt(index);
+    if (info.account) {
+        info.account->disconnect(this);
+    }
+}
+
+void NextcloudUserModel::removeAllAccounts()
+{
+    for (const AccountInfo &info : m_accounts) {
+        if (info.account) {
+            info.account->disconnect(this);
+        }
+    }
+    m_accounts.clear();
+}
+
+void NextcloudUserModel::enabledChanged(const QString &serviceName, bool enabled)
+{
+    Accounts::Account *account = qobject_cast<Accounts::Account*>(sender());
+    if (!account || (!serviceName.isEmpty() && serviceName != NextcloudImagesService)) {
+        return;
+    }
+
+    for (int row = 0; row < m_accounts.size(); ++row) {
+        if (m_accounts[row].account == account) {
+            if (serviceName.isEmpty()) {
+                m_accounts[row].accountEnabled = enabled;
+            } else {
+                m_accounts[row].imageServiceEnabled = enabled;
+            }
+            reload();
+            break;
+        }
+    }
+}
+
+void NextcloudUserModel::accountDestroyed()
+{
+    Accounts::Account *account = qobject_cast<Accounts::Account*>(sender());
+    if (!account) {
+        return;
+    }
+
+    for (int row = 0; row < m_accounts.size(); ++row) {
+        if (m_accounts[row].account == account) {
+            m_accounts[row].account = nullptr;
+            reload();
+            break;  // don't remove from list, do that when m_data is updated to keep the two lists in sync
+        }
+    }
+}
+
+void NextcloudUserModel::reload()
+{
+    if (m_accounts.size() != m_data.size()) {
+        qmlInfo(this) << "Users lists are not in-sync!";
+        return;
+    }
+
+    const int prevCount = rowCount();
+    QVector<SyncCache::User> enabledUsers;
+
+    for (int i = 0; i < m_accounts.size(); ++i) {
+        const AccountInfo &info = m_accounts.at(i);
+        if (info.account && info.accountEnabled && info.imageServiceEnabled) {
+            enabledUsers.append(m_data.at(i));
+        }
+    }
+
+    beginResetModel();
+    m_filteredData = enabledUsers;
+    endResetModel();
+
+    if (prevCount != enabledUsers.size()) {
+        emit rowCountChanged();
+    }
 }
 
 //-----------------------------------------------------------------------------
