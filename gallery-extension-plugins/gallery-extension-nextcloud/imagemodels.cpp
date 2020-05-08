@@ -425,13 +425,21 @@ void NextcloudAlbumModel::setImageCache(SyncCache::ImageCache *cache)
                 if (album.accountId == existing.accountId
                         && album.userId == existing.userId
                         && album.albumId == existing.albumId) {
-                    m_data.replace(row, album);
-                    emit dataChanged(index(row, 0, QModelIndex()), index(row, 0, QModelIndex()));
+                    if (album.photoCount == 0) {
+                        emit beginRemoveRows(QModelIndex(), row, row);
+                        m_data.remove(row);
+                        emit endRemoveRows();
+                        emit rowCountChanged();
+                    } else {
+                        m_data.replace(row, album);
+                        emit dataChanged(index(row, 0, QModelIndex()), index(row, 0, QModelIndex()));
+                    }
                     foundAlbum = true;
                 }
             }
 
             if (!foundAlbum
+                    && album.photoCount > 0
                     && (album.accountId == accountId() || accountId() == 0)
                     && (album.userId == userId() || userId().isEmpty())) {
                 emit beginInsertRows(QModelIndex(), m_data.size(), m_data.size());
@@ -550,8 +558,14 @@ void NextcloudAlbumModel::loadData()
             emit endRemoveRows();
         }
         if (albums.size()) {
-            emit beginInsertRows(QModelIndex(), 0, albums.size() - 1);
-            m_data = albums;
+            QVector<SyncCache::Album> nonEmptyAlbums;
+            for (const SyncCache::Album &album : albums) {
+                if (album.photoCount > 0) {
+                    nonEmptyAlbums.append(album);
+                }
+            }
+            emit beginInsertRows(QModelIndex(), 0, nonEmptyAlbums.size() - 1);
+            m_data = nonEmptyAlbums;
             emit endInsertRows();
         }
         if (m_data.size() != oldSize) {
