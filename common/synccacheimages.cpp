@@ -355,10 +355,11 @@ void ImageCacheThreadWorker::populatePhotoImage(int idempToken, int accountId, c
             if (storeError.errorCode == DatabaseError::NoError&& album.thumbnailPath.isEmpty()) {
                 album.thumbnailPath = photoToStore.thumbnailPath;
                 m_db.storeAlbum(album, &storeError);
-                if (storeError.errorCode != DatabaseError::NoError) {
+                if (storeError.errorCode == DatabaseError::NoError) {
                     emit populateAlbumThumbnailFinished(idempToken, photoToStore.thumbnailPath.toString());
                 } else {
-                    qWarning() << "Unable to store photo as album thumbnail";
+                    qWarning() << "Unable to store photo as album thumbnail"
+                               << storeError.errorCode << storeError.errorMessage;
                 }
             }
         }
