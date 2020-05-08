@@ -23,8 +23,9 @@ OnlineSyncAccountCreationAgent {
         accountManager.service("nextcloud-sharing")
     ]
 
-    webdavPath: AccountsUtil.joinServerPathInAddress(serverAddress, "/remote.php/webdav/")
+    webdavPath: AccountsUtil.joinServerPathInAddress(serverAddress, "/remote.php/dav/files/" + username)
     imagesPath: AccountsUtil.joinServerPathInAddress(serverAddress, "/remote.php/dav/files/" + username + "/Photos")
+    backupsPath: AccountsUtil.joinServerPathInAddress(serverAddress, "/remote.php/dav/files/" + username + "/Sailfish OS/Backups")
 
     showAdvancedSettings: true
 }

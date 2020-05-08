@@ -29,7 +29,9 @@ void NextcloudShareServiceStatus::signInResponseHandler(int accountId, const QSt
     accountDetails.username = username;
     accountDetails.password = password;
     accountDetails.serverAddress = serverAddress;
-    accountDetails.webdavPath = webdavPath.isEmpty() ? QStringLiteral("/remote.php/webdav/") : webdavPath;
+    accountDetails.webdavPath = webdavPath.isEmpty()
+            ? QStringLiteral("/remote.php/dav/files/") + username
+            : webdavPath;
     accountDetails.ignoreSslErrors = ignoreSslErrors;
 
     setAccountDetailsState(accountId, Populated);

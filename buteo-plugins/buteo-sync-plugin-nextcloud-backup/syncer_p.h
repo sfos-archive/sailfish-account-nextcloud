@@ -12,7 +12,11 @@
 
 #include "webdavsyncer_p.h"
 
+// libaccounts-qt5
+#include <Accounts/Manager>
+
 #include <QFileInfo>
+#include <QDir>
 
 class QFile;
 class WebDavRequestGenerator;
@@ -64,10 +68,13 @@ private:
 
     void cleanUp();
 
+    QString initBackupDir();
+
+    Accounts::Manager *m_manager = nullptr;
     QFile *m_downloadedFile = nullptr;
     QDBusInterface *m_sailfishBackup = nullptr;
     QFileInfo m_localFileInfo;
-    QString m_remoteDirPath;
+    QString m_remoteBackupDirPath;
     Operation m_operation = BackupQuery;
 };
 
