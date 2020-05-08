@@ -39,8 +39,57 @@ Syncer::~Syncer()
     delete m_manager;
 }
 
+void Syncer::purgeDeletedAccounts()
+{
+    SyncCache::ImageDatabase db;
+    SyncCache::DatabaseError error;
+    db.openDatabase(
+            QStringLiteral("%1/system/privileged/Images/nextcloud.db").arg(QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)),
+            &error);
+
+    if (error.errorCode != SyncCache::DatabaseError::NoError) {
+        LOG_WARNING("Failed to open database:" << error.errorMessage);
+        return;
+    }
+
+    QVector<SyncCache::User> usersToDelete;
+    const QVector<SyncCache::User> users = db.users(&error);
+    for (const SyncCache::User &user : users) {
+        if (!m_manager->account(user.accountId)) {
+            usersToDelete.append(user);
+        }
+    }
+
+    if (usersToDelete.count() > 0) {
+        if (!db.beginTransaction(&error)) {
+            LOG_WARNING(Q_FUNC_INFO << "failed to begin transaction:" << error.errorCode << error.errorMessage);
+            return;
+        }
+
+        for (const SyncCache::User &user : usersToDelete) {
+            LOG_DEBUG(Q_FUNC_INFO << "Account" << user.accountId
+                      << "has been deleted, purge associated user:" << user.userId << user.displayName);
+            db.deleteUser(user, &error);
+            if (error.errorCode != SyncCache::DatabaseError::NoError) {
+                LOG_WARNING("Failed to delete user for account:" << user.accountId
+                            << ":" << error.errorMessage);
+            }
+            deleteFilesForAccount(user.accountId);
+        }
+
+        if (error.errorCode != SyncCache::DatabaseError::NoError) {
+            db.rollbackTransaction(&error);
+        } else if (!db.commitTransaction(&error)) {
+            LOG_WARNING(Q_FUNC_INFO << "failed to commit transaction:" << error.errorCode << error.errorMessage);
+        }
+    }
+}
+
 void Syncer::beginSync()
 {
+    // In case a previous purge was interrupted or failed, ensure the db is up-to-date.
+    purgeDeletedAccounts();
+
     QNetworkReply *reply = m_requestGenerator->userInfo(NetworkRequestGenerator::JsonContentType);
     if (reply) {
         connect(reply, &QNetworkReply::finished,
@@ -407,7 +456,7 @@ void Syncer::purgeAccount(int accountId)
             } else {
                 db.deleteUser(user, &error);
                 if (error.errorCode != SyncCache::DatabaseError::NoError) {
-                    LOG_WARNING("Failed to purge Nextcloud images for account:" << accountId
+                    LOG_WARNING("Failed to delete user for account:" << accountId
                                 << ":" << error.errorMessage);
                 }
             }
@@ -417,11 +466,16 @@ void Syncer::purgeAccount(int accountId)
         }
     }
 
+    deleteFilesForAccount(accountId);
+
+    LOG_DEBUG("Purged Nextcloud images for account:" << accountId);
+}
+
+void Syncer::deleteFilesForAccount(int accountId)
+{
     QDir dir(SyncCache::ImageCache::imageCacheDir(accountId));
     if (dir.exists() && !dir.removeRecursively()) {
         LOG_WARNING("Failed to purge Nextcloud image cache for account:" << accountId
                     << "in dir:" << dir.absolutePath());
     }
-
-    LOG_DEBUG("Purged Nextcloud images for account:" << accountId);
 }

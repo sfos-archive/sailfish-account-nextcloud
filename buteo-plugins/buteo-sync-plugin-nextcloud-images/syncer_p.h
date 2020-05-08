@@ -41,6 +41,9 @@ private:
     bool performDirListingRequest(const QString &remoteDirPath);
     void handleDirListingReply();
 
+    void purgeDeletedAccounts();
+    void deleteFilesForAccount(int accountId);
+
     void beginSync() override;
     void calculateAndApplyDelta(const QHash<QString, SyncCache::Album> &albums,
                                 const QHash<QString, SyncCache::Photo> &photos,
