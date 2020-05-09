@@ -51,6 +51,7 @@ Album& Album::operator=(const Album &other)
     thumbnailUrl = other.thumbnailUrl;
     thumbnailPath = other.thumbnailPath;
     thumbnailFileName = other.thumbnailFileName;
+    etag = other.etag;
 
     return *this;
 }
@@ -78,6 +79,7 @@ Photo& Photo::operator=(const Photo &other)
     imageHeight = other.imageHeight;
     fileSize = other.fileSize;
     fileType = other.fileType;
+    etag = other.etag;
 
     return *this;
 }

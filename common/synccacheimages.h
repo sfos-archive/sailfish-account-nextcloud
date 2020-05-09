@@ -48,6 +48,7 @@ struct Album {
     QUrl thumbnailUrl;
     QUrl thumbnailPath;
     QString thumbnailFileName;
+    QString etag;
 };
 
 struct Photo {
@@ -70,6 +71,7 @@ struct Photo {
     int imageHeight = 0;
     int fileSize = 0;
     QString fileType;
+    QString etag;
 };
 
 struct PhotoCounter {
@@ -84,7 +86,7 @@ public:
     ImageDatabase(QObject *parent = nullptr);
 
     QVector<SyncCache::User> users(SyncCache::DatabaseError *error) const;
-    QVector<SyncCache::Album> albums(int accountId, const QString &userId, SyncCache::DatabaseError *error) const;
+    QVector<SyncCache::Album> albums(int accountId, const QString &userId, SyncCache::DatabaseError *error, const QString &parentAlbumId = QString()) const;
     QVector<SyncCache::Photo> photos(int accountId, const QString &userId, const QString &albumId, SyncCache::DatabaseError *error) const;
 
     SyncCache::User user(int accountId, SyncCache::DatabaseError *error) const;

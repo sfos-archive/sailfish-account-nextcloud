@@ -259,8 +259,7 @@ void Syncer::handleDirListingReply()
     }
 
     if (m_operation == BackupQuery) {
-        const QList<NetworkReplyParser::Resource> resourceList = XmlReplyParser::parsePropFindResponse(
-                replyData, remoteDirPath);
+        const QList<NetworkReplyParser::Resource> resourceList = XmlReplyParser::parsePropFindResponse(replyData);
         QStringList fileNames;
         for (const NetworkReplyParser::Resource &resource : resourceList) {
             LOG_DEBUG("Found remote file or dir:" << resource.href);
@@ -285,8 +284,7 @@ void Syncer::handleDirListingReply()
 
     } else if (m_operation == BackupRestore) {
         bool fileFound = false;
-        const QList<NetworkReplyParser::Resource> resourceList = XmlReplyParser::parsePropFindResponse(
-                replyData, remoteDirPath);
+        const QList<NetworkReplyParser::Resource> resourceList = XmlReplyParser::parsePropFindResponse(replyData);
         for (const NetworkReplyParser::Resource &resource : resourceList) {
             if (!resource.isCollection) {
                 int lastDirSep = resource.href.lastIndexOf('/');

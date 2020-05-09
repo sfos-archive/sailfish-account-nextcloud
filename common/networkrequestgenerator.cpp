@@ -168,6 +168,7 @@ QNetworkReply *NetworkRequestGenerator::dirListing(const QString &remoteDirPath)
              "<d:getlastmodified />" \
              "<d:getcontenttype />" \
              "<d:resourcetype />" \
+             "<d:getetag />" \
              "<oc:fileid />" \
              "<oc:owner-id />" \
              "<oc:size />" \
