@@ -41,17 +41,43 @@ private:
     bool performDirListingRequest(const QString &remoteDirPath);
     void handleDirListingReply();
 
-    void beginSync() override;
-    void calculateAndApplyDelta(const QHash<QString, SyncCache::Album> &albums,
-                                const QHash<QString, SyncCache::Photo> &photos,
-                                const QString &firstPhotoId);
+    void purgeDeletedAccounts();
+    void deleteFilesForAccount(int accountId);
 
+    void beginSync() override;
+
+    bool processQueriedAlbum(const SyncCache::Album &mainAlbum,
+                             const QVector<SyncCache::Photo> &photos,
+                             const QVector<SyncCache::Album> &subAlbums);
+
+    bool calculateAndApplyDelta(const SyncCache::Album &mainAlbum,
+                                const QVector<SyncCache::Photo> &photos,
+                                const QVector<SyncCache::Album> &subAlbums,
+                                SyncCache::ImageDatabase *db,
+                                SyncCache::DatabaseError *error);
+
+    class SyncProgressInfo
+    {
+    public:
+        void reset();
+
+        int addedAlbumCount = 0;
+        int modifiedAlbumCount = 0;
+        int removedAlbumCount = 0;
+
+        int addedPhotoCount = 0;
+        int modifiedPhotoCount = 0;
+        int removedPhotoCount = 0;
+
+        QStringList pendingAlbumListings;
+    };
+
+    SyncProgressInfo m_syncProgressInfo;
     Accounts::Manager *m_manager = nullptr;
     ReplyParser *m_replyParser = nullptr;
-    ReplyParser::GalleryMetadata m_dirListingResults;
-    QStringList m_pendingAlbumListings;
     QString m_userId;
     QString m_dirListingRootPath;
+    bool m_forceFullSync = false;
 };
 
 #endif // NEXTCLOUD_IMAGES_SYNCER_P_H

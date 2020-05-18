@@ -34,6 +34,7 @@ public:
         QString contentType;
         QString ownerId;
         QString fileId;
+        QString etag;
         int size = 0;
         bool isCollection = false;
     };
@@ -70,7 +71,7 @@ class XmlReplyParser
 {
 public:
     static QVariantMap xmlToVariantMap(QXmlStreamReader &reader);
-    static QList<NetworkReplyParser::Resource> parsePropFindResponse(const QByteArray &propFindResponse, const QString &remotePath);
+    static QList<NetworkReplyParser::Resource> parsePropFindResponse(const QByteArray &propFindResponse);
 
     static const QString XmlElementTextKey;
 };

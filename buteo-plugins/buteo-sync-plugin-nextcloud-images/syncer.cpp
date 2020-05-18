@@ -28,19 +28,81 @@
 #include <Accounts/Account>
 #include <Accounts/Service>
 
+void Syncer::SyncProgressInfo::reset()
+{
+    addedAlbumCount = 0;
+    modifiedAlbumCount = 0;
+    removedAlbumCount = 0;
+
+    addedPhotoCount = 0;
+    modifiedAlbumCount = 0;
+    removedPhotoCount = 0;
+
+    pendingAlbumListings.clear();
+}
+
 
 Syncer::Syncer(QObject *parent, Buteo::SyncProfile *syncProfile)
     : WebDavSyncer(parent, syncProfile, QStringLiteral("nextcloud-images"))
+    , m_manager(new Accounts::Manager(this))
 {
 }
 
 Syncer::~Syncer()
 {
-    delete m_manager;
+}
+
+void Syncer::purgeDeletedAccounts()
+{
+    SyncCache::ImageDatabase db;
+    SyncCache::DatabaseError error;
+    db.openDatabase(
+            QStringLiteral("%1/system/privileged/Images/nextcloud.db").arg(QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)),
+            &error);
+
+    if (error.errorCode != SyncCache::DatabaseError::NoError) {
+        LOG_WARNING("Failed to open database:" << error.errorMessage);
+        return;
+    }
+
+    QVector<SyncCache::User> usersToDelete;
+    const QVector<SyncCache::User> users = db.users(&error);
+    for (const SyncCache::User &user : users) {
+        if (!m_manager->account(user.accountId)) {
+            usersToDelete.append(user);
+        }
+    }
+
+    if (usersToDelete.count() > 0) {
+        if (!db.beginTransaction(&error)) {
+            LOG_WARNING(Q_FUNC_INFO << "failed to begin transaction:" << error.errorCode << error.errorMessage);
+            return;
+        }
+
+        for (const SyncCache::User &user : usersToDelete) {
+            LOG_DEBUG(Q_FUNC_INFO << "Account" << user.accountId
+                      << "has been deleted, purge associated user:" << user.userId << user.displayName);
+            db.deleteUser(user, &error);
+            if (error.errorCode != SyncCache::DatabaseError::NoError) {
+                LOG_WARNING("Failed to delete user for account:" << user.accountId
+                            << ":" << error.errorMessage);
+            }
+            deleteFilesForAccount(user.accountId);
+        }
+
+        if (error.errorCode != SyncCache::DatabaseError::NoError) {
+            db.rollbackTransaction(&error);
+        } else if (!db.commitTransaction(&error)) {
+            LOG_WARNING(Q_FUNC_INFO << "failed to commit transaction:" << error.errorCode << error.errorMessage);
+        }
+    }
 }
 
 void Syncer::beginSync()
 {
+    // In case a previous purge was interrupted or failed, ensure the db is up-to-date.
+    purgeDeletedAccounts();
+
     QNetworkReply *reply = m_requestGenerator->userInfo(NetworkRequestGenerator::JsonContentType);
     if (reply) {
         connect(reply, &QNetworkReply::finished,
@@ -88,9 +150,6 @@ void Syncer::handleUserInfoReply()
                     << error.errorCode << error.errorMessage);
     }
 
-    if (!m_manager) {
-        m_manager = new Accounts::Manager;
-    }
     Accounts::Account *account = m_manager->account(m_accountId);
     if (account) {
         const Accounts::ServiceList services = account->services();
@@ -108,8 +167,15 @@ void Syncer::handleUserInfoReply()
     if (m_dirListingRootPath.isEmpty()) {
         m_dirListingRootPath = QString("/remote.php/dav/files/%1/Photos/").arg(user.userId);
     }
-    m_dirListingResults.photos.clear();
-    m_dirListingResults.albums.clear();
+
+    m_forceFullSync = !m_syncProfile->lastSuccessfulSyncTime().isValid();
+    m_syncProgressInfo.reset();
+
+    LOG_DEBUG("Starting sync for account:" << m_accountId
+              << "user:" << m_userId
+              << "root path:" << m_dirListingRootPath
+              << "force full sync?" << m_forceFullSync
+              << "last sync was:" << m_syncProfile->lastSuccessfulSyncTime().toString());
 
     if (!performDirListingRequest(m_dirListingRootPath)) {
         WebDavSyncer::finishWithError("Directory list request failed");
@@ -139,57 +205,30 @@ void Syncer::handleDirListingReply()
     const int httpCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     const QString remoteDirPath = reply->property("remoteDirPath").toString();
 
-    if (httpCode == 404) {
-        // if directory doesn't exist, that's okay, there are no photos.
-        WebDavSyncer::finishWithSuccess();
-        return;
-    }
-
     if (reply->error() != QNetworkReply::NoError) {
         WebDavSyncer::finishWithHttpError("Remote directory listing failed", httpCode);
         return;
     }
 
-    const QList<NetworkReplyParser::Resource> resourceList = XmlReplyParser::parsePropFindResponse(
-            replyData, remoteDirPath);
+    const QList<NetworkReplyParser::Resource> resourceList = XmlReplyParser::parsePropFindResponse(replyData);
     const ReplyParser::GalleryMetadata metadata =
             ReplyParser::galleryMetadataFromResources(this, m_dirListingRootPath, remoteDirPath, resourceList);
-    m_dirListingResults.albums += metadata.albums;
-    m_dirListingResults.photos += metadata.photos;
 
-    for (const NetworkReplyParser::Resource &resource : resourceList) {
-        if (resource.isCollection && resource.href != remoteDirPath) {
-            m_pendingAlbumListings.append(resource.href);
+    if (processQueriedAlbum(metadata.album, metadata.photos, metadata.subAlbums)) {
+        if (m_syncProgressInfo.pendingAlbumListings.count() > 0) {
+            performDirListingRequest(m_syncProgressInfo.pendingAlbumListings.takeLast());
         }
-    }
-
-    if (!m_pendingAlbumListings.isEmpty()) {
-        performDirListingRequest(m_pendingAlbumListings.takeLast());
-    } else {
-        QHash<QString, SyncCache::Album> albums;
-        for (const SyncCache::Album &album : m_dirListingResults.albums) {
-            albums.insert(album.albumId, album);
-        }
-
-        QHash<QString, SyncCache::Photo> photos;
-        for (const SyncCache::Photo &photo : m_dirListingResults.photos) {
-            photos.insert(photo.photoId, photo);
-        }
-        m_dirListingResults.photos.clear();
-        m_dirListingResults.albums.clear();
-
-        calculateAndApplyDelta(albums, photos, metadata.photos.count() > 0 ? metadata.photos.first().photoId : QString());
-
-        WebDavSyncer::finishWithSuccess();
     }
 }
 
-void Syncer::calculateAndApplyDelta(
-        const QHash<QString, SyncCache::Album> &serverAlbums,
-        const QHash<QString, SyncCache::Photo> &serverPhotos,
-        const QString &firstPhotoId)
+bool Syncer::processQueriedAlbum(const SyncCache::Album &queriedAlbum,
+                                 const QVector<SyncCache::Photo> &photos,
+                                 const QVector<SyncCache::Album> &subAlbums)
 {
-    LOG_DEBUG("calculateAndApplyDelta: entry");
+    LOG_DEBUG(Q_FUNC_INFO << queriedAlbum.albumId
+              << "with" << photos.count() << "photos and"
+              << subAlbums.count() << "sub-albums");
+
     SyncCache::ImageDatabase db;
     SyncCache::DatabaseError error;
     db.openDatabase(
@@ -197,174 +236,44 @@ void Syncer::calculateAndApplyDelta(
             &error);
 
     if (error.errorCode != SyncCache::DatabaseError::NoError) {
-        LOG_WARNING("calculateAndApplyDelta: failed to open database:" << error.errorCode << error.errorMessage);
+        LOG_WARNING(Q_FUNC_INFO << "failed to open database:" << error.errorCode << error.errorMessage);
         emit syncFailed();
-        return;
+        return false;
     }
 
     if (!db.beginTransaction(&error)) {
-        LOG_WARNING("calculateAndApplyDelta: failed to begin transaction:" << error.errorCode << error.errorMessage);
+        LOG_WARNING(Q_FUNC_INFO << "failed to begin transaction:" << error.errorCode << error.errorMessage);
         emit syncFailed();
-        return;
+        return false;
     }
 
-    // read all albums and photos
-    QHash<QString, SyncCache::Album> currentAlbums;
-    QHash<QString, SyncCache::Photo> currentPhotos;
-    const QVector<SyncCache::Album> albums = db.albums(m_accountId, m_userId, &error);
-    if (error.errorCode != SyncCache::DatabaseError::NoError) {
-        LOG_WARNING("calculateAndApplyDelta: failed to read albums:" << error.errorCode << error.errorMessage);
-    } else {
-        Q_FOREACH (const SyncCache::Album &album, albums) {
-            currentAlbums.insert(album.albumId, album);
-            const QVector<SyncCache::Photo> photos = db.photos(m_accountId, m_userId, album.albumId, &error);
-            if (error.errorCode == SyncCache::DatabaseError::NoError) {
-                Q_FOREACH (const SyncCache::Photo &photo, photos) {
-                    currentPhotos.insert(photo.photoId, photo);
-                }
-            } else {
-                LOG_WARNING("calculateAndApplyDelta: failed to read photos:" << error.errorCode << error.errorMessage);
+    // Update the db for the main fetched album and its photos
+    if (calculateAndApplyDelta(queriedAlbum, photos, subAlbums, &db, &error)) {
+
+        // Look for sub-albums that have changed and need to be refreshed from the server.
+        for (QVector<SyncCache::Album>::ConstIterator it = subAlbums.constBegin();
+             it != subAlbums.constEnd(); ++it) {
+            const SyncCache::Album &serverAlbum = *it;
+            SyncCache::Album dbAlbum = db.album(m_accountId, m_userId, serverAlbum.albumId, &error);
+            if (error.errorCode != SyncCache::DatabaseError::NoError) {
+                LOG_WARNING(Q_FUNC_INFO << "db album() failed for:"
+                            << dbAlbum.albumId
+                            << error.errorCode << error.errorMessage);
                 break;
             }
-        }
-    }
 
-    // determine and apply delta.
-    int addedAlbums = 0, modifiedAlbums = 0, removedAlbums = 0;
-    int addedPhotos = 0, modifiedPhotos = 0, removedPhotos = 0;
+            // Note that sub-albums do not yet have the correct photoCount set until they are fetched
+            // individually, so don't save them to db here.
+            const bool isNewAlbum = dbAlbum.albumId.isEmpty();
+            const bool isModifiedAlbum = serverAlbum.etag != dbAlbum.etag;
 
-    // remove deleted albums.
-    if (error.errorCode == SyncCache::DatabaseError::NoError) {
-        Q_FOREACH (const SyncCache::Album &album, currentAlbums) {
-            if (!serverAlbums.contains(album.albumId)) {
-                db.deleteAlbum(album, &error);
-                if (error.errorCode != SyncCache::DatabaseError::NoError) {
-                    LOG_WARNING("calculateAndApplyDelta: failed to delete album:"
-                                << album.albumId
-                                << error.errorCode << error.errorMessage);
-                    break;
-                }
-                currentAlbums.remove(album.albumId);
-                ++removedAlbums;
-            }
-        }
-    }
+            LOG_DEBUG(Q_FUNC_INFO << "Sub-album:" << serverAlbum.albumId
+                      << "etag:" << serverAlbum.etag
+                      << "new?" << isNewAlbum
+                      << "modified?" << isModifiedAlbum);
 
-    // add new albums, update modified albums.
-    if (error.errorCode == SyncCache::DatabaseError::NoError) {
-        Q_FOREACH (const SyncCache::Album &album, serverAlbums) {
-            auto it = currentAlbums.find(album.albumId);
-            if (it != currentAlbums.end()) {
-                SyncCache::Album currAlbum = *it;
-                if (currAlbum.photoCount != album.photoCount
-                        || currAlbum.thumbnailUrl != album.thumbnailUrl) {
-                    currAlbum.photoCount = album.photoCount;
-                    currAlbum.thumbnailUrl = album.thumbnailUrl;
-                    db.storeAlbum(currAlbum, &error);
-                    if (error.errorCode != SyncCache::DatabaseError::NoError) {
-                        LOG_WARNING("calculateAndApplyDelta: failed to update album:"
-                                    << currAlbum.albumId
-                                    << error.errorCode << error.errorMessage);
-                        break;
-                    }
-                    ++modifiedAlbums;
-                }
-            } else {
-                currentAlbums.insert(album.albumId, album);
-                db.storeAlbum(album, &error);
-                if (error.errorCode != SyncCache::DatabaseError::NoError) {
-                    LOG_WARNING("calculateAndApplyDelta: failed to add album:"
-                                << album.albumId
-                                << error.errorCode << error.errorMessage);
-                    break;
-                }
-                ++addedAlbums;
-            }
-        }
-    }
-
-    // remove deleted photos.
-    if (error.errorCode == SyncCache::DatabaseError::NoError) {
-        Q_FOREACH (const SyncCache::Photo &photo, currentPhotos) {
-            if (!serverPhotos.contains(photo.photoId)) {
-                db.deletePhoto(photo, &error);
-                if (error.errorCode != SyncCache::DatabaseError::NoError) {
-                    LOG_WARNING("calculateAndApplyDelta: failed to delete photo:" << error.errorCode << error.errorMessage);
-                    break;
-                }
-                currentPhotos.remove(photo.photoId);
-                ++removedPhotos;
-            }
-        }
-    }
-
-    // add new photos, updated modified photos.
-    if (error.errorCode == SyncCache::DatabaseError::NoError) {
-        Q_FOREACH (const SyncCache::Photo &photo, serverPhotos) {
-            auto it = currentPhotos.find(photo.photoId);
-            if (it != currentPhotos.end()) {
-                bool changed = false;
-                SyncCache::Photo currPhoto = *it;
-                if (currPhoto.updatedTimestamp != photo.updatedTimestamp
-                        || currPhoto.imageUrl != photo.imageUrl) {
-                    // the image has changed, we need to delete the old image file.
-                    currPhoto.thumbnailPath = QUrl();
-                    currPhoto.thumbnailUrl = photo.thumbnailUrl;
-                    currPhoto.imagePath = QUrl();
-                    currPhoto.imageUrl = photo.imageUrl;
-                    currPhoto.updatedTimestamp = photo.updatedTimestamp;
-                    currPhoto.fileSize = photo.fileSize;
-                    changed = true;
-                }
-                if (currPhoto.albumId != photo.albumId) {
-                    // the image has moved to different album.
-                    currPhoto.albumId = photo.albumId;
-                    changed = true;
-                }
-                if (changed) {
-                    db.storePhoto(currPhoto, &error);
-                    if (error.errorCode != SyncCache::DatabaseError::NoError) {
-                        LOG_WARNING("calculateAndApplyDelta: failed to update photo:"
-                                    << currPhoto.photoId
-                                    << "in album" << photo.albumId << photo.albumPath
-                                    << error.errorCode << error.errorMessage);
-                        break;
-                    }
-                    ++modifiedPhotos;
-                }
-            } else {
-                currentPhotos.insert(photo.photoId, photo);
-                db.storePhoto(photo, &error);
-                if (error.errorCode != SyncCache::DatabaseError::NoError) {
-                    LOG_WARNING("calculateAndApplyDelta: failed to add photo:"
-                                << photo.photoId
-                                << "in album" << photo.albumId << photo.albumPath
-                                << error.errorCode << error.errorMessage);
-                    break;
-                }
-                ++addedPhotos;
-            }
-        }
-    }
-
-    // Set the user thumbnail using the first photo
-    if (!firstPhotoId.isEmpty()) {
-        SyncCache::Photo firstPhoto = serverPhotos.value(firstPhotoId);
-        if (firstPhoto.accountId > 0) {
-            SyncCache::User currentUser = db.user(m_accountId, &error);
-            if (error.errorCode != SyncCache::DatabaseError::NoError) {
-                LOG_WARNING("Failed to find user:" << m_userId << "for account:" << m_accountId
-                            << error.errorCode << error.errorMessage);
-            } else if (currentUser.thumbnailUrl.isEmpty()
-                       || currentUser.thumbnailUrl != firstPhoto.thumbnailUrl) {
-                currentUser.thumbnailUrl = firstPhoto.thumbnailUrl;
-                currentUser.thumbnailPath = firstPhoto.thumbnailPath;
-                currentUser.thumbnailFileName = firstPhoto.fileName;
-                db.storeUser(currentUser, &error);
-                if (error.errorCode != SyncCache::DatabaseError::NoError) {
-                    LOG_WARNING("Failed to store user:" << currentUser.userId
-                                << error.errorCode << error.errorMessage);
-                }
+            if (m_forceFullSync || isNewAlbum || isModifiedAlbum) {
+                m_syncProgressInfo.pendingAlbumListings.append(serverAlbum.albumId);
             }
         }
     }
@@ -372,19 +281,144 @@ void Syncer::calculateAndApplyDelta(
     if (error.errorCode != SyncCache::DatabaseError::NoError) {
         db.rollbackTransaction(&error);
         emit syncFailed();
-        return;
+        return false;
+
     } else if (!db.commitTransaction(&error)) {
-        LOG_WARNING("calculateAndApplyDelta: failed to commit transaction:" << error.errorCode << error.errorMessage);
+        LOG_WARNING(Q_FUNC_INFO << "failed to commit transaction:" << error.errorCode << error.errorMessage);
         db.rollbackTransaction(&error);
         emit syncFailed();
-        return;
+        return false;
     }
 
-    // success.
-    LOG_DEBUG(Q_FUNC_INFO << "Nextcloud images albums A/M/R:" << addedAlbums << "/" << modifiedAlbums << "/" << removedAlbums);
-    LOG_DEBUG(Q_FUNC_INFO << "Nextcloud images photos A/M/R:" << addedPhotos << "/" << modifiedPhotos << "/" << removedPhotos);
-    LOG_DEBUG(Q_FUNC_INFO << "Nextcloud images sync with account" << m_accountId << "finished successfully!");
-    emit syncSucceeded();
+    const bool allRequestsDone = m_syncProgressInfo.pendingAlbumListings.isEmpty();
+    if (allRequestsDone) {
+        LOG_DEBUG(Q_FUNC_INFO << "Nextcloud images albums A/M/R:"
+                  << m_syncProgressInfo.addedAlbumCount
+                  << "/" << m_syncProgressInfo.modifiedAlbumCount
+                  << "/" << m_syncProgressInfo.removedAlbumCount);
+        LOG_DEBUG(Q_FUNC_INFO << "Nextcloud images photos A/M/R:"
+                  << m_syncProgressInfo.addedPhotoCount
+                  << "/" << m_syncProgressInfo.modifiedPhotoCount
+                  << "/" << m_syncProgressInfo.removedPhotoCount);
+        LOG_DEBUG(Q_FUNC_INFO << "Nextcloud images sync with account" << m_accountId << "finished successfully!");
+
+        // Sync was successful. Next time, can do incremental sync based on known etags instead
+        // of doing a complete sync of the full remote directory tree.
+        WebDavSyncer::finishWithSuccess();
+    } else {
+        LOG_DEBUG(Q_FUNC_INFO << "Remaining albums to fetch:" << m_syncProgressInfo.pendingAlbumListings.count());
+    }
+
+    return true;
+}
+
+bool Syncer::calculateAndApplyDelta(const SyncCache::Album &mainAlbum,
+                                    const QVector<SyncCache::Photo> &photos,
+                                    const QVector<SyncCache::Album> &subAlbums,
+                                    SyncCache::ImageDatabase *db,
+                                    SyncCache::DatabaseError *error)
+{
+    SyncCache::Album dbAlbum = db->album(m_accountId, m_userId, mainAlbum.albumId, error);
+    if (error->errorCode != SyncCache::DatabaseError::NoError) {
+        LOG_WARNING(Q_FUNC_INFO << "db album() failed for:"
+                    << mainAlbum.albumId
+                    << error->errorCode << error->errorMessage);
+        return false;
+    }
+
+    const bool isNewAlbum = dbAlbum.albumId.isEmpty();
+    const bool isModifiedAlbum = mainAlbum.etag != dbAlbum.etag
+            || mainAlbum.photoCount != dbAlbum.photoCount;
+    LOG_DEBUG(Q_FUNC_INFO << "Album:" << mainAlbum.albumId
+              << "photoCount:" << mainAlbum.photoCount
+              << "etag:" << mainAlbum.etag
+              << "new?" << isNewAlbum
+              << "modified?" << isModifiedAlbum);
+
+    // Check if album is new or modified
+    if (isNewAlbum || isModifiedAlbum) {
+        db->storeAlbum(mainAlbum, error);
+        if (error->errorCode != SyncCache::DatabaseError::NoError) {
+            LOG_WARNING(Q_FUNC_INFO << "failed to update album:"
+                        << mainAlbum.albumId
+                        << error->errorCode << error->errorMessage);
+            return false;
+        }
+        if (isNewAlbum) {
+            m_syncProgressInfo.addedAlbumCount++;
+        } else {
+            m_syncProgressInfo.modifiedAlbumCount++;
+        }
+    }
+
+    if (isModifiedAlbum) {
+        // Check for deleted sub-albums.
+        // Delete any db sub-albums of this album that are not present on the server.
+        QSet<QString> serverSubAlbumIds;
+        for (const SyncCache::Album &serverSubAlbum : subAlbums) {
+            serverSubAlbumIds.insert(serverSubAlbum.albumId);
+        }
+        const QVector<SyncCache::Album> dbSubAlbums = db->albums(m_accountId, m_userId, error, mainAlbum.albumId);
+        for (const SyncCache::Album &dbSubAlbum : dbSubAlbums) {
+            if (!serverSubAlbumIds.remove(dbSubAlbum.albumId)) {
+                LOG_DEBUG(Q_FUNC_INFO << "Delete album:" << dbSubAlbum.albumId
+                          << "with parent" << mainAlbum.albumId);
+                db->deleteAlbum(dbSubAlbum, error);  // this deletes all photos in the album as well
+                if (error->errorCode != SyncCache::DatabaseError::NoError) {
+                    LOG_WARNING(Q_FUNC_INFO << "failed to delete album:"
+                                << dbSubAlbum.albumId
+                                << error->errorCode << error->errorMessage);
+                    return false;
+                }
+                m_syncProgressInfo.removedAlbumCount++;
+            }
+        }
+    }
+
+    // Check for new and modified photos
+    QSet<QString> serverPhotoIds;
+    for (const SyncCache::Photo &serverPhoto : photos) {
+        SyncCache::Photo dbPhoto = db->photo(m_accountId, m_userId, serverPhoto.albumId, serverPhoto.photoId, nullptr);
+        const bool isNewPhoto = dbPhoto.photoId.isEmpty();
+        if (dbPhoto.etag != serverPhoto.etag) {
+            db->storePhoto(serverPhoto, error);
+            if (error->errorCode != SyncCache::DatabaseError::NoError) {
+                LOG_WARNING(Q_FUNC_INFO << "failed to update photo:"
+                            << serverPhoto.photoId
+                            << serverPhoto.fileName
+                            << serverPhoto.albumId
+                            << error->errorCode << error->errorMessage);
+                return false;
+            }
+
+            if (isNewPhoto) {
+                m_syncProgressInfo.addedPhotoCount++;
+            } else {
+                m_syncProgressInfo.modifiedPhotoCount++;
+            }
+        }
+
+        serverPhotoIds.insert(serverPhoto.photoId);
+    }
+
+    // Check for photos deleted from this album.
+    // Delete any db photos in this album that are not present on the server.
+    const QVector<SyncCache::Photo> dbPhotos = db->photos(m_accountId, m_userId, mainAlbum.albumId, error);
+    for (const SyncCache::Photo &dbPhoto : dbPhotos) {
+        if (!serverPhotoIds.remove(dbPhoto.photoId)) {
+            LOG_DEBUG(Q_FUNC_INFO << "Delete photo:" << dbPhoto.photoId << dbPhoto.fileName);
+            db->deletePhoto(dbPhoto, error);  // this deletes all photos in the album as well
+            if (error->errorCode != SyncCache::DatabaseError::NoError) {
+                LOG_WARNING(Q_FUNC_INFO << "failed to delete photo:"
+                            << dbPhoto.photoId
+                            << error->errorCode << error->errorMessage);
+                return false;
+            }
+            m_syncProgressInfo.removedPhotoCount++;
+        }
+    }
+
+    return true;
 }
 
 void Syncer::purgeAccount(int accountId)
@@ -407,7 +441,7 @@ void Syncer::purgeAccount(int accountId)
             } else {
                 db.deleteUser(user, &error);
                 if (error.errorCode != SyncCache::DatabaseError::NoError) {
-                    LOG_WARNING("Failed to purge Nextcloud images for account:" << accountId
+                    LOG_WARNING("Failed to delete user for account:" << accountId
                                 << ":" << error.errorMessage);
                 }
             }
@@ -417,11 +451,16 @@ void Syncer::purgeAccount(int accountId)
         }
     }
 
+    deleteFilesForAccount(accountId);
+
+    LOG_DEBUG("Purged Nextcloud images for account:" << accountId);
+}
+
+void Syncer::deleteFilesForAccount(int accountId)
+{
     QDir dir(SyncCache::ImageCache::imageCacheDir(accountId));
     if (dir.exists() && !dir.removeRecursively()) {
         LOG_WARNING("Failed to purge Nextcloud image cache for account:" << accountId
                     << "in dir:" << dir.absolutePath());
     }
-
-    LOG_DEBUG("Purged Nextcloud images for account:" << accountId);
 }

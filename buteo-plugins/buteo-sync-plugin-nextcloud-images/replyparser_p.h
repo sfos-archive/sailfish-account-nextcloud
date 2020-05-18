@@ -21,14 +21,14 @@ class ReplyParser
 {
 public:
     struct GalleryMetadata {
-        QVector<SyncCache::Album> albums;
+        SyncCache::Album album;
         QVector<SyncCache::Photo> photos;
-        QString currAlbumId;
+        QVector<SyncCache::Album> subAlbums;
     };
 
     static GalleryMetadata galleryMetadataFromResources(Syncer *imageSyncer,
                                                         const QString &rootPath,
-                                                        const QString &albumRemotePath,
+                                                        const QString &queriedAlbumPath,
                                                         const QList<NetworkReplyParser::Resource> &resources);
 };
 

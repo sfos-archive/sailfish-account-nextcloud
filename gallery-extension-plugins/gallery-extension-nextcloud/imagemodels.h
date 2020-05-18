@@ -64,9 +64,9 @@ Q_SIGNALS:
 
 private:
     void loadData();
-    void addAccount(int index, int accountId);
+    void addAccount(Accounts::AccountId accountId);
     void addAllAccounts();
-    void removeAccount(int index);
+    void removeAccount(Accounts::AccountId accountId);
     void removeAllAccounts();
     void enabledChanged(const QString &serviceName, bool enabled);
     void accountDestroyed();
@@ -85,7 +85,7 @@ private:
     Accounts::Manager *m_accountManager = nullptr;
     QVector<SyncCache::User> m_data;
     QVector<SyncCache::User> m_filteredData;
-    QVector<AccountInfo> m_accounts;
+    QMap<Accounts::AccountId, AccountInfo> m_accounts;
 };
 
 class NextcloudAlbumModel : public QAbstractListModel, public QQmlParserStatus

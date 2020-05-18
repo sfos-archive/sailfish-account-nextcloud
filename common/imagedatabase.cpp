@@ -73,6 +73,25 @@ bool upgradeVersion2to3Fn(QSqlDatabase &database)
     return true;
 }
 
+bool upgradeVersion3to4Fn(QSqlDatabase &database)
+{
+    QSqlQuery addAlbumEtagQuery(QStringLiteral("ALTER TABLE Albums ADD etag TEXT;"), database);
+    if (addAlbumEtagQuery.lastError().isValid()) {
+        qWarning() << "Failed to add Albums etag column to images database schema for version 3:" << addAlbumEtagQuery.lastError().text();
+        return false;
+    }
+    addAlbumEtagQuery.finish();
+
+    QSqlQuery addPhotoEtagQuery(QStringLiteral("ALTER TABLE Photos ADD etag TEXT;"), database);
+    if (addPhotoEtagQuery.lastError().isValid()) {
+        qWarning() << "Failed to add Photos etag column to images database schema for version 3:" << addPhotoEtagQuery.lastError().text();
+        return false;
+    }
+    addPhotoEtagQuery.finish();
+
+    return true;
+}
+
 }
 
 ImageDatabasePrivate::ImageDatabasePrivate(ImageDatabase *parent)
@@ -82,7 +101,7 @@ ImageDatabasePrivate::ImageDatabasePrivate(ImageDatabase *parent)
 
 int ImageDatabasePrivate::currentSchemaVersion() const
 {
-    return 3;
+    return 4;
 }
 
 QVector<const char *> ImageDatabasePrivate::createStatements() const
@@ -108,6 +127,7 @@ QVector<const char *> ImageDatabasePrivate::createStatements() const
             "\n parentAlbumId TEXT,"
             "\n albumName TEXT,"
             "\n thumbnailFileName TEXT,"
+            "\n etag TEXT,"
             "\n PRIMARY KEY (accountId, userId, albumId),"
             "\n FOREIGN KEY (accountId, userId) REFERENCES Users (accountId, userId) ON DELETE CASCADE);";
 
@@ -130,6 +150,7 @@ QVector<const char *> ImageDatabasePrivate::createStatements() const
             "\n imageHeight INTEGER,"
             "\n fileSize INTEGER,"
             "\n fileType TEXT,"
+            "\n etag TEXT,"
             "\n PRIMARY KEY (accountId, userId, albumId, photoId),"
             "\n FOREIGN KEY (accountId, userId, albumId) REFERENCES Albums (accountId, userId, albumId) ON DELETE CASCADE);";
 
@@ -154,10 +175,16 @@ QVector<UpgradeOperation> ImageDatabasePrivate::upgradeVersions() const
          0 // NULL-terminated
     };
 
+    static const char *upgradeVersion3to4[] = {
+         "PRAGMA user_version=4",
+         0 // NULL-terminated
+    };
+
     static QVector<UpgradeOperation> retn {
         { 0, upgradeVersion0to1 },
         { upgradeVersion1to2Fn, upgradeVersion1to2 },
         { upgradeVersion2to3Fn, upgradeVersion2to3 },
+        { upgradeVersion3to4Fn, upgradeVersion3to4 },
     };
 
     return retn;
@@ -318,7 +345,7 @@ QVector<SyncCache::User> ImageDatabase::users(DatabaseError *error) const
             error);
 }
 
-QVector<SyncCache::Album> ImageDatabase::albums(int accountId, const QString &userId, DatabaseError *error) const
+QVector<SyncCache::Album> ImageDatabase::albums(int accountId, const QString &userId, DatabaseError *error, const QString &parentAlbumId) const
 {
     SYNCCACHE_DB_D(const ImageDatabase);
 
@@ -333,14 +360,21 @@ QVector<SyncCache::Album> ImageDatabase::albums(int accountId, const QString &us
         return QVector<SyncCache::Album>();
     }
 
-    const QString queryString = QStringLiteral("SELECT albumId, photoCount, thumbnailUrl, thumbnailPath, parentAlbumId, albumName, thumbnailFileName FROM ALBUMS"
+    const QString parentAlbumIdClause = parentAlbumId.isEmpty()
+            ? QString()
+            : QStringLiteral(" AND parentAlbumId = :parentAlbumId");
+    const QString queryString = QStringLiteral("SELECT albumId, photoCount, thumbnailUrl, thumbnailPath, parentAlbumId, albumName, thumbnailFileName, etag FROM ALBUMS"
                                                " WHERE accountId = :accountId AND userId = :userId"
-                                               " ORDER BY accountId ASC, userId ASC, albumId ASC");
+                                               "%1"
+                                               " ORDER BY accountId ASC, userId ASC, albumId ASC").arg(parentAlbumIdClause);
 
-    const QList<QPair<QString, QVariant> > bindValues {
+    QList<QPair<QString, QVariant> > bindValues {
         qMakePair<QString, QVariant>(QStringLiteral(":accountId"), accountId),
         qMakePair<QString, QVariant>(QStringLiteral(":userId"), userId)
     };
+    if (!parentAlbumIdClause.isEmpty()) {
+        bindValues.append(qMakePair<QString, QVariant>(QStringLiteral(":parentAlbumId"), parentAlbumId));
+    }
 
     auto resultHandler = [accountId, userId](DatabaseQuery &selectQuery) -> SyncCache::Album {
         int whichValue = 0;
@@ -354,6 +388,7 @@ QVector<SyncCache::Album> ImageDatabase::albums(int accountId, const QString &us
         currAlbum.parentAlbumId = selectQuery.value(whichValue++).toString();
         currAlbum.albumName = selectQuery.value(whichValue++).toString();
         currAlbum.thumbnailFileName = selectQuery.value(whichValue++).toString();
+        currAlbum.etag = selectQuery.value(whichValue++).toString();
         return currAlbum;
     };
 
@@ -371,7 +406,7 @@ QVector<SyncCache::Photo> ImageDatabase::photos(int accountId, const QString &us
     SYNCCACHE_DB_D(const ImageDatabase);
 
     QString queryString = QStringLiteral("SELECT albumId, photoId, createdTimestamp, updatedTimestamp, fileName, albumPath, description,"
-                                         " thumbnailUrl, thumbnailPath, imageUrl, imagePath, imageWidth, imageHeight, fileSize, fileType FROM Photos");
+                                         " thumbnailUrl, thumbnailPath, imageUrl, imagePath, imageWidth, imageHeight, fileSize, fileType, etag FROM Photos");
     QStringList conditions;
     QList<QPair<QString, QVariant> > bindValues;
     if (accountId > 0) {
@@ -411,6 +446,7 @@ QVector<SyncCache::Photo> ImageDatabase::photos(int accountId, const QString &us
         currPhoto.imageHeight = selectQuery.value(whichValue++).toInt();
         currPhoto.fileSize = selectQuery.value(whichValue++).toInt();
         currPhoto.fileType = selectQuery.value(whichValue++).toString();
+        currPhoto.etag = selectQuery.value(whichValue++).toString();
         return currPhoto;
     };
 
@@ -481,7 +517,7 @@ Album ImageDatabase::album(int accountId, const QString &userId, const QString &
         return Album();
     }
 
-    const QString queryString = QStringLiteral("SELECT photoCount, thumbnailUrl, thumbnailPath, parentAlbumId, albumName, thumbnailFileName FROM ALBUMS"
+    const QString queryString = QStringLiteral("SELECT photoCount, thumbnailUrl, thumbnailPath, parentAlbumId, albumName, thumbnailFileName, etag FROM ALBUMS"
                                                " WHERE accountId = :accountId AND userId = :userId AND albumId = :albumId");
 
     const QList<QPair<QString, QVariant> > bindValues {
@@ -502,6 +538,7 @@ Album ImageDatabase::album(int accountId, const QString &userId, const QString &
         currAlbum.parentAlbumId = selectQuery.value(whichValue++).toString();
         currAlbum.albumName = selectQuery.value(whichValue++).toString();
         currAlbum.thumbnailFileName = selectQuery.value(whichValue++).toString();
+        currAlbum.etag = selectQuery.value(whichValue++).toString();
         return currAlbum;
     };
 
@@ -540,7 +577,7 @@ Photo ImageDatabase::photo(int accountId, const QString &userId, const QString &
     }
 
     const QString queryString = QStringLiteral("SELECT createdTimestamp, updatedTimestamp, fileName, albumPath, description,"
-                                               " thumbnailUrl, thumbnailPath, imageUrl, imagePath, imageWidth, imageHeight, fileSize, fileType FROM Photos"
+                                               " thumbnailUrl, thumbnailPath, imageUrl, imagePath, imageWidth, imageHeight, fileSize, fileType, etag FROM Photos"
                                                " WHERE accountId = :accountId AND userId = :userId AND albumId = :albumId AND photoId = :photoId");
 
     const QList<QPair<QString, QVariant> > bindValues {
@@ -570,6 +607,7 @@ Photo ImageDatabase::photo(int accountId, const QString &userId, const QString &
         currPhoto.imageHeight = selectQuery.value(whichValue++).toInt();
         currPhoto.fileSize = selectQuery.value(whichValue++).toInt();
         currPhoto.fileType = selectQuery.value(whichValue++).toString();
+        currPhoto.etag = selectQuery.value(whichValue++).toString();
         return currPhoto;
     };
 
@@ -725,10 +763,10 @@ void ImageDatabase::storeAlbum(const Album &album, DatabaseError *error)
         return;
     }
 
-    const QString insertString = QStringLiteral("INSERT INTO Albums (accountId, userId, albumId, photoCount, thumbnailUrl, thumbnailPath, parentAlbumId, albumName, thumbnailFileName)"
-                                                " VALUES(:accountId, :userId, :albumId, :photoCount, :thumbnailUrl, :thumbnailPath, :parentAlbumId, :albumName, :thumbnailFileName)");
+    const QString insertString = QStringLiteral("INSERT INTO Albums (accountId, userId, albumId, photoCount, thumbnailUrl, thumbnailPath, parentAlbumId, albumName, thumbnailFileName, etag)"
+                                                " VALUES(:accountId, :userId, :albumId, :photoCount, :thumbnailUrl, :thumbnailPath, :parentAlbumId, :albumName, :thumbnailFileName, :etag)");
     const QString updateString = QStringLiteral("UPDATE Albums SET photoCount = :photoCount, thumbnailUrl = :thumbnailUrl, thumbnailPath = :thumbnailPath, "
-                                                "parentAlbumId = :parentAlbumId, albumName = :albumName, thumbnailFileName = :thumbnailFileName"
+                                                "parentAlbumId = :parentAlbumId, albumName = :albumName, thumbnailFileName = :thumbnailFileName, etag = :etag"
                                                 " WHERE accountId = :accountId AND userId = :userId AND albumId = :albumId");
 
     const bool insert = existingAlbum.albumId.isEmpty();
@@ -743,7 +781,8 @@ void ImageDatabase::storeAlbum(const Album &album, DatabaseError *error)
         qMakePair<QString, QVariant>(QStringLiteral(":thumbnailPath"), album.thumbnailPath),
         qMakePair<QString, QVariant>(QStringLiteral(":parentAlbumId"), album.parentAlbumId),
         qMakePair<QString, QVariant>(QStringLiteral(":albumName"), album.albumName),
-        qMakePair<QString, QVariant>(QStringLiteral(":thumbnailFileName"), album.thumbnailFileName)
+        qMakePair<QString, QVariant>(QStringLiteral(":thumbnailFileName"), album.thumbnailFileName),
+        qMakePair<QString, QVariant>(QStringLiteral(":etag"), album.etag),
     };
 
     auto storeResultHandler = [d, album]() -> void {
@@ -795,14 +834,14 @@ void ImageDatabase::storePhoto(const Photo &photo, DatabaseError *error)
 
     const QString insertString = QStringLiteral("INSERT INTO Photos (accountId, userId, albumId, photoId, createdTimestamp, updatedTimestamp, "
                                                                     "fileName, albumPath, description, thumbnailUrl, thumbnailPath, "
-                                                                    "imageUrl, imagePath, imageWidth, imageHeight, fileSize, fileType)"
+                                                                    "imageUrl, imagePath, imageWidth, imageHeight, fileSize, fileType, etag)"
                                                 " VALUES(:accountId, :userId, :albumId, :photoId, :createdTimestamp, :updatedTimestamp, "
-                                                        ":fileName, :albumPath, :description, :thumbnailUrl, :thumbnailPath, :imageUrl, :imagePath, :imageWidth, :imageHeight, :fileSize, :fileType)");
+                                                        ":fileName, :albumPath, :description, :thumbnailUrl, :thumbnailPath, :imageUrl, :imagePath, :imageWidth, :imageHeight, :fileSize, :fileType, :etag)");
     const QString updateString = QStringLiteral("UPDATE Photos SET createdTimestamp = :createdTimestamp, updatedTimestamp = :updatedTimestamp, "
                                                                   "fileName = :fileName, albumPath = :albumPath, description = :description, "
                                                                   "thumbnailUrl = :thumbnailUrl, thumbnailPath = :thumbnailPath, "
                                                                   "imageUrl = :imageUrl, imagePath = :imagePath, imageWidth = :imageWidth, imageHeight = :imageHeight,"
-                                                                  "fileSize = :fileSize, fileType = :fileType"
+                                                                  "fileSize = :fileSize, fileType = :fileType, etag = :etag"
                                                 " WHERE accountId = :accountId AND userId = :userId AND albumId = :albumId AND photoId = :photoId");
 
     const bool insert = existingPhoto.photoId.isEmpty();
@@ -825,7 +864,8 @@ void ImageDatabase::storePhoto(const Photo &photo, DatabaseError *error)
         qMakePair<QString, QVariant>(QStringLiteral(":imageWidth"), photo.imageWidth),
         qMakePair<QString, QVariant>(QStringLiteral(":imageHeight"), photo.imageHeight),
         qMakePair<QString, QVariant>(QStringLiteral(":fileSize"), photo.fileSize),
-        qMakePair<QString, QVariant>(QStringLiteral(":fileType"), photo.fileType)
+        qMakePair<QString, QVariant>(QStringLiteral(":fileType"), photo.fileType),
+        qMakePair<QString, QVariant>(QStringLiteral(":etag"), photo.etag)
     };
 
     auto storeResultHandler = [d, photo, existingPhoto, insert]() -> void {

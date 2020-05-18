@@ -377,7 +377,7 @@ QVariantMap XmlReplyParser::xmlToVariantMap(QXmlStreamReader &reader)
     return retn;
 }
 
-QList<NetworkReplyParser::Resource> XmlReplyParser::parsePropFindResponse(const QByteArray &propFindResponse, const QString &remotePath)
+QList<NetworkReplyParser::Resource> XmlReplyParser::parsePropFindResponse(const QByteArray &propFindResponse)
 {
     /* We expect a response of the form:
         <?xml version="1.0" encoding="UTF-8"?>
@@ -453,9 +453,6 @@ QList<NetworkReplyParser::Resource> XmlReplyParser::parsePropFindResponse(const 
                 QByteArray::fromPercentEncoding(
                         rmap.value(QStringLiteral("href")).toMap().value(
                                 XmlElementTextKey).toString().toUtf8()));
-        if (entryHref == remotePath) {
-            continue;
-        }
 
         QVariantList propstats;
         if (rmap.value(QStringLiteral("propstat")).type() == QVariant::List) {
@@ -482,6 +479,8 @@ QList<NetworkReplyParser::Resource> XmlReplyParser::parsePropFindResponse(const 
                     resource.ownerId = it.value().toMap().value(XmlElementTextKey).toString();
                 } else if (key == QStringLiteral("fileid")) {
                     resource.fileId = it.value().toMap().value(XmlElementTextKey).toString();
+                } else if (key == QStringLiteral("getetag")) {
+                    resource.etag = it.value().toMap().value(XmlElementTextKey).toString();
                 } else if (key == QStringLiteral("size")) {
                     resource.size = it.value().toMap().value(XmlElementTextKey).toInt();
                 } else if (key == QStringLiteral("resourcetype")) {

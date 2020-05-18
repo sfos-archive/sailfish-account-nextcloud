@@ -118,7 +118,7 @@ void NextcloudUserModel::setImageCache(SyncCache::ImageCache *cache)
                         && user.userId == existing.userId) {
                     m_data.replace(row, user);
                     removeAccount(existing.accountId);
-                    addAccount(row, user.accountId);
+                    addAccount(user.accountId);
                     reload();
                     foundUser = true;
                 }
@@ -126,7 +126,7 @@ void NextcloudUserModel::setImageCache(SyncCache::ImageCache *cache)
 
             if (!foundUser) {
                 m_data.append(user);
-                addAccount(m_data.size()-1, user.accountId);
+                addAccount(user.accountId);
                 reload();
             }
         }
@@ -197,10 +197,11 @@ void NextcloudUserModel::loadData()
     m_imageCache->requestUsers();
 }
 
-void NextcloudUserModel::addAccount(int index, int accountId)
+void NextcloudUserModel::addAccount(Accounts::AccountId accountId)
 {
     Accounts::Account *account = Accounts::Account::fromId(m_accountManager, accountId, this);
     if (!account) {
+        qmlInfo(this) << "Cannot find account to add:" << accountId;
         return;
     }
 
@@ -225,31 +226,32 @@ void NextcloudUserModel::addAccount(int index, int accountId)
     info.imageServiceEnabled = account->enabled();
     account->selectService(Accounts::Service());
 
-    m_accounts.insert(index, info);
+    m_accounts.insert(account->id(), info);
 }
 
 void NextcloudUserModel::addAllAccounts()
 {
     for (const SyncCache::User &user : m_data) {
-        addAccount(m_accounts.size(), user.accountId);
+        addAccount(user.accountId);
     }
 }
 
-void NextcloudUserModel::removeAccount(int index)
+void NextcloudUserModel::removeAccount(Accounts::AccountId accountId)
 {
-    if (index < 0 || index >= m_accounts.size()) {
-        return;
-    }
-
-    const AccountInfo info = m_accounts.takeAt(index);
-    if (info.account) {
-        info.account->disconnect(this);
+    auto it = m_accounts.find(accountId);
+    if (it != m_accounts.end()) {
+        const AccountInfo &info = *it;
+        if (info.account) {
+            info.account->disconnect(this);
+        }
+        m_accounts.erase(it);
     }
 }
 
 void NextcloudUserModel::removeAllAccounts()
 {
-    for (const AccountInfo &info : m_accounts) {
+    for (auto it = m_accounts.constBegin(); it != m_accounts.constEnd(); ++it) {
+        const AccountInfo &info = *it;
         if (info.account) {
             info.account->disconnect(this);
         }
@@ -264,16 +266,14 @@ void NextcloudUserModel::enabledChanged(const QString &serviceName, bool enabled
         return;
     }
 
-    for (int row = 0; row < m_accounts.size(); ++row) {
-        if (m_accounts[row].account == account) {
-            if (serviceName.isEmpty()) {
-                m_accounts[row].accountEnabled = enabled;
-            } else {
-                m_accounts[row].imageServiceEnabled = enabled;
-            }
-            reload();
-            break;
+    auto it = m_accounts.find(account->id());
+    if (it != m_accounts.end()) {
+        if (serviceName.isEmpty()) {
+            it->accountEnabled = enabled;
+        } else {
+            it->imageServiceEnabled = enabled;
         }
+        reload();
     }
 }
 
@@ -284,29 +284,23 @@ void NextcloudUserModel::accountDestroyed()
         return;
     }
 
-    for (int row = 0; row < m_accounts.size(); ++row) {
-        if (m_accounts[row].account == account) {
-            m_accounts[row].account = nullptr;
-            reload();
-            break;  // don't remove from list, do that when m_data is updated to keep the two lists in sync
-        }
+    AccountInfo info = m_accounts.take(account->id());
+    if (info.account) {
+        // Matching account was found, so reload the list.
+        reload();
     }
 }
 
 void NextcloudUserModel::reload()
 {
-    if (m_accounts.size() != m_data.size()) {
-        qmlInfo(this) << "Users lists are not in-sync!";
-        return;
-    }
-
     const int prevCount = rowCount();
     QVector<SyncCache::User> enabledUsers;
 
-    for (int i = 0; i < m_accounts.size(); ++i) {
-        const AccountInfo &info = m_accounts.at(i);
-        if (info.account && info.accountEnabled && info.imageServiceEnabled) {
-            enabledUsers.append(m_data.at(i));
+    const QVector<SyncCache::User> &users = m_data; // const list to avoid detach on loop
+    for (const SyncCache::User &user : users) {
+        auto it = m_accounts.constFind(user.accountId);
+        if (it->account && it->accountEnabled && it->imageServiceEnabled) {
+            enabledUsers.append(user);
         }
     }
 
@@ -425,13 +419,21 @@ void NextcloudAlbumModel::setImageCache(SyncCache::ImageCache *cache)
                 if (album.accountId == existing.accountId
                         && album.userId == existing.userId
                         && album.albumId == existing.albumId) {
-                    m_data.replace(row, album);
-                    emit dataChanged(index(row, 0, QModelIndex()), index(row, 0, QModelIndex()));
+                    if (album.photoCount == 0) {
+                        emit beginRemoveRows(QModelIndex(), row, row);
+                        m_data.remove(row);
+                        emit endRemoveRows();
+                        emit rowCountChanged();
+                    } else {
+                        m_data.replace(row, album);
+                        emit dataChanged(index(row, 0, QModelIndex()), index(row, 0, QModelIndex()));
+                    }
                     foundAlbum = true;
                 }
             }
 
             if (!foundAlbum
+                    && album.photoCount > 0
                     && (album.accountId == accountId() || accountId() == 0)
                     && (album.userId == userId() || userId().isEmpty())) {
                 emit beginInsertRows(QModelIndex(), m_data.size(), m_data.size());
@@ -550,8 +552,14 @@ void NextcloudAlbumModel::loadData()
             emit endRemoveRows();
         }
         if (albums.size()) {
-            emit beginInsertRows(QModelIndex(), 0, albums.size() - 1);
-            m_data = albums;
+            QVector<SyncCache::Album> nonEmptyAlbums;
+            for (const SyncCache::Album &album : albums) {
+                if (album.photoCount > 0) {
+                    nonEmptyAlbums.append(album);
+                }
+            }
+            emit beginInsertRows(QModelIndex(), 0, nonEmptyAlbums.size() - 1);
+            m_data = nonEmptyAlbums;
             emit endInsertRows();
         }
         if (m_data.size() != oldSize) {
