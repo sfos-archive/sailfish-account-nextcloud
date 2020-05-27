@@ -11,7 +11,9 @@
 #define NEXTCLOUD_EVENTSVIEW_EVENTCACHE_H
 
 #include "synccacheevents.h"
-#include "accountauthenticator_p.h"
+
+// sailfishaccounts
+#include <accountauthenticator.h>
 
 #include <QtCore/QList>
 #include <QtCore/QHash>
@@ -39,8 +41,8 @@ public:
 
 private Q_SLOTS:
     void performRequests();
-    void signOnResponse(int accountId, const QString &serviceName, const QString &serverUrl, const QString &webdavPath, const QString &username, const QString &password, const QString &accessToken, bool ignoreSslErrors);
-    void signOnError(int accountId, const QString &serviceName);
+    void signOnResponse(int accountId, const QString &serviceName, const AccountAuthenticatorCredentials &credentials);
+    void signOnError(int accountId, const QString &serviceName, const QString &errorString);
 
 private:
     QList<PendingRequest> m_pendingRequests;

@@ -9,7 +9,6 @@
 
 #include "eventmodel.h"
 #include "synccacheevents.h"
-#include "accountauthenticator_p.h"
 
 #include <QtCore/QTimer>
 #include <QtCore/QDebug>

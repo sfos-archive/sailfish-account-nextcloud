@@ -8,7 +8,6 @@
 ****************************************************************************************/
 
 #include "webdavsyncer_p.h"
-#include "accountauthenticator_p.h"
 #include "networkreplyparser_p.h"
 #include "networkrequestgenerator_p.h"
 
@@ -51,23 +50,30 @@ void WebDavSyncer::startSync(int accountId)
     m_auth->signIn(accountId, m_serviceName);
 }
 
-void WebDavSyncer::signInError()
+void WebDavSyncer::signInError(int accountId, const QString &serviceName, const QString &errorString)
 {
-    LOG_DEBUG(Q_FUNC_INFO << "Sign-in failed for" << m_serviceName << "sync with account" << m_accountId);
+    LOG_DEBUG(Q_FUNC_INFO << "Sign-in failed for"
+              << serviceName
+              << "sync with account" << accountId
+              << "error:" << errorString);
     emit syncFailed();
 }
 
-void WebDavSyncer::sync(int, const QString &, const QString &serverUrl, const QString &webdavPath, const QString &username, const QString &password, const QString &accessToken, bool ignoreSslErrors)
+void WebDavSyncer::sync(int, const QString &, const AccountAuthenticatorCredentials &credentials)
 {
     LOG_DEBUG(Q_FUNC_INFO << "Auth succeeded, start sync for service" << m_serviceName << "with account" << m_accountId);
 
-    m_serverUrl = serverUrl;
+    const bool ignoreSslErrors = credentials.serviceSettings.value(QStringLiteral("ignore_ssl_errors")).toBool();
+    const QString serverAddress = credentials.serviceSettings.value(QStringLiteral("server_address")).toString();
+    const QString webdavPath = credentials.serviceSettings.value(QStringLiteral("webdav_path")).toString();
+
+    m_serverUrl = serverAddress;
     m_webdavPath = webdavPath.isEmpty()
-            ? QStringLiteral("/remote.php/dav/files/") + username
+            ? QStringLiteral("/remote.php/dav/files/") + credentials.username
             : webdavPath;
-    m_username = username;
-    m_password = password;
-    m_accessToken = accessToken;
+    m_username = credentials.username;
+    m_password = credentials.password;
+    m_accessToken = credentials.accessToken;
     m_ignoreSslErrors = ignoreSslErrors;
 
     delete m_requestGenerator;

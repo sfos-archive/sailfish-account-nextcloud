@@ -10,11 +10,13 @@
 #ifndef NEXTCLOUD_WEBDAVSYNCER_P_H
 #define NEXTCLOUD_WEBDAVSYNCER_P_H
 
+// sailfishaccounts
+#include <accountauthenticator.h>
+
 #include <QObject>
 #include <QString>
 #include <QNetworkAccessManager>
 
-class AccountAuthenticator;
 class WebDavRequestGenerator;
 class NetworkRequestGenerator;
 namespace Buteo { class SyncProfile; }
@@ -40,11 +42,8 @@ Q_SIGNALS:
     void syncFailed();
 
 protected Q_SLOTS:
-    void sync(int accountId, const QString &serviceName,
-              const QString &serverUrl, const QString &webdavPath,
-              const QString &username, const QString &password,
-              const QString &accessToken, bool ignoreSslErrors);
-    void signInError();
+    void sync(int accountId, const QString &serviceName, const AccountAuthenticatorCredentials &credentials);
+    void signInError(int accountId, const QString &serviceName, const QString &errorString);
 
 protected:
     virtual void beginSync() = 0;

@@ -6,7 +6,7 @@ DEPENDPATH += .
 QT += network
 
 CONFIG += link_pkgconfig
-PKGCONFIG += nemotransferengine-qt5
+PKGCONFIG += nemotransferengine-qt5 accounts-qt5
 
 include($$PWD/../../common/auth.pri)
 
