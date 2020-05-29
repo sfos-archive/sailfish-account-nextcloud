@@ -12,16 +12,17 @@
 
 #include <QtCore/QObject>
 #include <QtCore/QVariantMap>
-#include <QtCore/QList>
-#include <QtCore/QString>
+#include <QtCore/QVector>
 
+// sailfishaccounts
+#include <accountauthenticator.h>
+
+// libaccounts-qt5
 #include <Accounts/Manager>
 #include <SignOn/SessionData>
 #include <SignOn/Error>
 
-#include "accountauthenticator_p.h"
-
-class NextcloudShareServiceStatus : public AccountAuthenticator
+class NextcloudShareServiceStatus : public QObject
 {
     Q_OBJECT
 
@@ -50,18 +51,18 @@ public:
     AccountDetails detailsByIdentifier(int accountIdentifier) const;
     int count() const;
 
+    bool setCredentialsNeedUpdate(int accountId, const QString &serviceName);
+
 Q_SIGNALS:
     void serviceReady();
     void serviceError(const QString &message);
 
 private Q_SLOTS:
-    void signInResponseHandler(int accountId, const QString &serviceName,
-                               const QString &serverUrl, const QString &webdavPath,
-                               const QString &username, const QString &password,
-                               const QString &accessToken, bool ignoreSslErrors);
+    void signInResponseHandler(int accountId, const QString &serviceName, const AccountAuthenticatorCredentials &credentials);
     void signInErrorHandler(int accountId, const QString &serviceName);
 
 private:
+    AccountAuthenticator *m_auth;
     QString m_serviceName;
     enum AccountDetailsState {
         Waiting,

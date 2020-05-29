@@ -9,28 +9,38 @@
 
 #include "nextcloudshareservicestatus.h"
 
+#include <Accounts/Manager>
+
 #include <QtDebug>
 
 NextcloudShareServiceStatus::NextcloudShareServiceStatus(QObject *parent)
-    : AccountAuthenticator(parent), m_serviceName(QStringLiteral("nextcloud-sharing"))
+    : QObject(parent)
+    , m_auth(new AccountAuthenticator(this))
+    , m_serviceName(QStringLiteral("nextcloud-sharing"))
 {
-    connect(this, &AccountAuthenticator::signInCompleted, this, &NextcloudShareServiceStatus::signInResponseHandler);
-    connect(this, &AccountAuthenticator::signInError, this, &NextcloudShareServiceStatus::signInErrorHandler);
+    connect(m_auth, &AccountAuthenticator::signInCompleted,
+            this, &NextcloudShareServiceStatus::signInResponseHandler);
+    connect(m_auth, &AccountAuthenticator::signInError,
+            this, &NextcloudShareServiceStatus::signInErrorHandler);
 }
 
-void NextcloudShareServiceStatus::signInResponseHandler(int accountId, const QString &, const QString &serverAddress, const QString &webdavPath, const QString &username, const QString &password, const QString &accessToken, bool ignoreSslErrors)
+void NextcloudShareServiceStatus::signInResponseHandler(int accountId, const QString &, const AccountAuthenticatorCredentials &credentials)
 {
     if (!m_accountIdToDetailsIdx.contains(accountId)) {
         return;
     }
 
+    const bool ignoreSslErrors = credentials.serviceSettings.value(QStringLiteral("ignore_ssl_errors")).toBool();
+    const QString serverAddress = credentials.serviceSettings.value(QStringLiteral("server_address")).toString();
+    const QString webdavPath = credentials.serviceSettings.value(QStringLiteral("webdav_path")).toString();
+
     AccountDetails &accountDetails(m_accountDetails[m_accountIdToDetailsIdx[accountId]]);
-    accountDetails.accessToken = accessToken;
-    accountDetails.username = username;
-    accountDetails.password = password;
+    accountDetails.accessToken = credentials.accessToken;
+    accountDetails.username = credentials.username;
+    accountDetails.password = credentials.password;
     accountDetails.serverAddress = serverAddress;
     accountDetails.webdavPath = webdavPath.isEmpty()
-            ? QStringLiteral("/remote.php/dav/files/") + username
+            ? QStringLiteral("/remote.php/dav/files/") + credentials.username
             : webdavPath;
     accountDetails.ignoreSslErrors = ignoreSslErrors;
 
@@ -75,15 +85,22 @@ int NextcloudShareServiceStatus::count() const
     return m_accountDetails.count();
 }
 
+bool NextcloudShareServiceStatus::setCredentialsNeedUpdate(int accountId, const QString &serviceName)
+{
+    return m_auth->setCredentialsNeedUpdate(accountId, serviceName);
+}
+
 void NextcloudShareServiceStatus::queryStatus(QueryStatusMode mode)
 {
     m_accountDetails.clear();
     m_accountIdToDetailsIdx.clear();
     m_accountDetailsState.clear();
 
+    Accounts::Manager manager;
+
     bool signInActive = false;
-    foreach(uint id, manager()->accountList()) {
-        Accounts::Account *acc = manager()->account(id);
+    for (Accounts::AccountId id : manager.accountList()) {
+        Accounts::Account *acc = manager.account(id);
 
         if (!acc) {
             qWarning() << Q_FUNC_INFO << "Failed to get account for id: " << id;
@@ -91,7 +108,7 @@ void NextcloudShareServiceStatus::queryStatus(QueryStatusMode mode)
         }
 
         acc->selectService(Accounts::Service());
-        const Accounts::Service service(manager()->service(m_serviceName));
+        const Accounts::Service service(manager.service(m_serviceName));
         const Accounts::ServiceList services = acc->services();
         bool found = false;
         Q_FOREACH (const Accounts::Service &s, services) {
@@ -119,8 +136,8 @@ void NextcloudShareServiceStatus::queryStatus(QueryStatusMode mode)
                 if (!m_accountIdToDetailsIdx.contains(id)) {
                     AccountDetails details;
                     details.accountId = id;
-                    details.providerName = manager()->provider(acc->providerName()).displayName();
-                    details.serviceName = manager()->service(m_serviceName).displayName();
+                    details.providerName = manager.provider(acc->providerName()).displayName();
+                    details.serviceName = manager.service(m_serviceName).displayName();
                     details.displayName = acc->displayName();
                     m_accountIdToDetailsIdx.insert(id, m_accountDetails.size());
                     m_accountDetails.append(details);
@@ -128,7 +145,7 @@ void NextcloudShareServiceStatus::queryStatus(QueryStatusMode mode)
 
                 if (mode == NextcloudShareServiceStatus::SignInMode) {
                     signInActive = true;
-                    signIn(id, m_serviceName);
+                    m_auth->signIn(id, m_serviceName);
                 }
             }
             acc->selectService(Accounts::Service());

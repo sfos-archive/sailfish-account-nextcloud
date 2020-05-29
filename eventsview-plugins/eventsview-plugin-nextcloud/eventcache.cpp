@@ -114,31 +114,28 @@ void NextcloudEventCache::signIn(int accountId)
     m_auth->signIn(accountId, QStringLiteral("nextcloud-posts"));
 }
 
-void NextcloudEventCache::signOnResponse(int accountId, const QString &serviceName,
-                                         const QString &serverUrl, const QString &webdavPath,
-                                         const QString &username, const QString &password,
-                                         const QString &accessToken, bool ignoreSslErrors)
+void NextcloudEventCache::signOnResponse(int accountId,
+                                         const QString &serviceName,
+                                         const AccountAuthenticatorCredentials &credentials)
 {
     Q_UNUSED(serviceName)
-    Q_UNUSED(serverUrl)
-    Q_UNUSED(webdavPath)
-    Q_UNUSED(ignoreSslErrors)
 
     // we need both username+password, OR accessToken.
-    if (!accessToken.isEmpty()) {
-        m_accountIdAccessTokens.insert(accountId, accessToken);
+    if (!credentials.accessToken.isEmpty()) {
+        m_accountIdAccessTokens.insert(accountId, credentials.accessToken);
     } else {
-        m_accountIdCredentials.insert(accountId, qMakePair<QString, QString>(username, password));
+        m_accountIdCredentials.insert(accountId, qMakePair<QString, QString>(credentials.username, credentials.password));
     }
 
     m_pendingAccountRequests.removeAll(accountId);
     QMetaObject::invokeMethod(this, "performRequests", Qt::QueuedConnection);
 }
 
-void NextcloudEventCache::signOnError(int accountId, const QString &serviceName)
+void NextcloudEventCache::signOnError(int accountId, const QString &serviceName, const QString &errorString)
 {
     qWarning() << "NextcloudEventCache: sign-on failed for account:" << accountId
-               << "service:" << serviceName;
+               << "service:" << serviceName
+               << "error:" << errorString;
     m_pendingAccountRequests.removeAll(accountId);
     m_signOnFailCount[accountId] += 1;
     QMetaObject::invokeMethod(this, "performRequests", Qt::QueuedConnection);

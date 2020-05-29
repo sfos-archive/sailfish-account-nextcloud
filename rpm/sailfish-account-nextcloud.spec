@@ -71,6 +71,7 @@ BuildRequires: pkgconfig(libsignon-qt5)
 BuildRequires: pkgconfig(accounts-qt5)
 BuildRequires: pkgconfig(socialcache)
 BuildRequires: pkgconfig(libsailfishkeyprovider)
+BuildRequires: pkgconfig(sailfishaccounts)
 Requires: %{name} = %{version}-%{release}
 Requires: buteo-syncfw-qt5-msyncd
 Requires: systemd
@@ -93,6 +94,7 @@ Provides synchronisation of posts blobs with Nextcloud.
 Summary:   Provides integration of Nextcloud notifications into Events view
 Group:     System/Libraries
 BuildRequires: pkgconfig(Qt5Gui)
+BuildRequires: pkgconfig(sailfishaccounts)
 
 %description -n eventsview-extensions-nextcloud
 Provides integration of Nextcloud notifications into Events view
@@ -130,6 +132,7 @@ BuildRequires: pkgconfig(libsignon-qt5)
 BuildRequires: pkgconfig(accounts-qt5)
 BuildRequires: pkgconfig(socialcache)
 BuildRequires: pkgconfig(libsailfishkeyprovider)
+BuildRequires: pkgconfig(sailfishaccounts)
 Requires: %{name} = %{version}-%{release}
 Requires: buteo-syncfw-qt5-msyncd
 Requires: systemd
@@ -169,6 +172,7 @@ BuildRequires: pkgconfig(libsignon-qt5)
 BuildRequires: pkgconfig(accounts-qt5)
 BuildRequires: pkgconfig(socialcache)
 BuildRequires: pkgconfig(libsailfishkeyprovider)
+BuildRequires: pkgconfig(sailfishaccounts)
 Requires: %{name} = %{version}-%{release}
 Requires: buteo-syncfw-qt5-msyncd
 Requires: systemd
@@ -193,6 +197,7 @@ Group:     System/Libraries
 BuildRequires: pkgconfig(Qt5Gui)
 BuildRequires: pkgconfig(Qt5Qml)
 BuildRequires: pkgconfig(accounts-qt5)
+BuildRequires: pkgconfig(sailfishaccounts)
 Requires: sailfish-components-gallery-qt5 >= 1.1.9
 Requires: sailfish-components-filemanager >= 0.2.17
 
@@ -245,6 +250,7 @@ BuildRequires: pkgconfig(accounts-qt5)
 BuildRequires: pkgconfig(socialcache)
 BuildRequires: pkgconfig(libsailfishkeyprovider)
 BuildRequires: pkgconfig(nemotransferengine-qt5)
+BuildRequires: pkgconfig(sailfishaccounts)
 BuildRequires: qt5-qttools
 BuildRequires: qt5-qttools-linguist
 Requires: sailfishsilica-qt5
