@@ -22,6 +22,6 @@ SOURCES += nextcloudshareplugin.cpp \
            nextcloudshareservicestatus.cpp \
            nextcloudapi.cpp
 
-target.path = /usr/lib/nemo-transferengine/plugins
+target.path = $$[QT_INSTALL_LIBS]/nemo-transferengine/plugins
 
 INSTALLS += target
