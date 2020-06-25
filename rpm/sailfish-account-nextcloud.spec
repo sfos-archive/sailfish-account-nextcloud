@@ -4,7 +4,6 @@ Version: 0.1.2
 Release: 1
 Source0: %{name}-%{version}.tar.bz2
 Summary: Account plugin for Nextcloud
-Group:   System/Libraries
 BuildRequires: qt5-qmake
 BuildRequires: sailfish-svg2png
 
@@ -58,7 +57,6 @@ BuildRequires: sailfish-svg2png
 
 %package -n buteo-sync-plugin-nextcloud-posts
 Summary:   Provides synchronisation of posts blobs with Nextcloud
-Group:     System/Applications
 BuildRequires: pkgconfig(Qt5Core)
 BuildRequires: pkgconfig(Qt5DBus)
 BuildRequires: pkgconfig(Qt5Sql)
@@ -83,16 +81,15 @@ Provides synchronisation of posts blobs with Nextcloud.
 %files -n buteo-sync-plugin-nextcloud-posts
 %defattr(-,root,root,-)
 #out-of-process-plugin form:
-/usr/lib/buteo-plugins-qt5/oopp/nextcloud-posts-client
+%{_libdir}/buteo-plugins-qt5/oopp/nextcloud-posts-client
 #in-process-plugin form:
-#/usr/lib/buteo-plugins-qt5/libnextcloud-posts-client.so
+#%%{_libdir}/buteo-plugins-qt5/libnextcloud-posts-client.so
 %config %{_sysconfdir}/buteo/profiles/client/nextcloud-posts.xml
 %config %{_sysconfdir}/buteo/profiles/sync/nextcloud.Posts.xml
 
 
 %package -n eventsview-extensions-nextcloud
 Summary:   Provides integration of Nextcloud notifications into Events view
-Group:     System/Libraries
 BuildRequires: pkgconfig(Qt5Gui)
 BuildRequires: pkgconfig(sailfishaccounts)
 
@@ -108,7 +105,6 @@ Provides integration of Nextcloud notifications into Events view
 
 %package -n eventsview-extensions-nextcloud-ts-devel
 Summary:  Translation source for Events Nextcloud plugin
-Group:    System/Libraries
 Requires: eventsview-extensions-nextcloud
 
 %description -n eventsview-extensions-nextcloud-ts-devel
@@ -121,7 +117,6 @@ Translation source for Events Nextcloud plugin.
 
 %package -n buteo-sync-plugin-nextcloud-backup
 Summary:   Provides synchronisation of backup/restore blobs with Nextcloud
-Group:     System/Applications
 BuildRequires: pkgconfig(Qt5Core)
 BuildRequires: pkgconfig(Qt5DBus)
 BuildRequires: pkgconfig(Qt5Sql)
@@ -144,13 +139,13 @@ Provides synchronisation of backup/restore blobs with Nextcloud.
 %files -n buteo-sync-plugin-nextcloud-backup
 %defattr(-,root,root,-)
 #out-of-process-plugin form:
-/usr/lib/buteo-plugins-qt5/oopp/nextcloud-backup-client
-/usr/lib/buteo-plugins-qt5/oopp/nextcloud-backupquery-client
-/usr/lib/buteo-plugins-qt5/oopp/nextcloud-backuprestore-client
+%{_libdir}/buteo-plugins-qt5/oopp/nextcloud-backup-client
+%{_libdir}/buteo-plugins-qt5/oopp/nextcloud-backupquery-client
+%{_libdir}/buteo-plugins-qt5/oopp/nextcloud-backuprestore-client
 #in-process-plugin form:
-#/usr/lib/buteo-plugins-qt5/libnextcloud-backup-client.so
-#/usr/lib/buteo-plugins-qt5/libnextcloud-backupquery-client.so
-#/usr/lib/buteo-plugins-qt5/libnextcloud-backuprestore-client.so
+#%%{_libdir}/buteo-plugins-qt5/libnextcloud-backup-client.so
+#%%{_libdir}/buteo-plugins-qt5/libnextcloud-backupquery-client.so
+#%%{_libdir}/buteo-plugins-qt5/libnextcloud-backuprestore-client.so
 %config %{_sysconfdir}/buteo/profiles/client/nextcloud-backup.xml
 %config %{_sysconfdir}/buteo/profiles/client/nextcloud-backupquery.xml
 %config %{_sysconfdir}/buteo/profiles/client/nextcloud-backuprestore.xml
@@ -161,7 +156,6 @@ Provides synchronisation of backup/restore blobs with Nextcloud.
 
 %package -n buteo-sync-plugin-nextcloud-images
 Summary:   Provides synchronisation of gallery images with Nextcloud
-Group:     System/Applications
 BuildRequires: pkgconfig(Qt5Core)
 BuildRequires: pkgconfig(Qt5DBus)
 BuildRequires: pkgconfig(Qt5Sql)
@@ -184,16 +178,15 @@ Provides synchronisation of gallery images with Nextcloud.
 %files -n buteo-sync-plugin-nextcloud-images
 %defattr(-,root,root,-)
 #out-of-process-plugin form:
-/usr/lib/buteo-plugins-qt5/oopp/nextcloud-images-client
+%{_libdir}/buteo-plugins-qt5/oopp/nextcloud-images-client
 #in-process-plugin form:
-#/usr/lib/buteo-plugins-qt5/libnextcloud-images-client.so
+#%%{_libdir}/buteo-plugins-qt5/libnextcloud-images-client.so
 %config %{_sysconfdir}/buteo/profiles/client/nextcloud-images.xml
 %config %{_sysconfdir}/buteo/profiles/sync/nextcloud.Images.xml
 
 
 %package -n jolla-gallery-extension-nextcloud
 Summary:   Provides integration of Nextcloud images into Gallery application
-Group:     System/Libraries
 BuildRequires: pkgconfig(Qt5Gui)
 BuildRequires: pkgconfig(Qt5Qml)
 BuildRequires: pkgconfig(accounts-qt5)
@@ -223,7 +216,6 @@ Provides integration of Nextcloud images into Gallery application.
 
 %package -n jolla-gallery-extension-nextcloud-ts-devel
 Summary:  Translation source for Gallery Nextcloud plugin
-Group:    System/Libraries
 Requires: jolla-gallery-extension-nextcloud
 
 %description -n jolla-gallery-extension-nextcloud-ts-devel
@@ -236,7 +228,6 @@ Translation source for Gallery Nextcloud plugin.
 
 %package -n transferengine-plugin-nextcloud
 Summary: Nextcloud file sharing plugin for Transfer Engine
-Group: System/Libraries
 BuildRequires: pkgconfig(Qt5Core)
 BuildRequires: pkgconfig(Qt5DBus)
 BuildRequires: pkgconfig(Qt5Sql)
@@ -253,7 +244,7 @@ BuildRequires: pkgconfig(nemotransferengine-qt5)
 BuildRequires: pkgconfig(sailfishaccounts)
 BuildRequires: qt5-qttools
 BuildRequires: qt5-qttools-linguist
-Requires: sailfishsilica-qt5
+Requires: sailfishsilica-qt5 >= 1.1.108
 Requires: declarative-transferengine-qt5 >= 0.3.13
 Requires: %{name} = %{version}-%{release}
 
@@ -273,7 +264,6 @@ Nextcloud file sharing plugin for Transfer Engine.
 
 %package -n transferengine-plugin-nextcloud-ts-devel
 Summary:  Translation source for Nextcloud Transfer Engine share plugin
-Group:    System/Libraries
 Requires: transferengine-plugin-nextcloud
 
 %description -n transferengine-plugin-nextcloud-ts-devel
@@ -286,7 +276,6 @@ Translation source for Nextcloud Transfer Engine share plugin.
 
 %package features-all
 Summary:   Meta package to include all Nextcloud account features
-Group:     System/Application
 Requires: %{name} = %{version}-%{release}
 Requires: transferengine-plugin-nextcloud
 Requires: jolla-gallery-extension-nextcloud
