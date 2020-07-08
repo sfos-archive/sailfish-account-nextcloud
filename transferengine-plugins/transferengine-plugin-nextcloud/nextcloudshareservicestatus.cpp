@@ -145,6 +145,7 @@ void NextcloudShareServiceStatus::queryStatus(QueryStatusMode mode)
 
                 if (mode == NextcloudShareServiceStatus::SignInMode) {
                     signInActive = true;
+                    m_accountDetailsState.insert(id, NextcloudShareServiceStatus::Waiting);
                     m_auth->signIn(id, m_serviceName);
                 }
             }
