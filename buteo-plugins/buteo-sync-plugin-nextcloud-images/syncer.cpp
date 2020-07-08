@@ -329,6 +329,7 @@ bool Syncer::calculateAndApplyDelta(const SyncCache::Album &mainAlbum,
     const bool isNewAlbum = dbAlbum.albumId.isEmpty();
     const bool isModifiedAlbum = mainAlbum.etag != dbAlbum.etag
             || mainAlbum.photoCount != dbAlbum.photoCount;
+
     LOG_DEBUG(Q_FUNC_INFO << "Album:" << mainAlbum.albumId
               << "photoCount:" << mainAlbum.photoCount
               << "etag:" << mainAlbum.etag
@@ -407,7 +408,7 @@ bool Syncer::calculateAndApplyDelta(const SyncCache::Album &mainAlbum,
     for (const SyncCache::Photo &dbPhoto : dbPhotos) {
         if (!serverPhotoIds.remove(dbPhoto.photoId)) {
             LOG_DEBUG(Q_FUNC_INFO << "Delete photo:" << dbPhoto.photoId << dbPhoto.fileName);
-            db->deletePhoto(dbPhoto, error);  // this deletes all photos in the album as well
+            db->deletePhoto(dbPhoto, error);
             if (error->errorCode != SyncCache::DatabaseError::NoError) {
                 LOG_WARNING(Q_FUNC_INFO << "failed to delete photo:"
                             << dbPhoto.photoId

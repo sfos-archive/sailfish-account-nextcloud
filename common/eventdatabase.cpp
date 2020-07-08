@@ -111,9 +111,10 @@ QVector<UpgradeOperation> EventDatabasePrivate::upgradeVersions() const
     return retn;
 }
 
-void EventDatabasePrivate::preTransactionCommit()
+bool EventDatabasePrivate::preTransactionCommit()
 {
     // nothing to do.
+    return true;
 }
 
 void EventDatabasePrivate::transactionCommittedPreUnlock()

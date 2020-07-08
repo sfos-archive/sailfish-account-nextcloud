@@ -190,9 +190,10 @@ QVector<UpgradeOperation> ImageDatabasePrivate::upgradeVersions() const
     return retn;
 }
 
-void ImageDatabasePrivate::preTransactionCommit()
+bool ImageDatabasePrivate::preTransactionCommit()
 {
     // Fixup album thumbnails if required.
+    SyncCache::DatabaseError thumbnailError;
     if (!m_deletedPhotos.isEmpty()
             || !m_storedPhotos.isEmpty()) {
         // potentially need to update album thumbnails.
@@ -200,7 +201,6 @@ void ImageDatabasePrivate::preTransactionCommit()
         Q_FOREACH (const SyncCache::Album &doomed, m_deletedAlbums) {
             doomedAlbums.insert(constructAlbumIdentifier(doomed.accountId, doomed.userId, doomed.albumId));
         }
-        SyncCache::DatabaseError thumbnailError;
         QHash<QString, SyncCache::Album> thumbnailAlbums;
         Q_FOREACH (const SyncCache::Photo &photo, m_deletedPhotos) {
             const QString albumIdentifier = constructAlbumIdentifier(photo.accountId, photo.userId, photo.albumId);
@@ -225,22 +225,50 @@ void ImageDatabasePrivate::preTransactionCommit()
         Q_FOREACH (const SyncCache::Album &album, thumbnailAlbums) {
             // if the album uses a photo image as its thumbnail
             // and if that photo image is set to be deleted,
-            // use another photo's image.
+            // use another photo's image (or null if album is empty).
             if (album.thumbnailUrl.isEmpty()
                     && (album.thumbnailPath.isEmpty()
                           || m_filesToDelete.contains(album.thumbnailPath.toString()))) {
-                QVector<SyncCache::Photo> photos = m_imageDbParent->photos(album.accountId, album.userId, album.albumId, &thumbnailError);
+                QUrl updatedAlbumThumbnailPath;
+                const QVector<SyncCache::Photo> photos = m_imageDbParent->photos(
+                        album.accountId, album.userId, album.albumId, &thumbnailError);
                 Q_FOREACH (const SyncCache::Photo &photo, photos) {
                     if (!photo.imagePath.isEmpty()) {
-                        SyncCache::Album updateAlbum = album;
-                        updateAlbum.thumbnailPath = photo.imagePath;
-                        m_imageDbParent->storeAlbum(updateAlbum, &thumbnailError);
+                        updatedAlbumThumbnailPath = photo.imagePath;
                         break;
+                    }
+                }
+
+                // update the album in the database if it previously didn't have a valid
+                // thumbnail but now does, or if its previous thumbnail path is no longer
+                // valid and must be changed.
+                if (!updatedAlbumThumbnailPath.isEmpty() || !album.thumbnailPath.isEmpty()) {
+                    SyncCache::Album updateAlbum = album;
+                    updateAlbum.thumbnailPath = updatedAlbumThumbnailPath;
+                    m_imageDbParent->storeAlbum(updateAlbum, &thumbnailError);
+                    // also update the cached copy in the m_storedAlbums vector
+                    // as the change signals depend on its contents.
+                    if (thumbnailError.errorCode == SyncCache::DatabaseError::NoError) {
+                        bool found = false;
+                        for (SyncCache::Album &storedAlbum : m_storedAlbums) {
+                            if (storedAlbum.accountId == updateAlbum.accountId
+                                    && storedAlbum.userId == updateAlbum.userId
+                                    && storedAlbum.albumId == updateAlbum.albumId) {
+                                storedAlbum.thumbnailPath = updateAlbum.thumbnailPath;
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (!found) {
+                            m_storedAlbums.append(updateAlbum);
+                        }
                     }
                 }
             }
         }
     }
+
+    return thumbnailError.errorCode == SyncCache::DatabaseError::NoError;
 }
 
 void ImageDatabasePrivate::transactionCommittedPreUnlock()

@@ -78,7 +78,7 @@ public:
     virtual QVector<const char *> createStatements() const = 0;
     virtual QVector<UpgradeOperation> upgradeVersions() const = 0;
 
-    virtual void preTransactionCommit() = 0;
+    virtual bool preTransactionCommit() = 0;
     virtual void transactionCommittedPreUnlock() = 0;
     virtual void transactionCommittedPostUnlock() = 0;
     virtual void transactionRolledBackPreUnlocked() = 0;
