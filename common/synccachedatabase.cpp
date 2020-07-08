@@ -223,6 +223,10 @@ static bool prepareDatabase(QSqlDatabase &database, const int currentSchemaVersi
 
 //-----------------------------------------------------------------------------
 
+DatabasePrivate::~DatabasePrivate()
+{
+}
+
 Database::Database(DatabasePrivate *dptr, QObject *parent)
     : QObject(parent), d_ptr(dptr)
 {

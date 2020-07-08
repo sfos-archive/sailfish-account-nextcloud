@@ -13,12 +13,14 @@
 #include "synccacheimages.h"
 #include "synccachedatabase_p.h"
 
+#include <QtCore/QScopedPointer>
 #include <QtCore/QVector>
 #include <QtCore/QThread>
 #include <QtSql/QSqlDatabase>
 
 namespace SyncCache {
 
+class ImageChangeNotifier;
 class ImageDownloader;
 
 class ImageCacheThreadWorker : public QObject
@@ -82,6 +84,8 @@ Q_SIGNALS:
     void albumsDeleted(const QVector<SyncCache::Album> &albums);
     void photosDeleted(const QVector<SyncCache::Photo> &photos);
 
+    void dataChanged();
+
 private:
     void photoThumbnailDownloadFinished(int idempToken, const SyncCache::Photo &photo, const QUrl &filePath);
 
@@ -119,7 +123,7 @@ private:
 class ImageDatabasePrivate : public DatabasePrivate
 {
 public:
-    ImageDatabasePrivate(ImageDatabase *parent);
+    ImageDatabasePrivate(ImageDatabase *parent, bool emitCrossProcessChangeNotifications);
 
     int currentSchemaVersion() const override;
     QVector<const char *> createStatements() const override;
@@ -133,6 +137,8 @@ public:
 private:
     friend class SyncCache::ImageDatabase;
     ImageDatabase *m_imageDbParent;
+    QScopedPointer<ImageChangeNotifier> m_changeNotifier;
+    bool m_emitCrossProcessChangeNotifications = true;
 
     QVector<QString> m_filesToDelete;
     QVector<SyncCache::User> m_deletedUsers;

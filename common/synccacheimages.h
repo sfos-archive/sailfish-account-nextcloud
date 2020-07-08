@@ -83,7 +83,7 @@ class ImageDatabase : public Database
     Q_OBJECT
 
 public:
-    ImageDatabase(QObject *parent = nullptr);
+    ImageDatabase(QObject *parent = nullptr, bool emitCrossProcessChangeNotifications = true);
 
     QVector<SyncCache::User> users(SyncCache::DatabaseError *error) const;
     QVector<SyncCache::Album> albums(int accountId, const QString &userId, SyncCache::DatabaseError *error, const QString &parentAlbumId = QString()) const;
@@ -112,6 +112,8 @@ Q_SIGNALS:
     void usersDeleted(const QVector<SyncCache::User> &users);
     void albumsDeleted(const QVector<SyncCache::Album> &albums);
     void photosDeleted(const QVector<SyncCache::Photo> &photos);
+
+    void dataChanged();
 };
 
 class ImageCachePrivate;
@@ -178,6 +180,8 @@ Q_SIGNALS:
     void usersDeleted(const QVector<SyncCache::User> &users);
     void albumsDeleted(const QVector<SyncCache::Album> &albums);
     void photosDeleted(const QVector<SyncCache::Photo> &photos);
+
+    void dataChanged();
 
 private:
     Q_DECLARE_PRIVATE(ImageCache)

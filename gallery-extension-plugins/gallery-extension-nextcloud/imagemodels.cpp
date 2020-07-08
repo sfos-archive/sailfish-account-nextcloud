@@ -146,6 +146,9 @@ void NextcloudUserModel::setImageCache(SyncCache::ImageCache *cache)
             }
         }
     });
+
+    connect(m_imageCache, &SyncCache::ImageCache::dataChanged,
+            this, [this] { this->loadData(); });
 }
 
 QVariantMap NextcloudUserModel::at(int row) const
@@ -460,6 +463,9 @@ void NextcloudAlbumModel::setImageCache(SyncCache::ImageCache *cache)
             }
         }
     });
+
+    connect(m_imageCache, &SyncCache::ImageCache::dataChanged,
+            this, [this] { this->loadData(); });
 }
 
 int NextcloudAlbumModel::accountId() const
@@ -766,6 +772,9 @@ void NextcloudPhotoModel::setImageCache(SyncCache::ImageCache *cache)
             }
         }
     });
+
+    connect(m_imageCache, &SyncCache::ImageCache::dataChanged,
+            this, [this] { this->loadData(); });
 }
 
 int NextcloudPhotoModel::accountId() const
@@ -930,6 +939,8 @@ void NextcloudPhotoCounter::setImageCache(SyncCache::ImageCache *cache)
     connect(m_imageCache, &SyncCache::ImageCache::photosStored,
             m_imageCache, &SyncCache::ImageCache::requestPhotoCount);
     connect(m_imageCache, &SyncCache::ImageCache::photosDeleted,
+            m_imageCache, &SyncCache::ImageCache::requestPhotoCount);
+    connect(m_imageCache, &SyncCache::ImageCache::dataChanged,
             m_imageCache, &SyncCache::ImageCache::requestPhotoCount);
     m_imageCache->requestPhotoCount();
 }

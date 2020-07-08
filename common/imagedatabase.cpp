@@ -10,6 +10,8 @@
 #include "synccacheimages.h"
 #include "synccacheimages_p.h"
 
+#include "synccacheimagechangenotifier_p.h"
+
 #include <QtCore/QFile>
 #include <QtCore/QDir>
 #include <QtCore/QUuid>
@@ -94,9 +96,12 @@ bool upgradeVersion3to4Fn(QSqlDatabase &database)
 
 }
 
-ImageDatabasePrivate::ImageDatabasePrivate(ImageDatabase *parent)
-    : DatabasePrivate(parent), m_imageDbParent(parent)
+ImageDatabasePrivate::ImageDatabasePrivate(ImageDatabase *parent, bool emitCrossProcessChangeNotifications)
+    : DatabasePrivate(parent)
+    , m_imageDbParent(parent)
+    , m_emitCrossProcessChangeNotifications(emitCrossProcessChangeNotifications)
 {
+    m_changeNotifier.reset(new ImageChangeNotifier(parent));
 }
 
 int ImageDatabasePrivate::currentSchemaVersion() const
@@ -298,24 +303,35 @@ void ImageDatabasePrivate::transactionCommittedPostUnlock()
         }
     }
 
+    bool dataChanged = false;
     if (!m_tempDeletedUsers.isEmpty()) {
+        dataChanged = true;
         emit m_imageDbParent->usersDeleted(m_tempDeletedUsers);
     }
     if (!m_tempDeletedAlbums.isEmpty()) {
+        dataChanged = true;
         emit m_imageDbParent->albumsDeleted(m_tempDeletedAlbums);
     }
     if (!m_tempDeletedPhotos.isEmpty()) {
+        dataChanged = true;
         emit m_imageDbParent->photosDeleted(m_tempDeletedPhotos);
     }
 
     if (!m_tempStoredUsers.isEmpty()) {
+        dataChanged = true;
         emit m_imageDbParent->usersStored(m_tempStoredUsers);
     }
     if (!m_tempStoredAlbums.isEmpty()) {
+        dataChanged = true;
         emit m_imageDbParent->albumsStored(m_tempStoredAlbums);
     }
     if (!m_tempStoredPhotos.isEmpty()) {
+        dataChanged = true;
         emit m_imageDbParent->photosStored(m_tempStoredPhotos);
+    }
+
+    if (dataChanged && m_changeNotifier && m_emitCrossProcessChangeNotifications) {
+        m_changeNotifier->dataChanged(); // emit cross-process change signal.
     }
 }
 
@@ -332,8 +348,8 @@ void ImageDatabasePrivate::transactionRolledBackPreUnlocked()
 
 //-----------------------------------------------------------------------------
 
-ImageDatabase::ImageDatabase(QObject *parent)
-    : Database(new ImageDatabasePrivate(this), parent)
+ImageDatabase::ImageDatabase(QObject *parent, bool emitCrossProcessChangeNotifications)
+    : Database(new ImageDatabasePrivate(this, emitCrossProcessChangeNotifications), parent)
 {
     qRegisterMetaType<SyncCache::User>();
     qRegisterMetaType<SyncCache::Album>();
