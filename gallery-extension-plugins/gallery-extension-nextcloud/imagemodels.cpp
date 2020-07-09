@@ -20,78 +20,27 @@ const QString NextcloudImagesService = QStringLiteral("nextcloud-images");
 
 }
 
-NextcloudUserModel::NextcloudUserModel(QObject *parent)
-    : QAbstractListModel(parent)
+//-----------------------------------------------------------------------------
+
+NextcloudEnabledUsersListener::NextcloudEnabledUsersListener(QObject *parent)
+    : QObject(parent)
     , m_accountManager(new Accounts::Manager(this))
 {
     qRegisterMetaType<SyncCache::User>();
     qRegisterMetaType<QVector<SyncCache::User> >();
 }
 
-void NextcloudUserModel::classBegin()
+QVector<SyncCache::User> NextcloudEnabledUsersListener::enabledUsers() const
 {
-    m_deferLoad = true;
+    return m_filteredData;
 }
 
-void NextcloudUserModel::componentComplete()
-{
-    m_deferLoad = false;
-    if (m_imageCache) {
-        loadData();
-    }
-}
-
-QModelIndex NextcloudUserModel::index(int row, int column, const QModelIndex &parent) const
-{
-    return !parent.isValid() && column == 0 && row >= 0 && row < m_filteredData.size()
-            ? createIndex(row, column)
-            : QModelIndex();
-}
-
-QVariant NextcloudUserModel::data(const QModelIndex &index, int role) const
-{
-    const int row = index.row();
-    if (!index.isValid() || row < 0 || row >= m_filteredData.size()) {
-        return QVariant();
-    }
-
-    // TODO: if thumbnail path is requested but empty,
-    //       call m_cache->populateUserThumbnail(),
-    //       and when it succeeds, emit dataChanged(row).
-    switch (role) {
-        case AccountIdRole:         return m_filteredData[row].accountId;
-        case UserIdRole:            return m_filteredData[row].userId;
-        case DisplayNameRole:       return m_filteredData[row].displayName;
-        case ThumbnailUrlRole:      return m_filteredData[row].thumbnailUrl;
-        case ThumbnailPathRole:     return m_filteredData[row].thumbnailPath;
-        default:                    return QVariant();
-    }
-}
-
-int NextcloudUserModel::rowCount(const QModelIndex &) const
-{
-    return m_filteredData.size();
-}
-
-QHash<int, QByteArray> NextcloudUserModel::roleNames() const
-{
-    static QHash<int, QByteArray> retn {
-        { AccountIdRole,        "accountId" },
-        { UserIdRole,           "userId" },
-        { DisplayNameRole,      "displayName" },
-        { ThumbnailUrlRole,     "thumbnailUrl" },
-        { ThumbnailPathRole,    "thumbnailPath" }
-    };
-
-    return retn;
-}
-
-SyncCache::ImageCache *NextcloudUserModel::imageCache() const
+SyncCache::ImageCache *NextcloudEnabledUsersListener::imageCache() const
 {
     return m_imageCache;
 }
 
-void NextcloudUserModel::setImageCache(SyncCache::ImageCache *cache)
+void NextcloudEnabledUsersListener::setImageCache(SyncCache::ImageCache *cache)
 {
     if (m_imageCache == cache) {
         return;
@@ -102,11 +51,6 @@ void NextcloudUserModel::setImageCache(SyncCache::ImageCache *cache)
     }
 
     m_imageCache = cache;
-    emit imageCacheChanged();
-
-    if (!m_deferLoad) {
-        loadData();
-    }
 
     connect(m_imageCache, &SyncCache::ImageCache::usersStored,
             this, [this] (const QVector<SyncCache::User> &users) {
@@ -151,23 +95,7 @@ void NextcloudUserModel::setImageCache(SyncCache::ImageCache *cache)
             this, [this] { this->loadData(); });
 }
 
-QVariantMap NextcloudUserModel::at(int row) const
-{
-    QVariantMap retn;
-    if (row < 0 || row >= rowCount()) {
-        return retn;
-    }
-
-    const QHash<int, QByteArray> roles = roleNames();
-    QHash<int, QByteArray>::const_iterator it = roles.constBegin();
-    QHash<int, QByteArray>::const_iterator end = roles.constEnd();
-    for ( ; it != end; it++) {
-        retn.insert(QString::fromLatin1(it.value()), data(index(row, 0, QModelIndex()), it.key()));
-    }
-    return retn;
-}
-
-void NextcloudUserModel::loadData()
+void NextcloudEnabledUsersListener::loadData()
 {
     if (!m_imageCache) {
         return;
@@ -200,7 +128,7 @@ void NextcloudUserModel::loadData()
     m_imageCache->requestUsers();
 }
 
-void NextcloudUserModel::addAccount(Accounts::AccountId accountId)
+void NextcloudEnabledUsersListener::addAccount(Accounts::AccountId accountId)
 {
     Accounts::Account *account = Accounts::Account::fromId(m_accountManager, accountId, this);
     if (!account) {
@@ -209,9 +137,9 @@ void NextcloudUserModel::addAccount(Accounts::AccountId accountId)
     }
 
     connect(account, &Accounts::Account::enabledChanged,
-            this, &NextcloudUserModel::enabledChanged, Qt::UniqueConnection);
+            this, &NextcloudEnabledUsersListener::enabledChanged, Qt::UniqueConnection);
     connect(account, &Accounts::Account::destroyed,
-            this, &NextcloudUserModel::accountDestroyed, Qt::UniqueConnection);
+            this, &NextcloudEnabledUsersListener::accountDestroyed, Qt::UniqueConnection);
 
     Accounts::Service imagesService = m_accountManager->service(NextcloudImagesService);
     if (!imagesService.isValid()) {
@@ -232,14 +160,14 @@ void NextcloudUserModel::addAccount(Accounts::AccountId accountId)
     m_accounts.insert(account->id(), info);
 }
 
-void NextcloudUserModel::addAllAccounts()
+void NextcloudEnabledUsersListener::addAllAccounts()
 {
     for (const SyncCache::User &user : m_data) {
         addAccount(user.accountId);
     }
 }
 
-void NextcloudUserModel::removeAccount(Accounts::AccountId accountId)
+void NextcloudEnabledUsersListener::removeAccount(Accounts::AccountId accountId)
 {
     auto it = m_accounts.find(accountId);
     if (it != m_accounts.end()) {
@@ -251,7 +179,7 @@ void NextcloudUserModel::removeAccount(Accounts::AccountId accountId)
     }
 }
 
-void NextcloudUserModel::removeAllAccounts()
+void NextcloudEnabledUsersListener::removeAllAccounts()
 {
     for (auto it = m_accounts.constBegin(); it != m_accounts.constEnd(); ++it) {
         const AccountInfo &info = *it;
@@ -262,7 +190,7 @@ void NextcloudUserModel::removeAllAccounts()
     m_accounts.clear();
 }
 
-void NextcloudUserModel::enabledChanged(const QString &serviceName, bool enabled)
+void NextcloudEnabledUsersListener::enabledChanged(const QString &serviceName, bool enabled)
 {
     Accounts::Account *account = qobject_cast<Accounts::Account*>(sender());
     if (!account || (!serviceName.isEmpty() && serviceName != NextcloudImagesService)) {
@@ -280,7 +208,7 @@ void NextcloudUserModel::enabledChanged(const QString &serviceName, bool enabled
     }
 }
 
-void NextcloudUserModel::accountDestroyed()
+void NextcloudEnabledUsersListener::accountDestroyed()
 {
     Accounts::Account *account = qobject_cast<Accounts::Account*>(sender());
     if (!account) {
@@ -294,9 +222,9 @@ void NextcloudUserModel::accountDestroyed()
     }
 }
 
-void NextcloudUserModel::reload()
+void NextcloudEnabledUsersListener::reload()
 {
-    const int prevCount = rowCount();
+//    const int prevCount = rowCount();
     QVector<SyncCache::User> enabledUsers;
 
     const QVector<SyncCache::User> &users = m_data; // const list to avoid detach on loop
@@ -307,11 +235,124 @@ void NextcloudUserModel::reload()
         }
     }
 
-    beginResetModel();
     m_filteredData = enabledUsers;
+    emit enabledUsersChanged();
+}
+
+//-----------------------------------------------------------------------------
+
+NextcloudUserModel::NextcloudUserModel(QObject *parent)
+    : QAbstractListModel(parent)
+      , m_enabledUsersListener(new NextcloudEnabledUsersListener(this))
+{
+    qRegisterMetaType<SyncCache::User>();
+    qRegisterMetaType<QVector<SyncCache::User> >();
+
+    connect(m_enabledUsersListener, &NextcloudEnabledUsersListener::enabledUsersChanged,
+            this, &NextcloudUserModel::enabledUsersChanged);
+}
+
+void NextcloudUserModel::classBegin()
+{
+    m_deferLoad = true;
+}
+
+void NextcloudUserModel::componentComplete()
+{
+    m_deferLoad = false;
+    if (m_enabledUsersListener->imageCache()) {
+        m_enabledUsersListener->loadData();
+    }
+}
+
+QModelIndex NextcloudUserModel::index(int row, int column, const QModelIndex &parent) const
+{
+    return !parent.isValid() && column == 0 && row >= 0 && row < m_users.size()
+            ? createIndex(row, column)
+            : QModelIndex();
+}
+
+QVariant NextcloudUserModel::data(const QModelIndex &index, int role) const
+{
+    const int row = index.row();
+    if (!index.isValid() || row < 0 || row >= m_users.size()) {
+        return QVariant();
+    }
+
+    // TODO: if thumbnail path is requested but empty,
+    //       call m_cache->populateUserThumbnail(),
+    //       and when it succeeds, emit dataChanged(row).
+    switch (role) {
+        case AccountIdRole:         return m_users[row].accountId;
+        case UserIdRole:            return m_users[row].userId;
+        case DisplayNameRole:       return m_users[row].displayName;
+        case ThumbnailUrlRole:      return m_users[row].thumbnailUrl;
+        case ThumbnailPathRole:     return m_users[row].thumbnailPath;
+        default:                    return QVariant();
+    }
+}
+
+int NextcloudUserModel::rowCount(const QModelIndex &) const
+{
+    return m_users.size();
+}
+
+QHash<int, QByteArray> NextcloudUserModel::roleNames() const
+{
+    static QHash<int, QByteArray> retn {
+        { AccountIdRole,        "accountId" },
+        { UserIdRole,           "userId" },
+        { DisplayNameRole,      "displayName" },
+        { ThumbnailUrlRole,     "thumbnailUrl" },
+        { ThumbnailPathRole,    "thumbnailPath" }
+    };
+
+    return retn;
+}
+
+SyncCache::ImageCache *NextcloudUserModel::imageCache() const
+{
+    return m_enabledUsersListener->imageCache();
+}
+
+void NextcloudUserModel::setImageCache(SyncCache::ImageCache *cache)
+{
+    if (m_enabledUsersListener->imageCache() == cache) {
+        return;
+    }
+
+    m_enabledUsersListener->setImageCache(cache);
+    emit imageCacheChanged();
+
+    if (!m_deferLoad) {
+        m_enabledUsersListener->loadData();
+    }
+}
+
+QVariantMap NextcloudUserModel::at(int row) const
+{
+    QVariantMap retn;
+    if (row < 0 || row >= rowCount()) {
+        return retn;
+    }
+
+    const QHash<int, QByteArray> roles = roleNames();
+    QHash<int, QByteArray>::const_iterator it = roles.constBegin();
+    QHash<int, QByteArray>::const_iterator end = roles.constEnd();
+    for ( ; it != end; it++) {
+        retn.insert(QString::fromLatin1(it.value()), data(index(row, 0, QModelIndex()), it.key()));
+    }
+    return retn;
+}
+
+void NextcloudUserModel::enabledUsersChanged()
+{
+    const int prevCount = rowCount();
+    beginResetModel();
+    m_users = m_enabledUsersListener->enabledUsers();
     endResetModel();
 
-    if (prevCount != enabledUsers.size()) {
+    if (prevCount != m_users.size()) {
         emit rowCountChanged();
     }
 }
@@ -321,8 +362,6 @@ void NextcloudUserModel::reload()
 NextcloudAlbumModel::NextcloudAlbumModel(QObject *parent)
     : QAbstractListModel(parent)
 {
-    qRegisterMetaType<SyncCache::Album>();
-    qRegisterMetaType<QVector<SyncCache::Album> >();
 }
 
 void NextcloudAlbumModel::classBegin()

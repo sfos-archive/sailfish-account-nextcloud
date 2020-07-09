@@ -24,6 +24,46 @@
 #include <Accounts/Manager>
 #include <Accounts/Account>
 
+class NextcloudEnabledUsersListener : public QObject
+{
+    Q_OBJECT
+public:
+    explicit NextcloudEnabledUsersListener(QObject *parent = nullptr);
+
+    SyncCache::ImageCache *imageCache() const;
+    void setImageCache(SyncCache::ImageCache *cache);
+
+    QVector<SyncCache::User> enabledUsers() const;
+
+    void loadData();
+
+Q_SIGNALS:
+    void enabledUsersChanged();
+
+private:
+    void addAccount(Accounts::AccountId accountId);
+    void addAllAccounts();
+    void removeAccount(Accounts::AccountId accountId);
+    void removeAllAccounts();
+    void enabledChanged(const QString &serviceName, bool enabled);
+    void accountDestroyed();
+    void reload();
+
+    class AccountInfo
+    {
+    public:
+        Accounts::Account *account = nullptr;
+        bool accountEnabled = false;
+        bool imageServiceEnabled = false;
+    };
+
+    SyncCache::ImageCache *m_imageCache = nullptr;
+    Accounts::Manager *m_accountManager = nullptr;
+    QVector<SyncCache::User> m_data;
+    QVector<SyncCache::User> m_filteredData;
+    QMap<Accounts::AccountId, AccountInfo> m_accounts;
+};
+
 class NextcloudUserModel : public QAbstractListModel, public QQmlParserStatus
 {
     Q_OBJECT
@@ -63,29 +103,11 @@ Q_SIGNALS:
     void rowCountChanged();
 
 private:
-    void loadData();
-    void addAccount(Accounts::AccountId accountId);
-    void addAllAccounts();
-    void removeAccount(Accounts::AccountId accountId);
-    void removeAllAccounts();
-    void enabledChanged(const QString &serviceName, bool enabled);
-    void accountDestroyed();
-    void reload();
+    void enabledUsersChanged();
 
-    class AccountInfo
-    {
-    public:
-        Accounts::Account *account = nullptr;
-        bool accountEnabled = false;
-        bool imageServiceEnabled = false;
-    };
-
+    QVector<SyncCache::User> m_users;
+    NextcloudEnabledUsersListener *m_enabledUsersListener = nullptr;
     bool m_deferLoad = false;
-    SyncCache::ImageCache *m_imageCache = nullptr;
-    Accounts::Manager *m_accountManager = nullptr;
-    QVector<SyncCache::User> m_data;
-    QVector<SyncCache::User> m_filteredData;
-    QMap<Accounts::AccountId, AccountInfo> m_accounts;
 };
 
 class NextcloudAlbumModel : public QAbstractListModel, public QQmlParserStatus
