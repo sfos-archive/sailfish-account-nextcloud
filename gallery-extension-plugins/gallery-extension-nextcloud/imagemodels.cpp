@@ -245,9 +245,6 @@ NextcloudUserModel::NextcloudUserModel(QObject *parent)
     : QAbstractListModel(parent)
       , m_enabledUsersListener(new NextcloudEnabledUsersListener(this))
 {
-    qRegisterMetaType<SyncCache::User>();
-    qRegisterMetaType<QVector<SyncCache::User> >();
-
     connect(m_enabledUsersListener, &NextcloudEnabledUsersListener::enabledUsersChanged,
             this, &NextcloudUserModel::enabledUsersChanged);
 }
@@ -942,49 +939,86 @@ void NextcloudPhotoModel::loadData()
 
 NextcloudPhotoCounter::NextcloudPhotoCounter(QObject *parent)
     : QObject(parent)
+    , m_enabledUsersListener(new NextcloudEnabledUsersListener(this))
 {
+    connect(m_enabledUsersListener, &NextcloudEnabledUsersListener::enabledUsersChanged,
+            this, [this]() {
+        const QVector<SyncCache::User> &users = m_enabledUsersListener->enabledUsers();
+        for (auto it = m_photoCounts.begin(); it != m_photoCounts.end(); ) {
+            bool foundAccount = false;
+            for (const SyncCache::User &user : users) {
+                if (user.accountId == it.key()) {
+                    foundAccount = true;
+                    break;
+                }
+            }
+            if (!foundAccount) {
+                it = m_photoCounts.erase(it);
+            } else {
+                ++it;
+            }
+        }
+        requestPhotoCount();
+    });
 }
 
 SyncCache::ImageCache *NextcloudPhotoCounter::imageCache() const
 {
-    return m_imageCache;
+    return m_enabledUsersListener->imageCache();
 }
 
 void NextcloudPhotoCounter::setImageCache(SyncCache::ImageCache *cache)
 {
-    if (m_imageCache == cache) {
+    if (m_enabledUsersListener->imageCache() == cache) {
         return;
     }
 
-    if (m_imageCache) {
-        disconnect(m_imageCache, 0, this, 0);
+    if (m_enabledUsersListener->imageCache()) {
+       disconnect(m_enabledUsersListener->imageCache(), 0, this, 0);
     }
 
-    m_imageCache = cache;
+    m_enabledUsersListener->setImageCache(cache);
     emit imageCacheChanged();
 
-    connect(m_imageCache, &SyncCache::ImageCache::requestPhotoCountFinished,
-            this, [this] (int photoCount) {
-        if (m_count != photoCount) {
-            m_count = photoCount;
-            emit countChanged();
-        }
+    m_enabledUsersListener->loadData();
+
+    connect(cache, &SyncCache::ImageCache::requestPhotoCountFinished,
+            this, [this] (int accountId, const QString &, int photoCount) {
+        m_photoCounts.insert(accountId, photoCount);
+        reload();
     });
-    connect(m_imageCache, &SyncCache::ImageCache::requestPhotoCountFailed,
-            this, [this] (const QString &errorMessage) {
-        qmlInfo(this) << "Request total photo count failed:" << errorMessage;
+    connect(cache, &SyncCache::ImageCache::requestPhotoCountFailed,
+            this, [this] (int accountId, const QString &userId, const QString &errorMessage) {
+        qmlInfo(this) << "Request total photo count failed for account:"
+                      << accountId << "user:" << userId << "error was:" << errorMessage;
     });
 
-    connect(m_imageCache, &SyncCache::ImageCache::photosStored,
-            m_imageCache, &SyncCache::ImageCache::requestPhotoCount);
-    connect(m_imageCache, &SyncCache::ImageCache::photosDeleted,
-            m_imageCache, &SyncCache::ImageCache::requestPhotoCount);
-    connect(m_imageCache, &SyncCache::ImageCache::dataChanged,
-            m_imageCache, &SyncCache::ImageCache::requestPhotoCount);
-    m_imageCache->requestPhotoCount();
+    connect(cache, &SyncCache::ImageCache::dataChanged,
+            this, &NextcloudPhotoCounter::requestPhotoCount);
+    requestPhotoCount();
 }
 
 int NextcloudPhotoCounter::count()
 {
     return m_count;
+}
+
+void NextcloudPhotoCounter::reload()
+{
+    int totalCount = 0;
+    for (auto it = m_photoCounts.constBegin(); it != m_photoCounts.constEnd(); ++it) {
+        totalCount += it.value();
+    }
+    if (m_count != totalCount) {
+        m_count = totalCount;
+        emit countChanged();
+    }
+}
+
+void NextcloudPhotoCounter::requestPhotoCount()
+{
+    const QVector<SyncCache::User> &users = m_enabledUsersListener->enabledUsers();
+    for (const SyncCache::User &user : users) {
+        m_enabledUsersListener->imageCache()->requestPhotoCount(user.accountId, user.userId);
+    }
 }

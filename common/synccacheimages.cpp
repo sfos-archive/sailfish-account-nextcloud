@@ -168,14 +168,14 @@ void ImageCacheThreadWorker::requestPhotos(int accountId, const QString &userId,
     }
 }
 
-void ImageCacheThreadWorker::requestPhotoCount()
+void ImageCacheThreadWorker::requestPhotoCount(int accountId, const QString &userId)
 {
     DatabaseError error;
-    SyncCache::PhotoCounter photoCounter = m_db.photoCount(&error);
+    SyncCache::PhotoCounter photoCounter = m_db.photoCount(accountId, userId, &error);
     if (error.errorCode != DatabaseError::NoError) {
-        emit requestPhotoCountFailed(error.errorMessage);
+        emit requestPhotoCountFailed(accountId, userId, error.errorMessage);
     } else {
-        emit requestPhotoCountFinished(photoCounter.count);
+        emit requestPhotoCountFinished(accountId, userId, photoCounter.count);
     }
 }
 
@@ -492,10 +492,10 @@ void ImageCache::requestPhotos(int accountId, const QString &userId, const QStri
     emit d->requestPhotos(accountId, userId, albumId);
 }
 
-void ImageCache::requestPhotoCount()
+void ImageCache::requestPhotoCount(int accountId, const QString &userId)
 {
     Q_D(ImageCache);
-    emit d->requestPhotoCount();
+    emit d->requestPhotoCount(accountId, userId);
 }
 
 void ImageCache::populateUserThumbnail(int idempToken, int accountId, const QString &userId, const QNetworkRequest &requestTemplate)

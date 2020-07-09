@@ -38,7 +38,7 @@ public Q_SLOTS:
     void requestUsers();
     void requestAlbums(int accountId, const QString &userId);
     void requestPhotos(int accountId, const QString &userId, const QString &albumId);
-    void requestPhotoCount();
+    void requestPhotoCount(int accountId, const QString &userId);
 
     void populateUserThumbnail(int idempToken, int accountId, const QString &userId, const QNetworkRequest &requestTemplate);
     void populateAlbumThumbnail(int idempToken, int accountId, const QString &userId, const QString &albumId, const QNetworkRequest &requestTemplate);
@@ -61,8 +61,8 @@ Q_SIGNALS:
     void requestPhotosFailed(int accountId, const QString &userId, const QString &albumId, const QString &errorMessage);
     void requestPhotosFinished(int accountId, const QString &userId, const QString &albumId, const QVector<SyncCache::Photo> &photos);
 
-    void requestPhotoCountFailed(const QString &errorMessage);
-    void requestPhotoCountFinished(int photoCount);
+    void requestPhotoCountFailed(int accountId, const QString &userId, const QString &errorMessage);
+    void requestPhotoCountFinished(int accountId, const QString &userId, int photoCount);
 
     void populateUserThumbnailFailed(int idempToken, const QString &errorMessage);
     void populateUserThumbnailFinished(int idempToken, const QString &path);
@@ -108,7 +108,7 @@ Q_SIGNALS:
     void requestUsers();
     void requestAlbums(int accountId, const QString &userId);
     void requestPhotos(int accountId, const QString &userId, const QString &albumId);
-    void requestPhotoCount();
+    void requestPhotoCount(int accountId, const QString &userId);
 
     bool populateUserThumbnail(int idempToken, int accountId, const QString &userId, const QNetworkRequest &requestTemplate);
     bool populateAlbumThumbnail(int idempToken, int accountId, const QString &userId, const QString &albumId, const QNetworkRequest &requestTemplate);

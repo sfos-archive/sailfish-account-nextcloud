@@ -271,7 +271,13 @@ Q_SIGNALS:
     void imageCacheChanged();
 
 private:
-    SyncCache::ImageCache *m_imageCache = nullptr;
+    void enabledUsersChanged();
+    void requestPhotoCount();
+    void reload();
+
+    QVector<SyncCache::User> m_users;
+    NextcloudEnabledUsersListener *m_enabledUsersListener = nullptr;
+    QMap<int, int> m_photoCounts;
     int m_count = 0;
 };
 
