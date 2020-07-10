@@ -87,7 +87,9 @@ Photo& Photo::operator=(const Photo &other)
 //-----------------------------------------------------------------------------
 
 ImageCacheThreadWorker::ImageCacheThreadWorker(QObject *parent)
-    : QObject(parent), m_downloader(nullptr)
+    : QObject(parent)
+    , m_db(nullptr, false) // don't emit changes to other processes
+    , m_downloader(nullptr)
 {
 }
 
@@ -116,6 +118,8 @@ void ImageCacheThreadWorker::openDatabase(const QString &accountType)
                 this, &ImageCacheThreadWorker::albumsDeleted);
         connect(&m_db, &ImageDatabase::photosDeleted,
                 this, &ImageCacheThreadWorker::photosDeleted);
+        connect(&m_db, &ImageDatabase::dataChanged,
+                this, &ImageCacheThreadWorker::dataChanged);
         emit openDatabaseFinished();
     }
 }
@@ -425,6 +429,7 @@ ImageCachePrivate::ImageCachePrivate(ImageCache *parent)
     connect(m_worker, &ImageCacheThreadWorker::usersDeleted, parent, &ImageCache::usersDeleted);
     connect(m_worker, &ImageCacheThreadWorker::albumsDeleted, parent, &ImageCache::albumsDeleted);
     connect(m_worker, &ImageCacheThreadWorker::photosDeleted, parent, &ImageCache::photosDeleted);
+    connect(m_worker, &ImageCacheThreadWorker::dataChanged, parent, &ImageCache::dataChanged);
 
     m_dbThread.start();
     m_dbThread.setPriority(QThread::IdlePriority);

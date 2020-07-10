@@ -92,7 +92,7 @@ public:
     QVector<const char *> createStatements() const override;
     QVector<UpgradeOperation> upgradeVersions() const override;
 
-    void preTransactionCommit() override;
+    bool preTransactionCommit() override;
     void transactionCommittedPreUnlock() override;
     void transactionCommittedPostUnlock() override;
     void transactionRolledBackPreUnlocked() override;

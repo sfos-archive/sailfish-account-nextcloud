@@ -223,6 +223,10 @@ static bool prepareDatabase(QSqlDatabase &database, const int currentSchemaVersi
 
 //-----------------------------------------------------------------------------
 
+DatabasePrivate::~DatabasePrivate()
+{
+}
+
 Database::Database(DatabasePrivate *dptr, QObject *parent)
     : QObject(parent), d_ptr(dptr)
 {
@@ -408,18 +412,24 @@ bool Database::commitTransaction(DatabaseError *error)
     ProcessMutex *mutex(processMutex());
 
     if (mutex->isLocked()) {
-        if (::commitTransaction(d->m_database)) {
-            d->m_inTransaction = false;
-            d->transactionCommittedPreUnlock();
-            mutex->unlock(); // process mutex.
-            d->transactionCommittedPostUnlock();
+        if (d->preTransactionCommit()) {
+            if (::commitTransaction(d->m_database)) {
+                d->m_inTransaction = false;
+                d->transactionCommittedPreUnlock();
+                mutex->unlock(); // process mutex.
+                d->transactionCommittedPostUnlock();
 
-            return true;
+                return true;
+            }
+
+            setDatabaseError(error, DatabaseError::TransactionError,
+                             QStringLiteral("Transaction error: unable to commit transaction: %1")
+                                       .arg(d->m_database.lastError().text()));
+        } else {
+            setDatabaseError(error, DatabaseError::TransactionError,
+                             QStringLiteral("Transaction error: pre-commit hook failed: %1")
+                                       .arg(d->m_database.lastError().text()));
         }
-
-        setDatabaseError(error, DatabaseError::TransactionError,
-                         QStringLiteral("Transaction error: unable to commit transaction: %1")
-                                   .arg(d->m_database.lastError().text()));
     } else {
         setDatabaseError(error, DatabaseError::TransactionLockError,
                          QStringLiteral("Lock error: no lock held on commit"));
