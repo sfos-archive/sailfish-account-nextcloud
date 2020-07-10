@@ -12,6 +12,7 @@
 #include "synccacheimagedownloads_p.h"
 
 #include <QtCore/QThread>
+#include <QtCore/QSaveFile>
 #include <QtCore/QFile>
 #include <QtCore/QDir>
 #include <QtCore/QStandardPaths>
@@ -164,15 +165,29 @@ void ImageDownloader::triggerDownload()
                         if (!dir.exists()) {
                             dir.mkpath(QStringLiteral("."));
                         }
-                        QFile file(dir.absoluteFilePath(download->m_fileName));
+                        QSaveFile file(dir.absoluteFilePath(download->m_fileName));
                         if (!file.open(QFile::WriteOnly)) {
                             download->setStatus(ImageDownload::Error,
                                                 QStringLiteral("Error opening image file %1 for writing: %2")
                                                         .arg(file.fileName(), file.errorString()));
                         } else {
-                            file.write(replyData);
-                            file.close();
-                            download->setStatus(ImageDownload::Downloaded);
+                            qint64 bytesToWrite = replyData.size();
+                            while (bytesToWrite > 0) {
+                                const qint64 written = file.write(replyData.mid(replyData.size() - bytesToWrite));
+                                if (written >= 0) {
+                                    bytesToWrite -= written;
+                                } else {
+                                    // error occurred while writing file
+                                    break;
+                                }
+                            }
+                            if (bytesToWrite == 0 && file.commit()) {
+                                download->setStatus(ImageDownload::Downloaded);
+                            } else {
+                                download->setStatus(ImageDownload::Error,
+                                                    QStringLiteral("Error writing image file %1 data: %2")
+                                                              .arg(file.fileName(), file.errorString()));
+                            }
                         }
                     }
                 }
