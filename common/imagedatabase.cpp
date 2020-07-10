@@ -664,13 +664,26 @@ Photo ImageDatabase::photo(int accountId, const QString &userId, const QString &
             error);
 }
 
-SyncCache::PhotoCounter ImageDatabase::photoCount(DatabaseError *error) const
+SyncCache::PhotoCounter ImageDatabase::photoCount(int accountId, const QString &userId, DatabaseError *error) const
 {
     SYNCCACHE_DB_D(const ImageDatabase);
 
-    const QString queryString = QStringLiteral("SELECT COUNT(*) FROM Photos");
+    QString queryString = QStringLiteral("SELECT COUNT(*) FROM Photos");
 
-    const QList<QPair<QString, QVariant> > bindValues;
+    QStringList conditions;
+    QList<QPair<QString, QVariant> > bindValues;
+
+    if (accountId > 0) {
+        conditions << QStringLiteral("accountId = :accountId");
+        bindValues << qMakePair<QString, QVariant>(QStringLiteral(":accountId"), accountId);
+    }
+    if (!userId.isEmpty()) {
+        conditions << QStringLiteral("userId = :userId");
+        bindValues << qMakePair<QString, QVariant>(QStringLiteral(":userId"), userId);
+    }
+    if (!conditions.isEmpty()) {
+        queryString += QStringLiteral(" WHERE ") + conditions.join(QStringLiteral(" AND "));
+    }
 
     auto resultHandler = [](DatabaseQuery &selectQuery) -> SyncCache::PhotoCounter {
         PhotoCounter counter;
