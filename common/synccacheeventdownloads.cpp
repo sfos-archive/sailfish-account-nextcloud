@@ -9,6 +9,7 @@
 
 #include "synccacheeventdownloads_p.h"
 
+#include <QtCore/QSaveFile>
 #include <QtCore/QFile>
 #include <QtCore/QDir>
 
@@ -135,7 +136,7 @@ void EventImageDownloader::triggerDownload()
                         if (!dir.exists()) {
                             dir.mkpath(QStringLiteral("."));
                         }
-                        QFile file(download->m_filePath);
+                        QSaveFile file(download->m_filePath);
                         if (!file.open(QFile::WriteOnly)) {
                             if (download->m_watcher) {
                                 emit download->m_watcher->downloadFailed(QStringLiteral("Error opening event image file %1 for writing: %2")
@@ -143,8 +144,12 @@ void EventImageDownloader::triggerDownload()
                             }
                         } else {
                             file.write(replyData);
-                            file.close();
-                            emit download->m_watcher->downloadFinished(download->m_filePath);
+                            if (file.commit()) {
+                                emit download->m_watcher->downloadFinished(download->m_filePath);
+                            } else {
+                                emit download->m_watcher->downloadFailed(QStringLiteral("Error writing event image file %1: %2")
+                                                                                   .arg(download->m_filePath, file.errorString()));
+                            }
                         }
                     }
                 }
