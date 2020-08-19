@@ -92,6 +92,7 @@ Provides synchronisation of posts blobs with Nextcloud.
 Summary:   Provides integration of Nextcloud notifications into Events view
 BuildRequires: pkgconfig(Qt5Gui)
 BuildRequires: pkgconfig(sailfishaccounts)
+Requires:      lipstick-jolla-home-qt5-components >= 1.2.50
 
 %description -n eventsview-extensions-nextcloud
 Provides integration of Nextcloud notifications into Events view
