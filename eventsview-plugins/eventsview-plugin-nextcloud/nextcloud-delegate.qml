@@ -1,6 +1,6 @@
 /****************************************************************************************
 **
-** Copyright (c) 2019 Open Mobile Platform LLC.
+** Copyright (c) 2019-2020 Open Mobile Platform LLC.
 ** All rights reserved.
 **
 ** License: Proprietary.
@@ -25,6 +25,7 @@ Column {
     property bool userRemovable
     property bool hasRemovableItems
     property real mainContentHeight
+
     signal expanded(int itemPosY)
 
     // used by lipstick
