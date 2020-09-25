@@ -33,8 +33,8 @@ NotificationGroupMember {
     Image {
         id: image
         y: Theme.paddingLarge
-        width: Theme.itemSizeMedium
-        height: Theme.itemSizeMedium
+        width: Theme.iconSizeMedium
+        height: Theme.iconSizeMedium
     }
 
     Column {
