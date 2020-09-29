@@ -6,9 +6,21 @@ Source0: %{name}-%{version}.tar.bz2
 Summary: Account plugin for Nextcloud
 BuildRequires: qt5-qmake
 BuildRequires: sailfish-svg2png
+Requires(post): %{_libexecdir}/manage-groups
+Requires(postun): %{_libexecdir}/manage-groups
 
 %description
 %{summary}.
+
+%post
+/sbin/ldconfig
+%{_libexecdir}/manage-groups add account-nextcloud || :
+
+%postun
+/sbin/ldconfig
+if [ "$1" -eq 0 ]; then
+    %{_libexecdir}/manage-groups remove account-nextcloud || :
+fi
 
 %files
 %defattr(-,root,root,-)
@@ -305,6 +317,3 @@ make
 %qmake5_install
 cd icons
 make INSTALL_ROOT=%{buildroot} install
-
-%post -p /sbin/ldconfig
-%postun -p /sbin/ldconfig

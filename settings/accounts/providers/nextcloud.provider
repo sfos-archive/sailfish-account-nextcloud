@@ -4,4 +4,8 @@
     <name>Nextcloud</name>
     <description>Nextcloud private cloud</description>
     <icon>image://theme/graphic-service-nextcloud</icon>
+
+    <tags>
+        <tag>user-group:account-nextcloud</tag>
+    </tags>
 </provider>
