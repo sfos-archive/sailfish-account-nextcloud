@@ -185,9 +185,7 @@ NotificationGroupItem {
             groupHighlighted: root.highlighted
             contentLeftMargin: groupHeader.textLeftMargin
 
-            readonly property bool lastItem: model.index === boundedModel.count - 1
-            roundedCorners: lastItem ? BubbleBackground.BottomLeft | BubbleBackground.BottomRight
-                                     : BubbleBackground.NoCorners
+            lastItem: model.index === boundedModel.count - 1
 
             onRemoveRequested: {
                 removeComponent.createObject(delegateItem, { "target": delegateItem })
