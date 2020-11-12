@@ -47,7 +47,7 @@ NotificationGroupMember {
             topMargin: -Theme.paddingSmall
         }
 
-        width: root.contentWidth - x - Theme.paddingMedium
+        width: root.width - x - root.contentLeftMargin - Theme.paddingMedium
         spacing: Theme.paddingSmall
 
         Label {
