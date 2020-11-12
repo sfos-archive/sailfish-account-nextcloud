@@ -69,7 +69,10 @@ Column {
             collapsed: root.collapsed
             showingInActiveView: root.showingInActiveView
 
-            onExpanded: root.expanded(itemPosY)
+            onExpanded: {
+                root.collapsed = false
+                root.expanded(itemPosY)
+            }
 
             onUserRemovableChanged: {
                 var _userRemovable = true

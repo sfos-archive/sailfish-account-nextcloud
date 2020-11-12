@@ -29,7 +29,6 @@ NotificationGroupItem {
     property int _modelCount: listView.model.count
     property int _expansionThreshold: 5
     property int _expansionMaximum: 10
-    property bool _manuallyExpanded
     property string _hostUrl
 
     signal expanded(int itemPosY)
@@ -66,11 +65,6 @@ NotificationGroupItem {
     height: _modelCount === 0 ? 0 : expansionToggle.y + expansionToggle.height
     draggable: groupHeader.draggable
 
-    onCollapsedChanged: {
-        if (!collapsed) {
-            root._manuallyExpanded = false
-        }
-    }
     onSwipedAway: if (model) removeComponent.createObject(root, { "target": root })
 
     NotificationGroupHeader {
@@ -122,16 +116,15 @@ NotificationGroupItem {
                     || eventModel.count > _expansionMaximum
         enabled: expandable && !groupHeader.drag.active
 
-        title: !item._manuallyExpanded
+        title: root.collapsed
                ? defaultTitle
                  //% "Show more in Nextcloud"
                : qsTrId("lipstick-jolla-home-la-show-more-in-nextcloud")
         remainingCount: eventModel.count - boundedModel.count
 
         onClicked: {
-            if (!root._manuallyExpanded) {
+            if (root.collapsed) {
                 var itemPosY = listView.contentHeight + groupHeader.height - Theme.paddingLarge
-                root._manuallyExpanded = true
                 root.expanded(itemPosY)
             } else {
                 if (root._hostUrl.length > 0) {
@@ -168,7 +161,7 @@ NotificationGroupItem {
     BoundedModel {
         id: boundedModel
         model: eventModel
-        maximumCount: root._manuallyExpanded ? root._expansionMaximum : root._expansionThreshold
+        maximumCount: !root.collapsed ? root._expansionMaximum : root._expansionThreshold
 
         delegate: NextcloudFeedItem {
             id: delegateItem
