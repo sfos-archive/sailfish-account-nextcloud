@@ -69,12 +69,16 @@ Column {
             collapsed: root.collapsed
             showingInActiveView: root.showingInActiveView
 
-            onExpanded: root.expanded(itemPosY)
+            onExpanded: {
+                root.collapsed = false
+                root.expanded(itemPosY)
+            }
 
             onUserRemovableChanged: {
                 var _userRemovable = true
                 for (var i = 0; i < accountFeedRepeater.count; ++i) {
-                    if (!accountFeedRepeater.itemAt(i).userRemovable) {
+                    var item = accountFeedRepeater.itemAt(i)
+                    if (!!item && !item.userRemovable) {
                         _userRemovable = false
                         break
                     }
@@ -85,7 +89,8 @@ Column {
             onHasRemovableItemsChanged: {
                 var _hasRemovableItems = true
                 for (var i = 0; i < accountFeedRepeater.count; ++i) {
-                    if (!accountFeedRepeater.itemAt(i).hasRemovableItems) {
+                    var item = accountFeedRepeater.itemAt(i)
+                    if (!!item && !item.hasRemovableItems) {
                         _hasRemovableItems = false
                         break
                     }
@@ -96,7 +101,10 @@ Column {
             onMainContentHeightChanged: {
                 var _mainContentHeight = 0
                 for (var i = 0; i < accountFeedRepeater.count; ++i) {
-                    _mainContentHeight += accountFeedRepeater.itemAt(i).mainContentHeight
+                    var item = accountFeedRepeater.itemAt(i)
+                    if (!!item) {
+                        _mainContentHeight += item.mainContentHeight
+                    }
                 }
                 root.mainContentHeight = _mainContentHeight
             }
