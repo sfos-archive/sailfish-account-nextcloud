@@ -6,6 +6,22 @@ Source0: %{name}-%{version}.tar.bz2
 Summary: Account plugin for Nextcloud
 BuildRequires: qt5-qmake
 BuildRequires: sailfish-svg2png
+BuildRequires: pkgconfig(Qt5Core)
+BuildRequires: pkgconfig(Qt5DBus)
+BuildRequires: pkgconfig(Qt5Sql)
+BuildRequires: pkgconfig(Qt5Network)
+BuildRequires: pkgconfig(Qt5Gui)
+BuildRequires: pkgconfig(Qt5Qml)
+BuildRequires: pkgconfig(mlite5)
+BuildRequires: pkgconfig(buteosyncfw5)
+BuildRequires: pkgconfig(libsignon-qt5)
+BuildRequires: pkgconfig(accounts-qt5)
+BuildRequires: pkgconfig(socialcache)
+BuildRequires: pkgconfig(libsailfishkeyprovider)
+BuildRequires: pkgconfig(sailfishaccounts)
+BuildRequires: pkgconfig(nemotransferengine-qt5)
+BuildRequires: qt5-qttools
+BuildRequires: qt5-qttools-linguist
 Requires(post): %{_libexecdir}/manage-groups
 Requires(postun): %{_libexecdir}/manage-groups
 
@@ -69,19 +85,6 @@ fi
 
 %package -n buteo-sync-plugin-nextcloud-posts
 Summary:   Provides synchronisation of posts blobs with Nextcloud
-BuildRequires: pkgconfig(Qt5Core)
-BuildRequires: pkgconfig(Qt5DBus)
-BuildRequires: pkgconfig(Qt5Sql)
-BuildRequires: pkgconfig(Qt5Network)
-BuildRequires: pkgconfig(Qt5Gui)
-BuildRequires: pkgconfig(Qt5Qml)
-BuildRequires: pkgconfig(mlite5)
-BuildRequires: pkgconfig(buteosyncfw5)
-BuildRequires: pkgconfig(libsignon-qt5)
-BuildRequires: pkgconfig(accounts-qt5)
-BuildRequires: pkgconfig(socialcache)
-BuildRequires: pkgconfig(libsailfishkeyprovider)
-BuildRequires: pkgconfig(sailfishaccounts)
 Requires: %{name} = %{version}-%{release}
 Requires: buteo-syncfw-qt5-msyncd
 Requires: systemd
@@ -102,8 +105,6 @@ Provides synchronisation of posts blobs with Nextcloud.
 
 %package -n eventsview-extensions-nextcloud
 Summary:   Provides integration of Nextcloud notifications into Events view
-BuildRequires: pkgconfig(Qt5Gui)
-BuildRequires: pkgconfig(sailfishaccounts)
 Requires:      lipstick-jolla-home-qt5-components >= 1.2.50
 
 %description -n eventsview-extensions-nextcloud
@@ -130,17 +131,6 @@ Translation source for Events Nextcloud plugin.
 
 %package -n buteo-sync-plugin-nextcloud-backup
 Summary:   Provides synchronisation of backup/restore blobs with Nextcloud
-BuildRequires: pkgconfig(Qt5Core)
-BuildRequires: pkgconfig(Qt5DBus)
-BuildRequires: pkgconfig(Qt5Sql)
-BuildRequires: pkgconfig(Qt5Network)
-BuildRequires: pkgconfig(mlite5)
-BuildRequires: pkgconfig(buteosyncfw5)
-BuildRequires: pkgconfig(libsignon-qt5)
-BuildRequires: pkgconfig(accounts-qt5)
-BuildRequires: pkgconfig(socialcache)
-BuildRequires: pkgconfig(libsailfishkeyprovider)
-BuildRequires: pkgconfig(sailfishaccounts)
 Requires: %{name} = %{version}-%{release}
 Requires: buteo-syncfw-qt5-msyncd
 Requires: systemd
@@ -169,17 +159,6 @@ Provides synchronisation of backup/restore blobs with Nextcloud.
 
 %package -n buteo-sync-plugin-nextcloud-images
 Summary:   Provides synchronisation of gallery images with Nextcloud
-BuildRequires: pkgconfig(Qt5Core)
-BuildRequires: pkgconfig(Qt5DBus)
-BuildRequires: pkgconfig(Qt5Sql)
-BuildRequires: pkgconfig(Qt5Network)
-BuildRequires: pkgconfig(mlite5)
-BuildRequires: pkgconfig(buteosyncfw5)
-BuildRequires: pkgconfig(libsignon-qt5)
-BuildRequires: pkgconfig(accounts-qt5)
-BuildRequires: pkgconfig(socialcache)
-BuildRequires: pkgconfig(libsailfishkeyprovider)
-BuildRequires: pkgconfig(sailfishaccounts)
 Requires: %{name} = %{version}-%{release}
 Requires: buteo-syncfw-qt5-msyncd
 Requires: systemd
@@ -200,11 +179,6 @@ Provides synchronisation of gallery images with Nextcloud.
 
 %package -n jolla-gallery-extension-nextcloud
 Summary:   Provides integration of Nextcloud images into Gallery application
-BuildRequires: pkgconfig(Qt5Gui)
-BuildRequires: pkgconfig(Qt5Qml)
-BuildRequires: pkgconfig(Qt5DBus)
-BuildRequires: pkgconfig(accounts-qt5)
-BuildRequires: pkgconfig(sailfishaccounts)
 Requires: sailfish-components-gallery-qt5 >= 1.1.9
 Requires: sailfish-components-filemanager >= 0.2.17
 
@@ -242,22 +216,6 @@ Translation source for Gallery Nextcloud plugin.
 
 %package -n transferengine-plugin-nextcloud
 Summary: Nextcloud file sharing plugin for Transfer Engine
-BuildRequires: pkgconfig(Qt5Core)
-BuildRequires: pkgconfig(Qt5DBus)
-BuildRequires: pkgconfig(Qt5Sql)
-BuildRequires: pkgconfig(Qt5Network)
-BuildRequires: pkgconfig(Qt5Gui)
-BuildRequires: pkgconfig(Qt5Qml)
-BuildRequires: pkgconfig(mlite5)
-BuildRequires: pkgconfig(buteosyncfw5)
-BuildRequires: pkgconfig(libsignon-qt5)
-BuildRequires: pkgconfig(accounts-qt5)
-BuildRequires: pkgconfig(socialcache)
-BuildRequires: pkgconfig(libsailfishkeyprovider)
-BuildRequires: pkgconfig(nemotransferengine-qt5)
-BuildRequires: pkgconfig(sailfishaccounts)
-BuildRequires: qt5-qttools
-BuildRequires: qt5-qttools-linguist
 Requires: sailfishsilica-qt5 >= 1.1.108
 Requires: declarative-transferengine-qt5 >= 0.3.13
 Requires: %{name} = %{version}-%{release}
