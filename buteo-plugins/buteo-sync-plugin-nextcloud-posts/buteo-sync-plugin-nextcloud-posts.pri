@@ -1,7 +1,7 @@
 QT -= gui
 
 include($$PWD/../../common/webdav.pri)
-include($$PWD/../../common/synccacheevents.pri)
+include($$PWD/../../common/common.pri)
 
 CONFIG += link_pkgconfig
 PKGCONFIG += mlite5

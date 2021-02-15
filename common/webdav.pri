@@ -2,8 +2,9 @@ QT += network dbus
 CONFIG += link_pkgconfig
 PKGCONFIG += buteosyncfw5
 
-include($$PWD/common.pri)
-include($$PWD/auth.pri)
+PKGCONFIG += libsignon-qt5 accounts-qt5 sailfishaccounts
+
+INCLUDEPATH += $$PWD
 
 HEADERS += \
     $$PWD/webdavsyncer_p.h \

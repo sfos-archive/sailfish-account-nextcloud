@@ -6,9 +6,7 @@ DEPENDPATH += .
 QT += network
 
 CONFIG += link_pkgconfig
-PKGCONFIG += nemotransferengine-qt5 accounts-qt5
-
-include($$PWD/../../common/auth.pri)
+PKGCONFIG += nemotransferengine-qt5 accounts-qt5 sailfishaccounts
 
 HEADERS += nextcloudshareplugin.h \
            nextclouduploader.h \
