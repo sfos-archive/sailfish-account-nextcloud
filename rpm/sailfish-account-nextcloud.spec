@@ -42,6 +42,8 @@ fi
 %defattr(-,root,root,-)
 %{_libdir}/libnextcloudcommon.so.*
 %exclude %{_libdir}/libnextcloudcommon.so
+%{_libdir}/libnextcloudbuteocommon.so.*
+%exclude %{_libdir}/libnextcloudbuteocommon.so
 %{_datadir}/accounts/providers/nextcloud.provider
 %{_datadir}/accounts/services/nextcloud-backup.service
 %{_datadir}/accounts/services/nextcloud-caldav.service

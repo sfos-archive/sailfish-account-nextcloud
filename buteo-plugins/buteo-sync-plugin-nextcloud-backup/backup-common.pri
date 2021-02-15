@@ -1,6 +1,6 @@
 QT -= gui
 
-include($$PWD/../../common/webdav.pri)
+include($$PWD/../buteo-common/buteo-common.pri)
 
 INCLUDEPATH += $$PWD
 

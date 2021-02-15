@@ -1,8 +1,8 @@
-include($$PWD/../../common/webdav.pri)
+include($$PWD/../buteo-common/buteo-common.pri)
 include($$PWD/../../common/common.pri)
 
 CONFIG += link_pkgconfig
-PKGCONFIG += accounts-qt5
+PKGCONFIG += accounts-qt5 buteosyncfw5
 
 INCLUDEPATH += $$PWD
 
