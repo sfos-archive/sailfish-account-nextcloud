@@ -269,7 +269,7 @@ features to image (e.g. sharing, image sync, backups, etc).
 
 %build
 %qmake5 "VERSION=%{version}" "DEFINES+=BUTEO_OUT_OF_PROCESS_SUPPORT"
-make
+%make_build
 
 %install
 %qmake5_install
