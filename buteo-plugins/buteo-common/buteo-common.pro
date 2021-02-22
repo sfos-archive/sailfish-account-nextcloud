@@ -1,9 +1,14 @@
+TEMPLATE = lib
+
+TARGET = nextcloudbuteocommon
+TARGET = $$qtLibraryTarget($$TARGET)
+
+QT -= gui
 QT += network dbus
 CONFIG += link_pkgconfig
-PKGCONFIG += buteosyncfw5
+PKGCONFIG += buteosyncfw5 sailfishaccounts
 
-include($$PWD/common.pri)
-include($$PWD/auth.pri)
+INCLUDEPATH += $$PWD
 
 HEADERS += \
     $$PWD/webdavsyncer_p.h \
@@ -14,3 +19,8 @@ SOURCES += \
     $$PWD/webdavsyncer.cpp \
     $$PWD/networkrequestgenerator.cpp \
     $$PWD/networkreplyparser.cpp
+
+TARGETPATH = $$[QT_INSTALL_LIBS]
+target.path = $$TARGETPATH
+
+INSTALLS += target

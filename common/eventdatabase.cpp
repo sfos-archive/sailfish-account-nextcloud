@@ -22,7 +22,8 @@
 
 using namespace SyncCache;
 
-static bool upgradeVersion1to2Fn(QSqlDatabase &database) {
+static bool upgradeVersion1to2Fn(QSqlDatabase &database)
+{
     QSqlQuery alterTableQuery(QStringLiteral("ALTER TABLE Events ADD eventSubject TEXT;"), database);
     if (alterTableQuery.lastError().isValid()) {
         qWarning() << "Failed to update events database schema for version 2:" << alterTableQuery.lastError().text();
@@ -40,7 +41,8 @@ static bool upgradeVersion1to2Fn(QSqlDatabase &database) {
     return true;
 }
 
-static bool upgradeVersion2to3Fn(QSqlDatabase &database) {
+static bool upgradeVersion2to3Fn(QSqlDatabase &database)
+{
     QSqlQuery alterTableQuery(QStringLiteral("ALTER TABLE Events ADD deletedLocally BOOL;"), database);
     if (alterTableQuery.lastError().isValid()) {
         qWarning() << "Failed to update events database schema for version 3:" << alterTableQuery.lastError().text();
