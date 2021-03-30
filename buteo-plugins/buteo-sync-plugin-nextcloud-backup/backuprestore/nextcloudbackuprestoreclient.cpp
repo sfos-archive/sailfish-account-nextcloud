@@ -1,6 +1,7 @@
 /****************************************************************************************
 **
 ** Copyright (c) 2020 Open Mobile Platform LLC
+** Copyright (c) 2021 Jolla Ltd.
 ** All rights reserved.
 **
 ** License: Proprietary.
@@ -14,18 +15,14 @@
 #include <PluginCbInterface.h>
 #include <SyncProfile.h>
 
-extern "C" NextcloudBackupRestoreClient* createPlugin(
+Buteo::ClientPlugin* NextcloudBackupRestoreClientLoader::createClientPlugin(
         const QString& pluginName,
         const Buteo::SyncProfile& profile,
-        Buteo::PluginCbInterface *cbInterface)
+        Buteo::PluginCbInterface* cbInterface)
 {
     return new NextcloudBackupRestoreClient(pluginName, profile, cbInterface);
 }
 
-extern "C" void destroyPlugin(NextcloudBackupRestoreClient *client)
-{
-    delete client;
-}
 
 NextcloudBackupRestoreClient::NextcloudBackupRestoreClient(
         const QString& pluginName,

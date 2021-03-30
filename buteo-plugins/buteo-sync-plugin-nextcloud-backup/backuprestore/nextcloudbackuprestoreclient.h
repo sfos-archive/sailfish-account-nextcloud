@@ -1,6 +1,7 @@
 /****************************************************************************************
 **
 ** Copyright (c) 2020 Open Mobile Platform LLC
+** Copyright (c) 2021 Jolla Ltd.
 ** All rights reserved.
 **
 ** License: Proprietary.
@@ -11,6 +12,8 @@
 #define NEXTCLOUD_BACKUPQUERY_CLIENT_H
 
 #include "nextcloudbackupoperationclient.h"
+
+#include <buteosyncfw5/SyncPluginLoader.h>
 
 class Q_DECL_EXPORT NextcloudBackupRestoreClient : public NextcloudBackupOperationClient
 {
@@ -27,10 +30,16 @@ protected:
     Syncer *newSyncer() override;
 };
 
-extern "C" NextcloudBackupRestoreClient* createPlugin(const QString &pluginName,
-                                               const Buteo::SyncProfile &profile,
-                                               Buteo::PluginCbInterface *cbInterface);
+class NextcloudBackupRestoreClientLoader : public Buteo::SyncPluginLoader
+{
+    Q_OBJECT
+    Q_PLUGIN_METADATA(IID "org.sailfishos.plugins.sync.NextcloudBackupRestoreClientLoader")
+    Q_INTERFACES(Buteo::SyncPluginLoader)
 
-extern "C" void destroyPlugin(NextcloudBackupRestoreClient *client);
+public:
+    Buteo::ClientPlugin* createClientPlugin(const QString& pluginName,
+                                            const Buteo::SyncProfile& profile,
+                                            Buteo::PluginCbInterface* cbInterface) override;
+};
 
 #endif // NEXTCLOUD_BACKUPQUERY_CLIENT_H

@@ -1,6 +1,7 @@
 /****************************************************************************************
 **
 ** Copyright (C) 2019 Open Mobile Platform LLC
+** Copyright (C) 2021 Jolla Ltd.
 ** All rights reserved.
 **
 ** License: Proprietary.
@@ -12,6 +13,7 @@
 
 // Buteo
 #include <ClientPlugin.h>
+#include <SyncPluginLoader.h>
 #include <SyncProfile.h>
 #include <SyncResults.h>
 #include <SyncCommonDefs.h>
@@ -59,10 +61,16 @@ private:
     int m_accountId;
 };
 
-extern "C" NextcloudPostsClient* createPlugin(const QString &pluginName,
-                                               const Buteo::SyncProfile &profile,
-                                               Buteo::PluginCbInterface *cbInterface);
+class NextcloudPostsClientLoader : public Buteo::SyncPluginLoader
+{
+    Q_OBJECT
+    Q_PLUGIN_METADATA(IID "org.sailfishos.plugins.sync.NextcloudPostsClientLoader")
+    Q_INTERFACES(Buteo::SyncPluginLoader)
 
-extern "C" void destroyPlugin(NextcloudPostsClient *client);
+public:
+    Buteo::ClientPlugin* createClientPlugin(const QString& pluginName,
+                                            const Buteo::SyncProfile& profile,
+                                            Buteo::PluginCbInterface* cbInterface) override;
+};
 
 #endif // NEXTCLOUD_POSTS_CLIENT_H
