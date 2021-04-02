@@ -1,6 +1,7 @@
 /****************************************************************************************
 **
 ** Copyright (C) 2019 Open Mobile Platform LLC
+** Copyright (C) 2021 Jolla Ltd.
 ** All rights reserved.
 **
 ** License: Proprietary.
@@ -18,18 +19,14 @@
 #include <ProfileEngineDefs.h>
 #include <ProfileManager.h>
 
-extern "C" NextcloudPostsClient* createPlugin(
+Buteo::ClientPlugin* NextcloudPostsClientLoader::createClientPlugin(
         const QString& pluginName,
         const Buteo::SyncProfile& profile,
-        Buteo::PluginCbInterface *cbInterface)
+        Buteo::PluginCbInterface* cbInterface)
 {
     return new NextcloudPostsClient(pluginName, profile, cbInterface);
 }
 
-extern "C" void destroyPlugin(NextcloudPostsClient *client)
-{
-    delete client;
-}
 
 NextcloudPostsClient::NextcloudPostsClient(
         const QString& pluginName,

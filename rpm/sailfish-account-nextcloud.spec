@@ -13,7 +13,7 @@ BuildRequires: pkgconfig(Qt5Network)
 BuildRequires: pkgconfig(Qt5Gui)
 BuildRequires: pkgconfig(Qt5Qml)
 BuildRequires: pkgconfig(mlite5)
-BuildRequires: pkgconfig(buteosyncfw5)
+BuildRequires: pkgconfig(buteosyncfw5) >= 0.10.0
 BuildRequires: pkgconfig(libsignon-qt5)
 BuildRequires: pkgconfig(accounts-qt5)
 BuildRequires: pkgconfig(socialcache)
@@ -99,10 +99,7 @@ Provides synchronisation of posts blobs with Nextcloud.
 
 %files -n buteo-sync-plugin-nextcloud-posts
 %defattr(-,root,root,-)
-#out-of-process-plugin form:
-%{_libdir}/buteo-plugins-qt5/oopp/nextcloud-posts-client
-#in-process-plugin form:
-#%%{_libdir}/buteo-plugins-qt5/libnextcloud-posts-client.so
+%{_libdir}/buteo-plugins-qt5/oopp/libnextcloud-posts-client.so
 %config %{_sysconfdir}/buteo/profiles/client/nextcloud-posts.xml
 %config %{_sysconfdir}/buteo/profiles/sync/nextcloud.Posts.xml
 
@@ -145,14 +142,9 @@ Provides synchronisation of backup/restore blobs with Nextcloud.
 
 %files -n buteo-sync-plugin-nextcloud-backup
 %defattr(-,root,root,-)
-#out-of-process-plugin form:
-%{_libdir}/buteo-plugins-qt5/oopp/nextcloud-backup-client
-%{_libdir}/buteo-plugins-qt5/oopp/nextcloud-backupquery-client
-%{_libdir}/buteo-plugins-qt5/oopp/nextcloud-backuprestore-client
-#in-process-plugin form:
-#%%{_libdir}/buteo-plugins-qt5/libnextcloud-backup-client.so
-#%%{_libdir}/buteo-plugins-qt5/libnextcloud-backupquery-client.so
-#%%{_libdir}/buteo-plugins-qt5/libnextcloud-backuprestore-client.so
+%{_libdir}/buteo-plugins-qt5/oopp/libnextcloud-backup-client.so
+%{_libdir}/buteo-plugins-qt5/oopp/libnextcloud-backupquery-client.so
+%{_libdir}/buteo-plugins-qt5/oopp/libnextcloud-backuprestore-client.so
 %config %{_sysconfdir}/buteo/profiles/client/nextcloud-backup.xml
 %config %{_sysconfdir}/buteo/profiles/client/nextcloud-backupquery.xml
 %config %{_sysconfdir}/buteo/profiles/client/nextcloud-backuprestore.xml
@@ -173,10 +165,7 @@ Provides synchronisation of gallery images with Nextcloud.
 
 %files -n buteo-sync-plugin-nextcloud-images
 %defattr(-,root,root,-)
-#out-of-process-plugin form:
-%{_libdir}/buteo-plugins-qt5/oopp/nextcloud-images-client
-#in-process-plugin form:
-#%%{_libdir}/buteo-plugins-qt5/libnextcloud-images-client.so
+%{_libdir}/buteo-plugins-qt5/oopp/libnextcloud-images-client.so
 %config %{_sysconfdir}/buteo/profiles/client/nextcloud-images.xml
 %config %{_sysconfdir}/buteo/profiles/sync/nextcloud.Images.xml
 
@@ -272,7 +261,7 @@ features to image (e.g. sharing, image sync, backups, etc).
 %setup -q -n %{name}-%{version}
 
 %build
-%qmake5 "VERSION=%{version}" "DEFINES+=BUTEO_OUT_OF_PROCESS_SUPPORT"
+%qmake5 "VERSION=%{version}"
 %make_build
 
 %install
