@@ -52,7 +52,7 @@ void NextcloudImagesClient::connectivityStateChanged(Sync::ConnectivityType type
     LOG_DEBUG("Received connectivity change event:" << type << " changed to " << state);
     if (type == Sync::CONNECTIVITY_INTERNET && !state) {
         // we lost connectivity during sync.
-        abortSync(Sync::SYNC_CONNECTION_ERROR);
+        abortSync(Buteo::SyncResults::CONNECTION_ERROR);
     }
 }
 
@@ -106,18 +106,13 @@ void NextcloudImagesClient::syncFailed()
     syncFinished(Buteo::SyncResults::INTERNAL_ERROR, QString());
 }
 
-void NextcloudImagesClient::abortSync(Sync::SyncStatus status)
-{
-    abort(status);
-}
-
-void NextcloudImagesClient::abort(Sync::SyncStatus status)
+void NextcloudImagesClient::abortSync(Buteo::SyncResults::MinorCode minorErrorCode)
 {
     m_syncer->abortSync();
-    syncFinished(status, QStringLiteral("Sync aborted"));
+    syncFinished(minorErrorCode, QStringLiteral("Sync aborted"));
 }
 
-void NextcloudImagesClient::syncFinished(int minorErrorCode, const QString &message)
+void NextcloudImagesClient::syncFinished(Buteo::SyncResults::MinorCode minorErrorCode, const QString &message)
 {
     if (minorErrorCode == Buteo::SyncResults::NO_ERROR) {
         LOG_DEBUG("Nextcloud Images sync succeeded!" << message);

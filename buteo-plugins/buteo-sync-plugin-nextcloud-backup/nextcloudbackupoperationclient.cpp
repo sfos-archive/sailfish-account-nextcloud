@@ -40,7 +40,7 @@ void NextcloudBackupOperationClient::connectivityStateChanged(Sync::Connectivity
     LOG_DEBUG("Received connectivity change event:" << type << " changed to " << state);
     if (type == Sync::CONNECTIVITY_INTERNET && !state) {
         // we lost connectivity during sync.
-        abortSync(Sync::SYNC_CONNECTION_ERROR);
+        abortSync(Buteo::SyncResults::CONNECTION_ERROR);
     }
 }
 
@@ -94,18 +94,13 @@ void NextcloudBackupOperationClient::syncFailed()
     syncFinished(Buteo::SyncResults::INTERNAL_ERROR, QString());
 }
 
-void NextcloudBackupOperationClient::abortSync(Sync::SyncStatus status)
-{
-    abort(status);
-}
-
-void NextcloudBackupOperationClient::abort(Sync::SyncStatus status)
+void NextcloudBackupOperationClient::abortSync(Buteo::SyncResults::MinorCode minorErrorCode)
 {
     m_syncer->abortSync();
-    syncFinished(status, QStringLiteral("Sync aborted"));
+    syncFinished(minorErrorCode, QStringLiteral("Sync aborted"));
 }
 
-void NextcloudBackupOperationClient::syncFinished(int minorErrorCode, const QString &message)
+void NextcloudBackupOperationClient::syncFinished(Buteo::SyncResults::MinorCode minorErrorCode, const QString &message)
 {
     if (minorErrorCode == Buteo::SyncResults::NO_ERROR) {
         LOG_DEBUG("Nextcloud Backup sync succeeded!" << message);
