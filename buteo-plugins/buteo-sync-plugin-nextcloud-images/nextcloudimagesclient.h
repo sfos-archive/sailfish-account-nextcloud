@@ -36,7 +36,7 @@ public:
     bool init();
     bool uninit();
     bool startSync();
-    void abortSync(Sync::SyncStatus aStatus = Sync::SYNC_ABORTED);
+    void abortSync(Buteo::SyncResults::MinorCode minorErrorCode);
     Buteo::SyncResults getSyncResults() const;
     bool cleanUp();
 
@@ -48,8 +48,7 @@ private Q_SLOTS:
     void syncFailed();
 
 private:
-    void abort(Sync::SyncStatus status = Sync::SYNC_ABORTED);
-    void syncFinished(int minorErrorCode, const QString &message);
+    void syncFinished(Buteo::SyncResults::MinorCode minorErrorCode, const QString &message);
     Buteo::SyncProfile::SyncDirection syncDirection();
     Buteo::SyncProfile::ConflictResolutionPolicy conflictResolutionPolicy();
 

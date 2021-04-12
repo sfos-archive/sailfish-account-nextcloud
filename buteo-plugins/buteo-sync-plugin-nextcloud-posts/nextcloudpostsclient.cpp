@@ -51,7 +51,7 @@ void NextcloudPostsClient::connectivityStateChanged(Sync::ConnectivityType type,
     LOG_DEBUG("Received connectivity change event:" << type << " changed to " << state);
     if (type == Sync::CONNECTIVITY_INTERNET && !state) {
         // we lost connectivity during sync.
-        abortSync(Sync::SYNC_CONNECTION_ERROR);
+        abortSync(Buteo::SyncResults::CONNECTION_ERROR);
     }
 }
 
@@ -105,18 +105,13 @@ void NextcloudPostsClient::syncFailed()
     syncFinished(Buteo::SyncResults::INTERNAL_ERROR, QString());
 }
 
-void NextcloudPostsClient::abortSync(Sync::SyncStatus status)
-{
-    abort(status);
-}
-
-void NextcloudPostsClient::abort(Sync::SyncStatus status)
+void NextcloudPostsClient::abortSync(Buteo::SyncResults::MinorCode minorErrorCode)
 {
     m_syncer->abortSync();
-    syncFinished(status, QStringLiteral("Sync aborted"));
+    syncFinished(minorErrorCode, QStringLiteral("Sync aborted"));
 }
 
-void NextcloudPostsClient::syncFinished(int minorErrorCode, const QString &message)
+void NextcloudPostsClient::syncFinished(Buteo::SyncResults::MinorCode minorErrorCode, const QString &message)
 {
     if (minorErrorCode == Buteo::SyncResults::NO_ERROR) {
         LOG_DEBUG("Nextcloud Posts sync succeeded!" << message);
