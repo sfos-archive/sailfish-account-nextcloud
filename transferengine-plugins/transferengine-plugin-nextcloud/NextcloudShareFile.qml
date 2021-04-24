@@ -9,10 +9,10 @@
 import QtQuick 2.6
 import Sailfish.Silica 1.0
 import Sailfish.Accounts 1.0
+import Sailfish.Share 1.0
 import Sailfish.TransferEngine 1.0
-import Sailfish.TransferEngine.Nextcloud 1.0 // for translations
 
-ShareFilePreviewDialog {
+ShareFilePreview {
     id: root
 
     imageScaleVisible: false
@@ -22,13 +22,15 @@ ShareFilePreviewDialog {
     remoteDirName: account.savedRemoteDirName
     remoteDirReadOnly: false
 
-    onAccepted: {
-        if (account.updateShareConfig()) {
-            // Do blocking sync, else the sync may not finish before the page is popped and
-            // possibly destroyed.
-            account.blockingSync()
+    Connections {
+        target: root.sailfishAction
+
+        onDone: {
+            if (account.updateShareConfig()) {
+                // Do blocking sync, else the sync may not finish before the object is destroyed.
+                account.blockingSync()
+            }
         }
-        shareItem.start()
     }
 
     Account {
@@ -52,7 +54,7 @@ ShareFilePreviewDialog {
             return true
         }
 
-        identifier: root.accountId
+        identifier: root.sailfishTransfer.transferMethodInfo.accountId
 
         onStatusChanged: {
             if (status === Account.Initialized) {
@@ -68,3 +70,4 @@ ShareFilePreviewDialog {
         }
     }
 }
+

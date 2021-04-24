@@ -63,7 +63,7 @@ void NextcloudPluginInfo::serviceReady()
 
         info.methodId        = QLatin1String("Nextcloud");
         info.accountIcon     = QLatin1String("image://theme/graphic-m-service-nextcloud");
-        info.shareUIPath     = QLatin1String("/usr/share/nemo-transferengine/plugins/NextcloudShareDialog.qml");
+        info.shareUIPath     = QLatin1String("/usr/share/nemo-transferengine/plugins/NextcloudShareFile.qml");
         info.capabilitities  = m_capabilities;
 
         m_info << info;

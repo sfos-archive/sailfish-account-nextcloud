@@ -1,3 +1,0 @@
-module Sailfish.TransferEngine.Nextcloud
-plugin sailfishtransferenginenextcloudplugin
-NextcloudShareFile 1.0 NextcloudShareFile.qml

@@ -22,4 +22,9 @@ SOURCES += nextcloudshareplugin.cpp \
 
 target.path = $$[QT_INSTALL_LIBS]/nemo-transferengine/plugins
 
-INSTALLS += target
+OTHER_FILES += *.qml
+
+shareui.files = NextcloudShareFile.qml
+shareui.path = /usr/share/nemo-transferengine/plugins
+
+INSTALLS += target shareui
