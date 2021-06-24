@@ -23,7 +23,7 @@ ShareFilePreview {
     remoteDirReadOnly: false
 
     Connections {
-        target: root.sailfishAction
+        target: root.sailfishAction || null
 
         onDone: {
             if (account.updateShareConfig()) {
