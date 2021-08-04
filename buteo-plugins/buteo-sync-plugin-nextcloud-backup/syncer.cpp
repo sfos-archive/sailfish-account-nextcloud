@@ -11,6 +11,7 @@
 
 #include "networkrequestgenerator_p.h"
 #include "networkreplyparser_p.h"
+#include "logging.h"
 
 #include <QtCore/QDateTime>
 #include <QtCore/QUrl>
@@ -27,7 +28,6 @@
 
 // buteo
 #include <SyncProfile.h>
-#include <LogMacros.h>
 
 // libaccounts-qt5
 #include <Accounts/Account>
@@ -58,7 +58,7 @@ Syncer::~Syncer()
 
 void Syncer::beginSync()
 {
-    LOG_DEBUG("Starting Nextcloud operation:" << m_operation);
+    qCDebug(lcNextcloud) << "Starting Nextcloud operation:" << m_operation;
 
     m_remoteBackupDirPath = initBackupDir();
     if (m_remoteBackupDirPath.isEmpty()) {
@@ -113,7 +113,7 @@ void Syncer::cloudBackupStatusChanged(int accountId, const QString &status)
         return;
     }
 
-    LOG_DEBUG("Backup status changed:" << status << "for file:" << m_localFileInfo.absoluteFilePath());
+    qCDebug(lcNextcloud) << "Backup status changed:" << status << "for file:" << m_localFileInfo.absoluteFilePath();
 
     if (status == QLatin1String("UploadingBackup")) {
 
@@ -122,7 +122,7 @@ void Syncer::cloudBackupStatusChanged(int accountId, const QString &status)
             return;
         }
 
-        LOG_DEBUG("Will upload" << m_localFileInfo.absoluteFilePath());
+        qCDebug(lcNextcloud) << "Will upload" << m_localFileInfo.absoluteFilePath();
 
         // Verify the remote dir exists before uploading the file.
         if (!performDirListingRequest(m_remoteBackupDirPath)) {
@@ -152,7 +152,7 @@ void Syncer::cloudRestoreStatusChanged(int accountId, const QString &status)
         return;
     }
 
-    LOG_DEBUG("Backup restore status changed:" << status << "for file:" << m_localFileInfo.absoluteFilePath());
+    qCDebug(lcNextcloud) << "Backup restore status changed:" << status << "for file:" << m_localFileInfo.absoluteFilePath();
 
     if (status == QLatin1String("Canceled")) {
         WebDavSyncer::finishWithError("Cloud backup restore was canceled");
@@ -168,7 +168,7 @@ void Syncer::cloudRestoreError(int accountId, const QString &error, const QStrin
         return;
     }
 
-    LOG_DEBUG("Cloud backup restore error was:" << error << errorString);
+    qCDebug(lcNextcloud) << "Cloud backup restore error was:" << error << errorString;
 }
 
 bool Syncer::performDirCreationRequest(const QStringList &remotePathParts, int remotePathPartsIndex)
@@ -262,7 +262,7 @@ void Syncer::handleDirListingReply()
         const QList<NetworkReplyParser::Resource> resourceList = XmlReplyParser::parsePropFindResponse(replyData);
         QStringList fileNames;
         for (const NetworkReplyParser::Resource &resource : resourceList) {
-            LOG_DEBUG("Found remote file or dir:" << resource.href);
+            qCDebug(lcNextcloud) << "Found remote file or dir:" << resource.href;
             if (!resource.isCollection) {
                 fileNames.append(resource.href.toUtf8());
             }
@@ -271,8 +271,8 @@ void Syncer::handleDirListingReply()
         QDBusReply<void> setCloudBackupsReply =
                 m_sailfishBackup->call("setCloudBackups", m_syncProfile->name(), fileNames);
         if (!setCloudBackupsReply.isValid()) {
-            LOG_WARNING("Call to setCloudBackups() failed:" << setCloudBackupsReply.error().name()
-                        << setCloudBackupsReply.error().message());
+            qCWarning(lcNextcloud) << "Call to setCloudBackups() failed:" << setCloudBackupsReply.error().name()
+                        << setCloudBackupsReply.error().message();
         }
         WebDavSyncer::finishWithSuccess();
 
@@ -296,7 +296,7 @@ void Syncer::handleDirListingReply()
             }
         }
         if (fileFound) {
-            LOG_DEBUG("Will download file:" << m_localFileInfo.fileName());
+            qCDebug(lcNextcloud) << "Will download file:" << m_localFileInfo.fileName();
             if (!performDownloadRequest(m_localFileInfo.fileName())) {
                 WebDavSyncer::finishWithError("Download request failed");
             }
@@ -312,14 +312,14 @@ void Syncer::handleDirListingReply()
 bool Syncer::performUploadRequest(const QString &fileName)
 {
     if (fileName.isEmpty()) {
-        LOG_WARNING("No files to upload!");
+        qCWarning(lcNextcloud) << "No files to upload!";
         return false;
     }
 
     const QString localFilePath = m_localFileInfo.dir().absoluteFilePath(fileName);
     QFile file(localFilePath);
     if (!file.open(QFile::ReadOnly)) {
-        LOG_WARNING("Cannot open local file to be uploaded:" << file.fileName());
+        qCWarning(lcNextcloud) << "Cannot open local file to be uploaded:" << file.fileName();
         return false;
     }
     QMimeDatabase mimeDb;
@@ -342,7 +342,7 @@ bool Syncer::performUploadRequest(const QString &fileName)
 
 void Syncer::handleUploadProgress(qint64 bytesSent, qint64 bytesTotal)
 {
-    LOG_DEBUG("Nextcloud uploaded" << bytesSent << "bytes of" << bytesTotal);
+    qCDebug(lcNextcloud) << "Nextcloud uploaded" << bytesSent << "bytes of" << bytesTotal;
 }
 
 void Syncer::handleUploadReply()
@@ -362,7 +362,7 @@ void Syncer::handleUploadReply()
 bool Syncer::performDownloadRequest(const QString &fileName)
 {
     if (fileName.isEmpty()) {
-        LOG_WARNING("No files to download!");
+        qCWarning(lcNextcloud) << "No files to download!";
         return false;
     }
 
@@ -372,7 +372,7 @@ bool Syncer::performDownloadRequest(const QString &fileName)
     }
     m_downloadedFile = new QFile(localFilePath);
     if (!m_downloadedFile->open(QFile::WriteOnly)) {
-        LOG_WARNING("Cannot open file for writing: " + m_downloadedFile->fileName());
+        qCWarning(lcNextcloud) << "Cannot open file for writing: " + m_downloadedFile->fileName();
         delete m_downloadedFile;
         m_downloadedFile = nullptr;
         return false;
@@ -393,20 +393,20 @@ bool Syncer::performDownloadRequest(const QString &fileName)
 
 void Syncer::handleDownloadProgress(qint64 bytesReceived, qint64 bytesTotal)
 {
-    LOG_DEBUG("Nextcloud downloaded" << bytesReceived << "bytes of" << bytesTotal);
+    qCDebug(lcNextcloud) << "Nextcloud downloaded" << bytesReceived << "bytes of" << bytesTotal;
 
     QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
 
     if (!m_downloadedFile) {
-        LOG_WARNING("Download file is not set!");
+        qCWarning(lcNextcloud) << "Download file is not set!";
         reply->abort();
         return;
     }
 
     if (reply->bytesAvailable() > 0
             && m_downloadedFile->write(reply->readAll()) < 0) {
-        LOG_WARNING("Failed to write" << reply->bytesAvailable()
-                    << "bytes to file:" << m_downloadedFile->fileName());
+        qCWarning(lcNextcloud) << "Failed to write" << reply->bytesAvailable()
+                    << "bytes to file:" << m_downloadedFile->fileName();
         reply->abort();
     }
 }
@@ -434,7 +434,7 @@ void Syncer::handleDownloadReply()
 void Syncer::cleanUp()
 {
     if (m_operation == Backup) {
-        LOG_DEBUG("Deleting created backup file" << m_localFileInfo.absoluteFilePath());
+        qCDebug(lcNextcloud) << "Deleting created backup file" << m_localFileInfo.absoluteFilePath();
         QFile::remove(m_localFileInfo.absoluteFilePath());
         QDir().rmdir(m_localFileInfo.absolutePath());
     }
@@ -451,8 +451,8 @@ QString Syncer::initBackupDir()
     QDBusReply<QString> backupDeviceIdReply = m_sailfishBackup->call("backupFileDeviceId");
     const QString backupDeviceId = backupDeviceIdReply.value();
     if (backupDeviceId.isEmpty()) {
-        LOG_WARNING("Backup device ID is invalid! D-Bus error was:"
-                    << backupDeviceIdReply.error().message());
+        qCWarning(lcNextcloud) << "Backup device ID is invalid! D-Bus error was:"
+                    << backupDeviceIdReply.error().message();
         return QString();
     }
 

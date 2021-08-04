@@ -12,10 +12,10 @@
 #include "syncer_p.h"
 #include "networkrequestgenerator_p.h"
 #include "networkreplyparser_p.h"
+#include "logging.h"
 
 // Buteo
 #include <PluginCbInterface.h>
-#include <LogMacros.h>
 #include <ProfileEngineDefs.h>
 #include <ProfileManager.h>
 
@@ -37,7 +37,8 @@ NextcloudImagesClient::NextcloudImagesClient(
     , m_syncer(0)
     , m_accountId(0)
 {
-    if (Buteo::Logger::instance()->getLogLevel() >= 7) {
+
+    if (!lcNextcloudProtocol().isDebugEnabled()) {
         NetworkRequestGenerator::debugEnabled = true;
         NetworkReplyParser::debugEnabled = true;
     }
@@ -49,7 +50,7 @@ NextcloudImagesClient::~NextcloudImagesClient()
 
 void NextcloudImagesClient::connectivityStateChanged(Sync::ConnectivityType type, bool state)
 {
-    LOG_DEBUG("Received connectivity change event:" << type << " changed to " << state);
+    qCDebug(lcNextcloud) << "Received connectivity change event:" << type << " changed to " << state;
     if (type == Sync::CONNECTIVITY_INTERNET && !state) {
         // we lost connectivity during sync.
         abortSync(Buteo::SyncResults::CONNECTION_ERROR);
@@ -61,7 +62,7 @@ bool NextcloudImagesClient::init()
     QString accountIdString = iProfile.key(Buteo::KEY_ACCOUNT_ID);
     m_accountId = accountIdString.toInt();
     if (m_accountId == 0) {
-        LOG_CRITICAL("Nextcloud Images profile does not specify" << Buteo::KEY_ACCOUNT_ID);
+        qCCritical(lcNextcloud) << "Nextcloud Images profile does not specify" << Buteo::KEY_ACCOUNT_ID;
         return false;
     }
 
@@ -115,13 +116,13 @@ void NextcloudImagesClient::abortSync(Buteo::SyncResults::MinorCode minorErrorCo
 void NextcloudImagesClient::syncFinished(Buteo::SyncResults::MinorCode minorErrorCode, const QString &message)
 {
     if (minorErrorCode == Buteo::SyncResults::NO_ERROR) {
-        LOG_DEBUG("Nextcloud Images sync succeeded!" << message);
+        qCDebug(lcNextcloud) << "Nextcloud Images sync succeeded!" << message;
         m_results = Buteo::SyncResults(QDateTime::currentDateTimeUtc(),
                                        Buteo::SyncResults::SYNC_RESULT_SUCCESS,
                                        Buteo::SyncResults::NO_ERROR);
         emit success(getProfileName(), message);
     } else {
-        LOG_CRITICAL("Nextcloud Images sync failed:" << minorErrorCode << message);
+        qCCritical(lcNextcloud) << "Nextcloud Images sync failed:" << minorErrorCode << message;
         m_results = Buteo::SyncResults(iProfile.lastSuccessfulSyncTime(), // don't change the last sync time
                                        Buteo::SyncResults::SYNC_RESULT_FAILED,
                                        minorErrorCode);
@@ -140,7 +141,7 @@ bool NextcloudImagesClient::cleanUp()
     QString accountIdString = iProfile.key(Buteo::KEY_ACCOUNT_ID);
     m_accountId = accountIdString.toInt();
     if (m_accountId == 0) {
-        LOG_CRITICAL("Nextcloud Images profile does not specify" << Buteo::KEY_ACCOUNT_ID);
+        qCCritical(lcNextcloud) << "Nextcloud Images profile does not specify" << Buteo::KEY_ACCOUNT_ID;
         return false;
     }
 

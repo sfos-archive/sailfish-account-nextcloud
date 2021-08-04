@@ -10,10 +10,10 @@
 #include "webdavsyncer_p.h"
 #include "networkreplyparser_p.h"
 #include "networkrequestgenerator_p.h"
+#include "logging.h"
 
 // buteo
 #include <SyncProfile.h>
-#include <LogMacros.h>
 
 static const int HTTP_UNAUTHORIZED_ACCESS = 401;
 
@@ -32,7 +32,7 @@ WebDavSyncer::~WebDavSyncer()
 
 void WebDavSyncer::abortSync()
 {
-    LOG_DEBUG(Q_FUNC_INFO << "Aborting sync for" << m_serviceName << "sync with account" << m_accountId);
+    qCDebug(lcNextcloud) << Q_FUNC_INFO << "Aborting sync for" << m_serviceName << "sync with account" << m_accountId;
     m_syncAborted = true;
 }
 
@@ -46,22 +46,22 @@ void WebDavSyncer::startSync(int accountId)
             this, &WebDavSyncer::sync);
     connect(m_auth, &AccountAuthenticator::signInError,
             this, &WebDavSyncer::signInError);
-    LOG_DEBUG(Q_FUNC_INFO << "starting" << m_serviceName << "sync with account" << m_accountId);
+    qCDebug(lcNextcloud) << Q_FUNC_INFO << "starting" << m_serviceName << "sync with account" << m_accountId;
     m_auth->signIn(accountId, m_serviceName);
 }
 
 void WebDavSyncer::signInError(int accountId, const QString &serviceName, const QString &errorString)
 {
-    LOG_DEBUG(Q_FUNC_INFO << "Sign-in failed for"
+    qCDebug(lcNextcloud) << Q_FUNC_INFO << "Sign-in failed for"
               << serviceName
               << "sync with account" << accountId
-              << "error:" << errorString);
+              << "error:" << errorString;
     emit syncFailed();
 }
 
 void WebDavSyncer::sync(int, const QString &, const AccountAuthenticatorCredentials &credentials)
 {
-    LOG_DEBUG(Q_FUNC_INFO << "Auth succeeded, start sync for service" << m_serviceName << "with account" << m_accountId);
+    qCDebug(lcNextcloud) << Q_FUNC_INFO << "Auth succeeded, start sync for service" << m_serviceName << "with account" << m_accountId;
 
     const bool ignoreSslErrors = credentials.serviceSettings.value(QStringLiteral("ignore_ssl_errors")).toBool();
     const QString serverAddress = credentials.serviceSettings.value(QStringLiteral("server_address")).toString();
@@ -95,7 +95,7 @@ void WebDavSyncer::finishWithHttpError(const QString &errorMessage, int httpCode
 
 void WebDavSyncer::finishWithError(const QString &errorMessage)
 {
-    LOG_WARNING("Nextcloud" << m_serviceName << "sync for account" << m_accountId << "finished with error:" << errorMessage);
+    qCWarning(lcNextcloud) << "Nextcloud" << m_serviceName << "sync for account" << m_accountId << "finished with error:" << errorMessage;
     m_syncError = true;
     cleanUp();
     emit syncFailed();
@@ -103,7 +103,7 @@ void WebDavSyncer::finishWithError(const QString &errorMessage)
 
 void WebDavSyncer::finishWithSuccess()
 {
-    LOG_DEBUG(Q_FUNC_INFO << "Nextcloud" << m_serviceName << "sync with account" << m_accountId << "finished successfully!");
+    qCDebug(lcNextcloud) << Q_FUNC_INFO << "Nextcloud" << m_serviceName << "sync with account" << m_accountId << "finished successfully!";
     cleanUp();
     emit syncSucceeded();
 }
