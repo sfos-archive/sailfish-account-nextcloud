@@ -11,6 +11,7 @@
 
 #include "networkrequestgenerator_p.h"
 #include "networkreplyparser_p.h"
+#include "logging.h"
 
 #include "synccacheevents.h"
 
@@ -26,7 +27,6 @@
 
 // buteo
 #include <SyncProfile.h>
-#include <LogMacros.h>
 
 namespace {
     const int HTTP_UNAUTHORIZED_ACCESS = 401;
@@ -141,7 +141,7 @@ void Syncer::handleNotificationListReply()
     const QVector<SyncCache::Event> localEvents = db.events(m_accountId, &error);
     if (error.errorCode != SyncCache::DatabaseError::NoError) {
         transactionsSucceeded = false;
-        LOG_WARNING("Unable to fetch stored events:" << error.errorCode << error.errorMessage);
+        qCWarning(lcNextcloud) << "Unable to fetch stored events:" << error.errorCode << error.errorMessage;
     }
 
     QList<NetworkReplyParser::Notification> remoteEvents;
@@ -158,18 +158,18 @@ void Syncer::handleNotificationListReply()
         for (const SyncCache::Event &event : localEvents) {
             // Find events that are locally marked for deletion
             if (event.deletedLocally) {
-                LOG_DEBUG("Event deleted locally:" << event.eventId << event.eventSubject << event.eventText);
+                qCDebug(lcNextcloud) << "Event deleted locally:" << event.eventId << event.eventSubject << event.eventText;
                 locallyDeletedEventIds.insert(event.eventId);
             }
 
             // Delete local events that were deleted remotely
             if (!remoteEventIds.contains(event.eventId)) {
-                LOG_DEBUG("Event deleted remotely:" << event.eventId << event.eventSubject << event.eventText);
+                qCDebug(lcNextcloud) << "Event deleted remotely:" << event.eventId << event.eventSubject << event.eventText;
                 db.deleteEvent(event.accountId, event.eventId, &error);
                 if (error.errorCode != SyncCache::DatabaseError::NoError) {
                     transactionsSucceeded = false;
-                    LOG_WARNING("Failed to delete event" << event.eventId << ":"
-                                << error.errorCode << error.errorMessage);
+                    qCWarning(lcNextcloud) << "Failed to delete event" << event.eventId << ":"
+                                << error.errorCode << error.errorMessage;
                     break;
                 }
             }
@@ -195,12 +195,12 @@ void Syncer::handleNotificationListReply()
             event.timestamp = notif.dateTime;
 
             db.storeEvent(event, &error);
-            LOG_DEBUG("Adding event:" << event.eventId << event.eventSubject << event.eventText);
+            qCDebug(lcNextcloud) << "Adding event:" << event.eventId << event.eventSubject << event.eventText;
 
             if (error.errorCode != SyncCache::DatabaseError::NoError) {
                 transactionsSucceeded = false;
-                LOG_WARNING("Failed to store event" << event.eventId << ":"
-                            << error.errorCode << error.errorMessage);
+                qCWarning(lcNextcloud) << "Failed to store event" << event.eventId << ":"
+                            << error.errorCode << error.errorMessage;
                 break;
             }
         }
@@ -245,7 +245,7 @@ bool Syncer::performNotificationDeleteRequest(const QStringList &notificationIds
             connect(reply, &QNetworkReply::finished,
                     this, &Syncer::handleNotificationDeleteReply);
         } else {
-            LOG_WARNING("Failed to start request to delete notification:" << reply->error());
+            qCWarning(lcNextcloud) << "Failed to start request to delete notification:" << reply->error();
         }
     }
 
@@ -315,7 +315,7 @@ void Syncer::purgeAccount(int accountId)
     bool deleteSucceeded = true;
     const QVector<SyncCache::Event> events = db.events(accountId, &error);
     if (error.errorCode != SyncCache::DatabaseError::NoError) {
-        LOG_WARNING("Failed to query Posts for purge:" << error.errorCode << error.errorMessage);
+        qCWarning(lcNextcloud) << "Failed to query Posts for purge:" << error.errorCode << error.errorMessage;
         db.rollbackTransaction(&error); // TODO: log the fact that we need to purge this one later.
         return;
     }
@@ -335,10 +335,10 @@ void Syncer::purgeAccount(int accountId)
     }
 
     if (commitSucceeded) {
-        LOG_DEBUG("Successfully purged posts for deleted account" << accountId);
+        qCDebug(lcNextcloud) << "Successfully purged posts for deleted account" << accountId;
     } else if (deleteSucceeded) {
-        LOG_WARNING("Failed to commit purge Posts transaction:" << error.errorCode << error.errorMessage);
+        qCWarning(lcNextcloud) << "Failed to commit purge Posts transaction:" << error.errorCode << error.errorMessage;
     } else {
-        LOG_WARNING("Failed to purge Posts:" << error.errorCode << error.errorMessage);
+        qCWarning(lcNextcloud) << "Failed to purge Posts:" << error.errorCode << error.errorMessage;
     }
 }

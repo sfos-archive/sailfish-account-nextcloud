@@ -12,10 +12,10 @@
 #include "syncer_p.h"
 #include "networkrequestgenerator_p.h"
 #include "networkreplyparser_p.h"
+#include "logging.h"
 
 // Buteo
 #include <PluginCbInterface.h>
-#include <LogMacros.h>
 #include <ProfileEngineDefs.h>
 #include <ProfileManager.h>
 
@@ -36,7 +36,7 @@ NextcloudPostsClient::NextcloudPostsClient(
     , m_syncer(0)
     , m_accountId(0)
 {
-    if (Buteo::Logger::instance()->getLogLevel() >= 7) {
+    if (!lcNextcloudProtocol().isDebugEnabled()) {
         NetworkRequestGenerator::debugEnabled = true;
         NetworkReplyParser::debugEnabled = true;
     }
@@ -48,7 +48,7 @@ NextcloudPostsClient::~NextcloudPostsClient()
 
 void NextcloudPostsClient::connectivityStateChanged(Sync::ConnectivityType type, bool state)
 {
-    LOG_DEBUG("Received connectivity change event:" << type << " changed to " << state);
+    qCDebug(lcNextcloud) << "Received connectivity change event:" << type << " changed to " << state;
     if (type == Sync::CONNECTIVITY_INTERNET && !state) {
         // we lost connectivity during sync.
         abortSync(Buteo::SyncResults::CONNECTION_ERROR);
@@ -60,7 +60,7 @@ bool NextcloudPostsClient::init()
     QString accountIdString = iProfile.key(Buteo::KEY_ACCOUNT_ID);
     m_accountId = accountIdString.toInt();
     if (m_accountId == 0) {
-        LOG_CRITICAL("Nextcloud Posts profile does not specify" << Buteo::KEY_ACCOUNT_ID);
+        qCCritical(lcNextcloud) << "Nextcloud Posts profile does not specify" << Buteo::KEY_ACCOUNT_ID;
         return false;
     }
 
@@ -114,13 +114,13 @@ void NextcloudPostsClient::abortSync(Buteo::SyncResults::MinorCode minorErrorCod
 void NextcloudPostsClient::syncFinished(Buteo::SyncResults::MinorCode minorErrorCode, const QString &message)
 {
     if (minorErrorCode == Buteo::SyncResults::NO_ERROR) {
-        LOG_DEBUG("Nextcloud Posts sync succeeded!" << message);
+        qCDebug(lcNextcloud) << "Nextcloud Posts sync succeeded!" << message;
         m_results = Buteo::SyncResults(QDateTime::currentDateTimeUtc(),
                                        Buteo::SyncResults::SYNC_RESULT_SUCCESS,
                                        Buteo::SyncResults::NO_ERROR);
         emit success(getProfileName(), message);
     } else {
-        LOG_CRITICAL("Nextcloud Posts sync failed:" << minorErrorCode << message);
+        qCCritical(lcNextcloud) << "Nextcloud Posts sync failed:" << minorErrorCode << message;
         m_results = Buteo::SyncResults(iProfile.lastSuccessfulSyncTime(), // don't change the last sync time
                                        Buteo::SyncResults::SYNC_RESULT_FAILED,
                                        minorErrorCode);
@@ -139,7 +139,7 @@ bool NextcloudPostsClient::cleanUp()
     QString accountIdString = iProfile.key(Buteo::KEY_ACCOUNT_ID);
     m_accountId = accountIdString.toInt();
     if (m_accountId == 0) {
-        LOG_CRITICAL("Nextcloud Posts profile does not specify" << Buteo::KEY_ACCOUNT_ID);
+        qCCritical(lcNextcloud) << "Nextcloud Posts profile does not specify" << Buteo::KEY_ACCOUNT_ID;
         return false;
     }
 

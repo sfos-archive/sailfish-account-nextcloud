@@ -11,10 +11,10 @@
 #include "syncer_p.h"
 #include "networkrequestgenerator_p.h"
 #include "networkreplyparser_p.h"
+#include "logging.h"
 
 // Buteo
 #include <PluginCbInterface.h>
-#include <LogMacros.h>
 #include <ProfileEngineDefs.h>
 #include <ProfileManager.h>
 
@@ -25,7 +25,7 @@ NextcloudBackupOperationClient::NextcloudBackupOperationClient(const QString& pl
     , m_syncer(0)
     , m_accountId(0)
 {
-    if (Buteo::Logger::instance()->getLogLevel() >= 7) {
+    if (!lcNextcloudProtocol().isDebugEnabled()) {
         NetworkRequestGenerator::debugEnabled = true;
         NetworkReplyParser::debugEnabled = true;
     }
@@ -37,7 +37,7 @@ NextcloudBackupOperationClient::~NextcloudBackupOperationClient()
 
 void NextcloudBackupOperationClient::connectivityStateChanged(Sync::ConnectivityType type, bool state)
 {
-    LOG_DEBUG("Received connectivity change event:" << type << " changed to " << state);
+    qCDebug(lcNextcloud) << "Received connectivity change event:" << type << " changed to " << state;
     if (type == Sync::CONNECTIVITY_INTERNET && !state) {
         // we lost connectivity during sync.
         abortSync(Buteo::SyncResults::CONNECTION_ERROR);
@@ -49,7 +49,7 @@ bool NextcloudBackupOperationClient::init()
     QString accountIdString = iProfile.key(Buteo::KEY_ACCOUNT_ID);
     m_accountId = accountIdString.toInt();
     if (m_accountId == 0) {
-        LOG_CRITICAL("Nextcloud Backup profile does not specify" << Buteo::KEY_ACCOUNT_ID);
+        qCCritical(lcNextcloud) << "Nextcloud Backup profile does not specify" << Buteo::KEY_ACCOUNT_ID;
         return false;
     }
 
@@ -103,13 +103,13 @@ void NextcloudBackupOperationClient::abortSync(Buteo::SyncResults::MinorCode min
 void NextcloudBackupOperationClient::syncFinished(Buteo::SyncResults::MinorCode minorErrorCode, const QString &message)
 {
     if (minorErrorCode == Buteo::SyncResults::NO_ERROR) {
-        LOG_DEBUG("Nextcloud Backup sync succeeded!" << message);
+        qCDebug(lcNextcloud) << "Nextcloud Backup sync succeeded!" << message;
         m_results = Buteo::SyncResults(QDateTime::currentDateTimeUtc(),
                                        Buteo::SyncResults::SYNC_RESULT_SUCCESS,
                                        Buteo::SyncResults::NO_ERROR);
         emit success(getProfileName(), message);
     } else {
-        LOG_CRITICAL("Nextcloud Backup sync failed:" << minorErrorCode << message);
+        qCCritical(lcNextcloud) << "Nextcloud Backup sync failed:" << minorErrorCode << message;
         m_results = Buteo::SyncResults(iProfile.lastSuccessfulSyncTime(), // don't change the last sync time
                                        Buteo::SyncResults::SYNC_RESULT_FAILED,
                                        minorErrorCode);
@@ -128,7 +128,7 @@ bool NextcloudBackupOperationClient::cleanUp()
     QString accountIdString = iProfile.key(Buteo::KEY_ACCOUNT_ID);
     m_accountId = accountIdString.toInt();
     if (m_accountId == 0) {
-        LOG_CRITICAL("Nextcloud Backup profile does not specify" << Buteo::KEY_ACCOUNT_ID);
+        qCCritical(lcNextcloud) << "Nextcloud Backup profile does not specify" << Buteo::KEY_ACCOUNT_ID;
         return false;
     }
 

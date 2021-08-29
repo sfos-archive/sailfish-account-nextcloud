@@ -8,6 +8,7 @@
 ****************************************************************************************/
 
 #include "syncer_p.h"
+#include "logging.h"
 
 #include "networkrequestgenerator_p.h"
 #include "networkreplyparser_p.h"
@@ -22,7 +23,6 @@
 
 // buteo
 #include <SyncProfile.h>
-#include <LogMacros.h>
 
 // libaccounts-qt5
 #include <Accounts/Account>
@@ -61,7 +61,7 @@ void Syncer::purgeDeletedAccounts()
             &error);
 
     if (error.errorCode != SyncCache::DatabaseError::NoError) {
-        LOG_WARNING("Failed to open database:" << error.errorMessage);
+        qCWarning(lcNextcloud) << "Failed to open database:" << error.errorMessage;
         return;
     }
 
@@ -75,17 +75,17 @@ void Syncer::purgeDeletedAccounts()
 
     if (usersToDelete.count() > 0) {
         if (!db.beginTransaction(&error)) {
-            LOG_WARNING(Q_FUNC_INFO << "failed to begin transaction:" << error.errorCode << error.errorMessage);
+            qCWarning(lcNextcloud) << Q_FUNC_INFO << "failed to begin transaction:" << error.errorCode << error.errorMessage;
             return;
         }
 
         for (const SyncCache::User &user : usersToDelete) {
-            LOG_DEBUG(Q_FUNC_INFO << "Account" << user.accountId
-                      << "has been deleted, purge associated user:" << user.userId << user.displayName);
+            qCDebug(lcNextcloud) << Q_FUNC_INFO << "Account" << user.accountId
+                      << "has been deleted, purge associated user:" << user.userId << user.displayName;
             db.deleteUser(user, &error);
             if (error.errorCode != SyncCache::DatabaseError::NoError) {
-                LOG_WARNING("Failed to delete user for account:" << user.accountId
-                            << ":" << error.errorMessage);
+                qCWarning(lcNextcloud) << "Failed to delete user for account:" << user.accountId
+                            << ":" << error.errorMessage;
             }
             deleteFilesForAccount(user.accountId);
         }
@@ -93,7 +93,7 @@ void Syncer::purgeDeletedAccounts()
         if (error.errorCode != SyncCache::DatabaseError::NoError) {
             db.rollbackTransaction(&error);
         } else if (!db.commitTransaction(&error)) {
-            LOG_WARNING(Q_FUNC_INFO << "failed to commit transaction:" << error.errorCode << error.errorMessage);
+            qCWarning(lcNextcloud) << Q_FUNC_INFO << "failed to commit transaction:" << error.errorCode << error.errorMessage;
         }
     }
 }
@@ -136,8 +136,8 @@ void Syncer::handleUserInfoReply()
             QStringLiteral("%1/system/privileged/Images/nextcloud.db").arg(QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)),
             &error);
     if (error.errorCode != SyncCache::DatabaseError::NoError) {
-        LOG_WARNING("Failed to open database to store user for account:" << m_accountId
-                    << ":" << error.errorMessage);
+        qCWarning(lcNextcloud) << "Failed to open database to store user for account:" << m_accountId
+                    << ":" << error.errorMessage;
         return;
     }
     SyncCache::User currentUser;
@@ -146,8 +146,8 @@ void Syncer::handleUserInfoReply()
     currentUser.displayName = user.displayName;
     db.storeUser(currentUser, &error);
     if (error.errorCode != SyncCache::DatabaseError::NoError) {
-        LOG_WARNING("Failed to store user:" << currentUser.userId
-                    << error.errorCode << error.errorMessage);
+        qCWarning(lcNextcloud) << "Failed to store user:" << currentUser.userId
+                    << error.errorCode << error.errorMessage;
     }
 
     Accounts::Account *account = m_manager->account(m_accountId);
@@ -171,11 +171,11 @@ void Syncer::handleUserInfoReply()
     m_forceFullSync = !m_syncProfile->lastSuccessfulSyncTime().isValid();
     m_syncProgressInfo.reset();
 
-    LOG_DEBUG("Starting sync for account:" << m_accountId
+    qCDebug(lcNextcloud) << "Starting sync for account:" << m_accountId
               << "user:" << m_userId
               << "root path:" << m_dirListingRootPath
               << "force full sync?" << m_forceFullSync
-              << "last sync was:" << m_syncProfile->lastSuccessfulSyncTime().toString());
+              << "last sync was:" << m_syncProfile->lastSuccessfulSyncTime().toString();
 
     if (!performDirListingRequest(m_dirListingRootPath)) {
         WebDavSyncer::finishWithError("Directory list request failed");
@@ -184,7 +184,7 @@ void Syncer::handleUserInfoReply()
 
 bool Syncer::performDirListingRequest(const QString &remoteDirPath)
 {
-    LOG_DEBUG("Fetching directory listing for" << remoteDirPath);
+    qCDebug(lcNextcloud) << "Fetching directory listing for" << remoteDirPath;
 
     QNetworkReply *reply = m_requestGenerator->dirListing(remoteDirPath);
     if (reply) {
@@ -225,9 +225,9 @@ bool Syncer::processQueriedAlbum(const SyncCache::Album &queriedAlbum,
                                  const QVector<SyncCache::Photo> &photos,
                                  const QVector<SyncCache::Album> &subAlbums)
 {
-    LOG_DEBUG(Q_FUNC_INFO << queriedAlbum.albumId
+    qCDebug(lcNextcloud) << Q_FUNC_INFO << queriedAlbum.albumId
               << "with" << photos.count() << "photos and"
-              << subAlbums.count() << "sub-albums");
+              << subAlbums.count() << "sub-albums";
 
     SyncCache::ImageDatabase db;
     SyncCache::DatabaseError error;
@@ -236,13 +236,13 @@ bool Syncer::processQueriedAlbum(const SyncCache::Album &queriedAlbum,
             &error);
 
     if (error.errorCode != SyncCache::DatabaseError::NoError) {
-        LOG_WARNING(Q_FUNC_INFO << "failed to open database:" << error.errorCode << error.errorMessage);
+        qCWarning(lcNextcloud) << Q_FUNC_INFO << "failed to open database:" << error.errorCode << error.errorMessage;
         emit syncFailed();
         return false;
     }
 
     if (!db.beginTransaction(&error)) {
-        LOG_WARNING(Q_FUNC_INFO << "failed to begin transaction:" << error.errorCode << error.errorMessage);
+        qCWarning(lcNextcloud) << Q_FUNC_INFO << "failed to begin transaction:" << error.errorCode << error.errorMessage;
         emit syncFailed();
         return false;
     }
@@ -256,9 +256,9 @@ bool Syncer::processQueriedAlbum(const SyncCache::Album &queriedAlbum,
             const SyncCache::Album &serverAlbum = *it;
             SyncCache::Album dbAlbum = db.album(m_accountId, m_userId, serverAlbum.albumId, &error);
             if (error.errorCode != SyncCache::DatabaseError::NoError) {
-                LOG_WARNING(Q_FUNC_INFO << "db album() failed for:"
+                qCWarning(lcNextcloud) << Q_FUNC_INFO << "db album() failed for:"
                             << dbAlbum.albumId
-                            << error.errorCode << error.errorMessage);
+                            << error.errorCode << error.errorMessage;
                 break;
             }
 
@@ -267,10 +267,10 @@ bool Syncer::processQueriedAlbum(const SyncCache::Album &queriedAlbum,
             const bool isNewAlbum = dbAlbum.albumId.isEmpty();
             const bool isModifiedAlbum = serverAlbum.etag != dbAlbum.etag;
 
-            LOG_DEBUG(Q_FUNC_INFO << "Sub-album:" << serverAlbum.albumId
+            qCDebug(lcNextcloud) << Q_FUNC_INFO << "Sub-album:" << serverAlbum.albumId
                       << "etag:" << serverAlbum.etag
                       << "new?" << isNewAlbum
-                      << "modified?" << isModifiedAlbum);
+                      << "modified?" << isModifiedAlbum;
 
             if (m_forceFullSync || isNewAlbum || isModifiedAlbum) {
                 m_syncProgressInfo.pendingAlbumListings.append(serverAlbum.albumId);
@@ -284,7 +284,7 @@ bool Syncer::processQueriedAlbum(const SyncCache::Album &queriedAlbum,
         return false;
 
     } else if (!db.commitTransaction(&error)) {
-        LOG_WARNING(Q_FUNC_INFO << "failed to commit transaction:" << error.errorCode << error.errorMessage);
+        qCWarning(lcNextcloud) << Q_FUNC_INFO << "failed to commit transaction:" << error.errorCode << error.errorMessage;
         db.rollbackTransaction(&error);
         emit syncFailed();
         return false;
@@ -292,21 +292,21 @@ bool Syncer::processQueriedAlbum(const SyncCache::Album &queriedAlbum,
 
     const bool allRequestsDone = m_syncProgressInfo.pendingAlbumListings.isEmpty();
     if (allRequestsDone) {
-        LOG_DEBUG(Q_FUNC_INFO << "Nextcloud images albums A/M/R:"
+        qCDebug(lcNextcloud) << Q_FUNC_INFO << "Nextcloud images albums A/M/R:"
                   << m_syncProgressInfo.addedAlbumCount
                   << "/" << m_syncProgressInfo.modifiedAlbumCount
-                  << "/" << m_syncProgressInfo.removedAlbumCount);
-        LOG_DEBUG(Q_FUNC_INFO << "Nextcloud images photos A/M/R:"
+                  << "/" << m_syncProgressInfo.removedAlbumCount;
+        qCDebug(lcNextcloud) << Q_FUNC_INFO << "Nextcloud images photos A/M/R:"
                   << m_syncProgressInfo.addedPhotoCount
                   << "/" << m_syncProgressInfo.modifiedPhotoCount
-                  << "/" << m_syncProgressInfo.removedPhotoCount);
-        LOG_DEBUG(Q_FUNC_INFO << "Nextcloud images sync with account" << m_accountId << "finished successfully!");
+                  << "/" << m_syncProgressInfo.removedPhotoCount;
+        qCDebug(lcNextcloud) << Q_FUNC_INFO << "Nextcloud images sync with account" << m_accountId << "finished successfully!";
 
         // Sync was successful. Next time, can do incremental sync based on known etags instead
         // of doing a complete sync of the full remote directory tree.
         WebDavSyncer::finishWithSuccess();
     } else {
-        LOG_DEBUG(Q_FUNC_INFO << "Remaining albums to fetch:" << m_syncProgressInfo.pendingAlbumListings.count());
+        qCDebug(lcNextcloud) << Q_FUNC_INFO << "Remaining albums to fetch:" << m_syncProgressInfo.pendingAlbumListings.count();
     }
 
     return true;
@@ -320,9 +320,9 @@ bool Syncer::calculateAndApplyDelta(const SyncCache::Album &mainAlbum,
 {
     SyncCache::Album dbAlbum = db->album(m_accountId, m_userId, mainAlbum.albumId, error);
     if (error->errorCode != SyncCache::DatabaseError::NoError) {
-        LOG_WARNING(Q_FUNC_INFO << "db album() failed for:"
+        qCWarning(lcNextcloud) << Q_FUNC_INFO << "db album() failed for:"
                     << mainAlbum.albumId
-                    << error->errorCode << error->errorMessage);
+                    << error->errorCode << error->errorMessage;
         return false;
     }
 
@@ -330,19 +330,19 @@ bool Syncer::calculateAndApplyDelta(const SyncCache::Album &mainAlbum,
     const bool isModifiedAlbum = mainAlbum.etag != dbAlbum.etag
             || mainAlbum.photoCount != dbAlbum.photoCount;
 
-    LOG_DEBUG(Q_FUNC_INFO << "Album:" << mainAlbum.albumId
+    qCDebug(lcNextcloud) << Q_FUNC_INFO << "Album:" << mainAlbum.albumId
               << "photoCount:" << mainAlbum.photoCount
               << "etag:" << mainAlbum.etag
               << "new?" << isNewAlbum
-              << "modified?" << isModifiedAlbum);
+              << "modified?" << isModifiedAlbum;
 
     // Check if album is new or modified
     if (isNewAlbum || isModifiedAlbum) {
         db->storeAlbum(mainAlbum, error);
         if (error->errorCode != SyncCache::DatabaseError::NoError) {
-            LOG_WARNING(Q_FUNC_INFO << "failed to update album:"
+            qCWarning(lcNextcloud) << Q_FUNC_INFO << "failed to update album:"
                         << mainAlbum.albumId
-                        << error->errorCode << error->errorMessage);
+                        << error->errorCode << error->errorMessage;
             return false;
         }
         if (isNewAlbum) {
@@ -362,13 +362,13 @@ bool Syncer::calculateAndApplyDelta(const SyncCache::Album &mainAlbum,
         const QVector<SyncCache::Album> dbSubAlbums = db->albums(m_accountId, m_userId, error, mainAlbum.albumId);
         for (const SyncCache::Album &dbSubAlbum : dbSubAlbums) {
             if (!serverSubAlbumIds.remove(dbSubAlbum.albumId)) {
-                LOG_DEBUG(Q_FUNC_INFO << "Delete album:" << dbSubAlbum.albumId
-                          << "with parent" << mainAlbum.albumId);
+                qCDebug(lcNextcloud) << Q_FUNC_INFO << "Delete album:" << dbSubAlbum.albumId
+                          << "with parent" << mainAlbum.albumId;
                 db->deleteAlbum(dbSubAlbum, error);  // this deletes all photos in the album as well
                 if (error->errorCode != SyncCache::DatabaseError::NoError) {
-                    LOG_WARNING(Q_FUNC_INFO << "failed to delete album:"
+                    qCWarning(lcNextcloud) << Q_FUNC_INFO << "failed to delete album:"
                                 << dbSubAlbum.albumId
-                                << error->errorCode << error->errorMessage);
+                                << error->errorCode << error->errorMessage;
                     return false;
                 }
                 m_syncProgressInfo.removedAlbumCount++;
@@ -384,11 +384,11 @@ bool Syncer::calculateAndApplyDelta(const SyncCache::Album &mainAlbum,
         if (dbPhoto.etag != serverPhoto.etag) {
             db->storePhoto(serverPhoto, error);
             if (error->errorCode != SyncCache::DatabaseError::NoError) {
-                LOG_WARNING(Q_FUNC_INFO << "failed to update photo:"
+                qCWarning(lcNextcloud) << Q_FUNC_INFO << "failed to update photo:"
                             << serverPhoto.photoId
                             << serverPhoto.fileName
                             << serverPhoto.albumId
-                            << error->errorCode << error->errorMessage);
+                            << error->errorCode << error->errorMessage;
                 return false;
             }
 
@@ -407,12 +407,12 @@ bool Syncer::calculateAndApplyDelta(const SyncCache::Album &mainAlbum,
     const QVector<SyncCache::Photo> dbPhotos = db->photos(m_accountId, m_userId, mainAlbum.albumId, error);
     for (const SyncCache::Photo &dbPhoto : dbPhotos) {
         if (!serverPhotoIds.remove(dbPhoto.photoId)) {
-            LOG_DEBUG(Q_FUNC_INFO << "Delete photo:" << dbPhoto.photoId << dbPhoto.fileName);
+            qCDebug(lcNextcloud) << Q_FUNC_INFO << "Delete photo:" << dbPhoto.photoId << dbPhoto.fileName;
             db->deletePhoto(dbPhoto, error);
             if (error->errorCode != SyncCache::DatabaseError::NoError) {
-                LOG_WARNING(Q_FUNC_INFO << "failed to delete photo:"
+                qCWarning(lcNextcloud) << Q_FUNC_INFO << "failed to delete photo:"
                             << dbPhoto.photoId
-                            << error->errorCode << error->errorMessage);
+                            << error->errorCode << error->errorMessage;
                 return false;
             }
             m_syncProgressInfo.removedPhotoCount++;
@@ -431,37 +431,37 @@ void Syncer::purgeAccount(int accountId)
             &error);
 
     if (error.errorCode != SyncCache::DatabaseError::NoError) {
-        LOG_WARNING("Failed to open database in order to purge Nextcloud images for account:" << accountId
-                    << ":" << error.errorMessage);
+        qCWarning(lcNextcloud) << "Failed to open database in order to purge Nextcloud images for account:" << accountId
+                    << ":" << error.errorMessage;
     } else {
         SyncCache::User user = db.user(accountId, &error);
         if (error.errorCode == SyncCache::DatabaseError::NoError) {
             if (user.userId.isEmpty()) {
-                LOG_WARNING("Failed to find Nextcloud user ID for account:" << accountId
-                            << ":" << error.errorMessage);
+                qCWarning(lcNextcloud) << "Failed to find Nextcloud user ID for account:" << accountId
+                            << ":" << error.errorMessage;
             } else {
                 db.deleteUser(user, &error);
                 if (error.errorCode != SyncCache::DatabaseError::NoError) {
-                    LOG_WARNING("Failed to delete user for account:" << accountId
-                                << ":" << error.errorMessage);
+                    qCWarning(lcNextcloud) << "Failed to delete user for account:" << accountId
+                                << ":" << error.errorMessage;
                 }
             }
         } else {
-            LOG_WARNING("Failed to find Nextcloud user for account:" << accountId
-                        << ":" << error.errorMessage);
+            qCWarning(lcNextcloud) << "Failed to find Nextcloud user for account:" << accountId
+                        << ":" << error.errorMessage;
         }
     }
 
     deleteFilesForAccount(accountId);
 
-    LOG_DEBUG("Purged Nextcloud images for account:" << accountId);
+    qCDebug(lcNextcloud) << "Purged Nextcloud images for account:" << accountId;
 }
 
 void Syncer::deleteFilesForAccount(int accountId)
 {
     QDir dir(SyncCache::ImageCache::imageCacheDir(accountId));
     if (dir.exists() && !dir.removeRecursively()) {
-        LOG_WARNING("Failed to purge Nextcloud image cache for account:" << accountId
-                    << "in dir:" << dir.absolutePath());
+        qCWarning(lcNextcloud) << "Failed to purge Nextcloud image cache for account:" << accountId
+                    << "in dir:" << dir.absolutePath();
     }
 }
