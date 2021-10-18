@@ -19,7 +19,7 @@ BuildRequires: pkgconfig(accounts-qt5)
 BuildRequires: pkgconfig(socialcache)
 BuildRequires: pkgconfig(libsailfishkeyprovider)
 BuildRequires: pkgconfig(sailfishaccounts)
-BuildRequires: pkgconfig(nemotransferengine-qt5)
+BuildRequires: pkgconfig(nemotransferengine-qt5) >= 2.0.0
 BuildRequires: qt5-qttools
 BuildRequires: qt5-qttools-linguist
 Requires(post): %{_libexecdir}/manage-groups
@@ -211,6 +211,7 @@ Translation source for Gallery Nextcloud plugin.
 Summary: Nextcloud file sharing plugin for Transfer Engine
 Requires: sailfishsilica-qt5 >= 1.1.108
 Requires: declarative-transferengine-qt5 >= 0.3.13
+Requires: nemo-transferengine-qt5 >= 2.0.0
 Requires: %{name} = %{version}-%{release}
 
 %description -n transferengine-plugin-nextcloud
@@ -218,8 +219,9 @@ Nextcloud file sharing plugin for Transfer Engine.
 
 %files -n transferengine-plugin-nextcloud
 %defattr(-,root,root,-)
-%{_libdir}/nemo-transferengine/plugins/libnextcloudshareplugin.so
-%{_datadir}/nemo-transferengine/plugins/NextcloudShareFile.qml
+%{_libdir}/nemo-transferengine/plugins/sharing/libnextcloudshareplugin.so
+%{_libdir}/nemo-transferengine/plugins/transfer/libnextcloudtransferplugin.so
+%{_datadir}/nemo-transferengine/plugins/sharing/NextcloudShareFile.qml
 
 
 %package features-all

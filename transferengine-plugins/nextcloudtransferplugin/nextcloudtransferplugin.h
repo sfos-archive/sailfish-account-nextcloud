@@ -1,14 +1,14 @@
 /****************************************************************************************
 **
-** Copyright (C) 2019 Open Mobile Platform LLC
+** Copyright (c) 2019 - 2021 Open Mobile Platform LLC
 ** All rights reserved.
 **
 ** License: Proprietary.
 **
 ****************************************************************************************/
 
-#ifndef NEXTCLOUDSHAREPLUGIN_H
-#define NEXTCLOUDSHAREPLUGIN_H
+#ifndef NEXTCLOUDTRANSFERPLUGIN_H
+#define NEXTCLOUDTRANSFERPLUGIN_H
 
 #include <QtCore/QObject>
 
@@ -26,13 +26,10 @@ public:
     ~NextcloudSharePlugin();
 
     MediaTransferInterface * transferObject();
-    TransferPluginInfo *infoObject();
     QString pluginId() const;
-
-    bool enabled() const;
 
 private:
     QNetworkAccessManager *m_qnam;
 };
 
-#endif // NEXTCLOUDSHAREPLUGIN_H
+#endif // NEXTCLOUDTRANSFERPLUGIN_H

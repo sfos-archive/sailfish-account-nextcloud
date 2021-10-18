@@ -1,6 +1,6 @@
 /****************************************************************************************
 **
-** Copyright (C) 2019 Open Mobile Platform LLC
+** Copyright (c) 2019 - 2021 Open Mobile Platform LLC
 ** All rights reserved.
 **
 ** License: Proprietary.
@@ -8,15 +8,12 @@
 ****************************************************************************************/
 
 #include "nextcloudshareplugin.h"
-#include "nextclouduploader.h"
 #include "nextcloudplugininfo.h"
 
 #include <QtPlugin>
-#include <QNetworkAccessManager>
 
 NextcloudSharePlugin::NextcloudSharePlugin()
-    : QObject(), TransferPluginInterface()
-    , m_qnam(new QNetworkAccessManager(this))
+    : QObject(), SharingPluginInterface()
 {
 }
 
@@ -24,22 +21,12 @@ NextcloudSharePlugin::~NextcloudSharePlugin()
 {
 }
 
-MediaTransferInterface * NextcloudSharePlugin::transferObject()
-{
-    return new NextcloudUploader(m_qnam, this);
-}
-
-TransferPluginInfo *NextcloudSharePlugin::infoObject()
+SharingPluginInfo *NextcloudSharePlugin::infoObject()
 {
     return new NextcloudPluginInfo;
 }
 
 QString NextcloudSharePlugin::pluginId() const
 {
-    return "Nextcloud";
-}
-
-bool NextcloudSharePlugin::enabled() const
-{
-    return true;
+    return QLatin1String("Nextcloud");
 }

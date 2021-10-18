@@ -2,6 +2,8 @@
 *.swp
 *.o
 *.prl
+*.qm
+*.ts
 *.moc
 moc_*
 Makefile
@@ -11,5 +13,6 @@ debuglinks.list
 debugsources.list
 debugsourcefiles.list
 elfbins.list
-/installroot
-/RPMS
+/installroot/
+/RPMS/
+/icons/z*/

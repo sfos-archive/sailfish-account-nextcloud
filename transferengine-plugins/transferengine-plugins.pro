@@ -1,2 +1,2 @@
-TEMPLATE=subdirs
-SUBDIRS+=transferengine-plugin-nextcloud
+TEMPLATE = subdirs
+SUBDIRS = nextcloudshareplugin nextcloudtransferplugin
