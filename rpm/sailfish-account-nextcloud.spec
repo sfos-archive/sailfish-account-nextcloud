@@ -55,36 +55,11 @@ fi
 %{_datadir}/accounts/ui/nextcloud-settings.qml
 %{_datadir}/accounts/ui/nextcloud-update.qml
 # TODO: only install the appropriate scale factor icons for the build target?  How?
-%{_datadir}/themes/sailfish-default/meegotouch/z1.0/icons/graphic-service-nextcloud.png
-%{_datadir}/themes/sailfish-default/meegotouch/z1.0/icons/graphic-m-service-nextcloud.png
-%{_datadir}/themes/sailfish-default/meegotouch/z1.0/icons/graphic-s-service-nextcloud.png
-%{_datadir}/themes/sailfish-default/meegotouch/z1.0/icons/icon-l-nextcloud.png
-%{_datadir}/themes/sailfish-default/meegotouch/z1.0/icons/icon-m-file-folder-nextcloud.png
-%{_datadir}/themes/sailfish-default/meegotouch/z1.25/icons/graphic-service-nextcloud.png
-%{_datadir}/themes/sailfish-default/meegotouch/z1.25/icons/graphic-m-service-nextcloud.png
-%{_datadir}/themes/sailfish-default/meegotouch/z1.25/icons/graphic-s-service-nextcloud.png
-%{_datadir}/themes/sailfish-default/meegotouch/z1.25/icons/icon-l-nextcloud.png
-%{_datadir}/themes/sailfish-default/meegotouch/z1.25/icons/icon-m-file-folder-nextcloud.png
-%{_datadir}/themes/sailfish-default/meegotouch/z1.5/icons/graphic-service-nextcloud.png
-%{_datadir}/themes/sailfish-default/meegotouch/z1.5/icons/graphic-m-service-nextcloud.png
-%{_datadir}/themes/sailfish-default/meegotouch/z1.5/icons/graphic-s-service-nextcloud.png
-%{_datadir}/themes/sailfish-default/meegotouch/z1.5/icons/icon-l-nextcloud.png
-%{_datadir}/themes/sailfish-default/meegotouch/z1.5/icons/icon-m-file-folder-nextcloud.png
-%{_datadir}/themes/sailfish-default/meegotouch/z1.5-large/icons/graphic-service-nextcloud.png
-%{_datadir}/themes/sailfish-default/meegotouch/z1.5-large/icons/graphic-m-service-nextcloud.png
-%{_datadir}/themes/sailfish-default/meegotouch/z1.5-large/icons/graphic-s-service-nextcloud.png
-%{_datadir}/themes/sailfish-default/meegotouch/z1.5-large/icons/icon-l-nextcloud.png
-%{_datadir}/themes/sailfish-default/meegotouch/z1.5-large/icons/icon-m-file-folder-nextcloud.png
-%{_datadir}/themes/sailfish-default/meegotouch/z1.75/icons/graphic-service-nextcloud.png
-%{_datadir}/themes/sailfish-default/meegotouch/z1.75/icons/graphic-m-service-nextcloud.png
-%{_datadir}/themes/sailfish-default/meegotouch/z1.75/icons/graphic-s-service-nextcloud.png
-%{_datadir}/themes/sailfish-default/meegotouch/z1.75/icons/icon-l-nextcloud.png
-%{_datadir}/themes/sailfish-default/meegotouch/z1.75/icons/icon-m-file-folder-nextcloud.png
-%{_datadir}/themes/sailfish-default/meegotouch/z2.0/icons/graphic-service-nextcloud.png
-%{_datadir}/themes/sailfish-default/meegotouch/z2.0/icons/graphic-m-service-nextcloud.png
-%{_datadir}/themes/sailfish-default/meegotouch/z2.0/icons/graphic-s-service-nextcloud.png
-%{_datadir}/themes/sailfish-default/meegotouch/z2.0/icons/icon-l-nextcloud.png
-%{_datadir}/themes/sailfish-default/meegotouch/z2.0/icons/icon-m-file-folder-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/*/icons/graphic-service-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/*/icons/graphic-m-service-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/*/icons/graphic-s-service-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/*/icons/icon-l-nextcloud.png
+%{_datadir}/themes/sailfish-default/meegotouch/*/icons/icon-m-file-folder-nextcloud.png
 
 
 %package -n buteo-sync-plugin-nextcloud-posts
