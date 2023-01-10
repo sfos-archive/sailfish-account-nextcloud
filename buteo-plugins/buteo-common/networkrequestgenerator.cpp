@@ -43,7 +43,7 @@ QNetworkReply *NetworkRequestGenerator::sendRequest(const QNetworkRequest &reque
     }
 
     if (debugEnabled) {
-        qDebug() << "Sending request:" << requestType << "to:" << request.url().toString()
+        qDebug() << "Sending request:" << requestType << "to:" << request.url().toDisplayString(QUrl::RemoveUserInfo)
                  << "data:" << QString::fromUtf8(requestData);
     }
 
