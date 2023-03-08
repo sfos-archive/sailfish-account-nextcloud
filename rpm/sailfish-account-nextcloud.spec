@@ -22,6 +22,8 @@ BuildRequires: pkgconfig(sailfishaccounts)
 BuildRequires: pkgconfig(nemotransferengine-qt5) >= 2.0.0
 BuildRequires: qt5-qttools
 BuildRequires: qt5-qttools-linguist
+Requires:      jolla-settings-accounts-extensions-onlinesync
+Requires:      jolla-vault
 Requires(post): %{_libexecdir}/manage-groups
 Requires(postun): %{_libexecdir}/manage-groups
 
